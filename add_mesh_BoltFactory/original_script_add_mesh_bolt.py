@@ -2517,7 +2517,7 @@ def Create_New_Mesh(context):
         bpy.ops.object.mode_set(mode='EDIT')
     else:
         scene.objects.active = ob_new
-        if context.user_preferences.edit.enter_edit_mode:
+        if context.user_preferences.edit.use_enter_edit_mode:
             bpy.ops.object.mode_set(mode='EDIT')
 
 
