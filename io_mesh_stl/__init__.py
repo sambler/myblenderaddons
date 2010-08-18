@@ -41,10 +41,6 @@ Issues:
 Import:
     - Does not handle the normal of the triangles
     - Does not handle endien
-
-Export:
-    - Does not do the object space transformation
-    - Export only one object (the selected one)
 """
 
 import itertools
