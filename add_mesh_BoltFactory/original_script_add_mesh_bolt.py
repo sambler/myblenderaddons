@@ -2496,12 +2496,12 @@ def Create_New_Mesh(context):
 
     # ugh
     for ob in scene.objects:
-        ob.selected = False
+        ob.select = False
 
     mesh.update()
     ob_new = bpy.data.objects.new(sObjName, mesh)
     scene.objects.link(ob_new)
-    ob_new.selected = True
+    ob_new.select = True
 
     ob_new.location = scene.cursor_location
 
@@ -2510,7 +2510,7 @@ def Create_New_Mesh(context):
     if obj_act and obj_act.mode == 'EDIT':
         bpy.ops.object.mode_set(mode='OBJECT')
 
-        obj_act.selected = True
+        obj_act.select = True
         scene.update() # apply location
         #scene.objects.active = ob_new
 
@@ -2599,14 +2599,10 @@ class CUSTOM_OT_Create_Button(bpy.types.Operator):
 
 
 def register():
-    bpy.types.register(ObjectButtonsPanel)
-    bpy.types.register(CUSTOM_OT_Preset_Button)    
-    bpy.types.register(CUSTOM_OT_Create_Button)
+    pass
     
 def unregister():
-    bpy.types.unregister(ObjectButtonsPanel)
-    bpy.types.unregister(CUSTOM_OT_Preset_Button)
-    bpy.types.unregister(CUSTOM_OT_Create_Button)    
+    pass
 
  
 if __name__ == "__main__":

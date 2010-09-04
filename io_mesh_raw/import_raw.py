@@ -43,7 +43,7 @@ tolerance.
 import bpy
 
 # move those to a utility modul
-from import_scene_obj import unpack_face_list, unpack_list # TODO, make generic
+from io_utils import unpack_face_list, unpack_list # TODO, make generic
 
 
 def readMesh(filename, objName):
@@ -136,7 +136,7 @@ class RawImporter(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        wm = context.manager
+        wm = context.window_manager
         wm.add_fileselect(self)
         return {'RUNNING_MODAL'}
 

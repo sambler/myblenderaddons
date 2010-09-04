@@ -231,7 +231,11 @@ def getMaterial(tex, mapping):
     # ... otherwise create new one and apply mapping.
     if not mat:
         mat = bpy.data.materials.new(name=tex.name)
-        mat.add_texture(tex, texture_coordinates='UV', map_to='COLOR')
+        mtex = mat.texture_slots.add()
+        mtex.texture = tex
+        mtex.texture_coords = 'UV'
+        mtex.use_map_color_diffuse = True
+
         mat.mapping = mapping
         mat.name = tex.name
 
@@ -327,7 +331,7 @@ def main(filePath, options, mapping, dimension):
             plane = createPlaneObj(img, dimension)
 
             # Assign Material
-            plane.data.materials.link(mat)
+            plane.data.materials.append(mat)
 
             # Put Image into  UVTextureLayer
             plane.data.uv_textures[0].data[0].image = img
@@ -356,7 +360,7 @@ def main(filePath, options, mapping, dimension):
         plane = createPlaneObj(img, dimension)
 
         # Assign Material
-        plane.data.materials.link(mat)
+        plane.data.materials.append(mat)
 
         # Put image into UVTextureLayer
         plane.data.uv_textures[0].data[0].image = img
@@ -498,7 +502,7 @@ class ImportImagesAsPlanes(bpy.types.Operator):
         return {'FINISHED'}
 
     def invoke(self, context, event):
-        wm = bpy.context.manager
+        wm = bpy.context.window_manager
         wm.add_fileselect(self)
 
         return {'RUNNING_MODAL'}

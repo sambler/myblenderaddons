@@ -416,7 +416,10 @@ def check_texture(img,mat):
             found = True
             break
     if not found and mat:
-        mat.add_texture(tex, texture_coordinates='UV', map_to='COLOR')
+        mtex = mat.texture_slots.add()
+        mtex.texture = tex
+        mtex.texture_coords = 'UV'
+        mtex.use_map_color_diffuse = True
 
 def texface_to_mat():
     # editmode check here!
@@ -670,12 +673,12 @@ class VIEW3D_MT_select_material(bpy.types.Menu):
 
 
 def register():
-    km = bpy.context.manager.keyconfigs.active.keymaps['3D View']
+    km = bpy.context.window_manager.keyconfigs.active.keymaps['3D View']
     kmi = km.items.new('wm.call_menu', 'Q', 'PRESS')
     kmi.properties.name = "VIEW3D_MT_master_material"
 
 def unregister():
-    km = bpy.context.manager.keyconfigs.active.keymaps['3D View']
+    km = bpy.context.window_manager.keyconfigs.active.keymaps['3D View']
     for kmi in km.items:
         if kmi.idname == 'wm.call_menu':
             if kmi.properties.name ==  "VIEW3D_MT_master_material":
