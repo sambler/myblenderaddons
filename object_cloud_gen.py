@@ -24,7 +24,7 @@ bl_addon_info = {
     "api": 31667,
     "location": "Tool Shelf ",
     "description": "Creates Volumetric Clouds",
-    "warning": "returns error at line 542",
+    "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
         "Scripts/Object/Cloud_Gen",
     "tracker_url": "https://projects.blender.org/tracker/index.php?"\
@@ -549,7 +549,7 @@ class GenerateCloud(bpy.types.Operator):
 
             pDensity.use_color_ramp = True
             pRamp = pDensity.color_ramp
-            pRamp.use_interpolation = 'LINEAR'
+            #pRamp.use_interpolation = 'LINEAR'
             pRampElements = pRamp.elements
             #pRampElements[1].position = .9
             #pRampElements[1].color = [.18,.18,.18,.8]
@@ -567,7 +567,7 @@ class GenerateCloud(bpy.types.Operator):
  
             # Set the number of particles according to the volume
             # of bounds.
-            cloudParticles.settings.amount = numParticles
+            cloudParticles.settings.count = numParticles
 
             pDensity.point_density.radius = (.00013764 * volumeBoundBox + .3989) * pointDensityRadiusFactor
 
