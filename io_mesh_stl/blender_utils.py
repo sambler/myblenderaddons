@@ -36,7 +36,7 @@ def faces_from_mesh(ob, apply_modifier=False, triangulate=True):
 
     # get the modifiers
     mesh = ob.create_mesh(bpy.context.scene,
-                          True, "PREVIEW") if apply_modifier else ob.data
+                            apply_modifier, "PREVIEW")
 
     def iter_face_index():
         '''
