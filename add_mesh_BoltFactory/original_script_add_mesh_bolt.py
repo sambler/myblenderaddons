@@ -2195,14 +2195,14 @@ def Load_Preset(context):
 def Create_Propertys():
     #Model Types
     Model_Type_List = [('bf_Model_Bolt','BOLT','Bolt Model'),('bf_Model_Nut','NUT','Nut Model')]
-    bpy.types.Scene.EnumProperty( attr='bf_Model_Type',
+    bpy.types.Scene.bf_Model_Type = EnumProperty(
             name='Model',
             description='Choose the type off model you would like',
             items = Model_Type_List, default = 'bf_Model_Bolt')
 
     #Head Types
     Model_Type_List = [('bf_Head_Hex','HEX','Hex Head'),('bf_Head_Cap','CAP','Cap Head'),('bf_Head_Dome','DOME','Dome Head'),('bf_Head_Pan','PAN','Pan Head')]
-    bpy.types.Scene.EnumProperty( attr='bf_Head_Type',
+    bpy.types.Scene.bf_Head_Type = EnumProperty(
             name='Head',
             description='Choose the type off Head you would like',
             items = Model_Type_List, default = 'bf_Head_Hex')
@@ -2210,7 +2210,7 @@ def Create_Propertys():
     
         #Bit Types
     Bit_Type_List = [('bf_Bit_None','NONE','No Bit Type'),('bf_Bit_Allen','ALLEN','Allen Bit Type'),('bf_Bit_Philips','PHILLIPS','Phillips Bit Type')]
-    bpy.types.Scene.EnumProperty( attr='bf_Bit_Type',
+    bpy.types.Scene.bf_Bit_Type = EnumProperty(
             name='Bit Type',
             description='Choose the type of bit to you would like',
             items = Bit_Type_List, default = 'bf_Bit_None')
@@ -2218,135 +2218,135 @@ def Create_Propertys():
 
     #Nut Types
     Nut_Type_List = [('bf_Nut_Hex','HEX','Hex Nut'),('bf_Nut_Lock','LOCK','Lock Nut')]
-    bpy.types.Scene.EnumProperty( attr='bf_Nut_Type',
+    bpy.types.Scene.bf_Nut_Type = EnumProperty(
             name='Nut Type',
             description='Choose the type of nut you would like',
             items = Nut_Type_List, default = 'bf_Nut_Hex')
     
     
     Preset_List = [('bf_Preset_M3','M3','M3'),('bf_Preset_M4','M4','M4'),('bf_Preset_M5','M5','M5'),('bf_Preset_M6','M6','M6'),('bf_Preset_M8','M8','M8'),('bf_Preset_M10','M10','M10'),('bf_Preset_M12','M12','M12')]
-    bpy.types.Scene.EnumProperty( attr='bf_Preset_Menu',
+    bpy.types.Scene.bf_Preset_Menu = EnumProperty(
             name='Presets',
             description='Choose a screw type and Click Apply',
             items = Preset_List, default = 'bf_Preset_M3')
 
     #Shank Types    
-    bpy.types.Scene.FloatProperty( attr='bf_Shank_Length',
+    bpy.types.Scene.bf_Shank_Length = FloatProperty(
             name='Shank Length',
             min = 0,max = MAX_INPUT_NUMBER, 
             description='Length of the unthreaded shank'
             )
     
-    bpy.types.Scene.FloatProperty( attr='bf_Shank_Dia',
+    bpy.types.Scene.bf_Shank_Dia = FloatProperty(
             name='Shank Dia',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Diameter of the shank'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Phillips_Bit_Depth',
+    bpy.types.Scene.bf_Phillips_Bit_Depth = FloatProperty(
             name='Bit Depth',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Depth of the Phillips Bit'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Philips_Bit_Dia',
+    bpy.types.Scene.bf_Philips_Bit_Dia = FloatProperty(
             name='Bit Dia',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Diameter of the Philips Bit'
             )
     
-    bpy.types.Scene.FloatProperty( attr='bf_Allen_Bit_Depth',
+    bpy.types.Scene.bf_Allen_Bit_Depth = FloatProperty(
             name='Bit Depth',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Depth of the Allen Bit'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Allen_Bit_Flat_Distance',
+    bpy.types.Scene.bf_Allen_Bit_Flat_Distance = FloatProperty(
             name='Flat Dist',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Flat Distance of the Allen Bit'
             )
     
-    bpy.types.Scene.FloatProperty( attr='bf_Hex_Head_Height',
+    bpy.types.Scene.bf_Hex_Head_Height = FloatProperty(
             name='Head Height',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Height of the Hex Head'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Hex_Head_Flat_Distance',
+    bpy.types.Scene.bf_Hex_Head_Flat_Distance = FloatProperty(
             name='Flat Dist',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Flat Distance of the Hex Head'
             )
 
 
-    bpy.types.Scene.FloatProperty( attr='bf_Cap_Head_Dia',
+    bpy.types.Scene.bf_Cap_Head_Dia = FloatProperty(
             name='Head Height',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Diameter of the Cap Head'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Cap_Head_Height',
+    bpy.types.Scene.bf_Cap_Head_Height = FloatProperty(
             name='Head Dia',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Height of the Cap Head'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Dome_Head_Dia',
+    bpy.types.Scene.bf_Dome_Head_Dia = FloatProperty(
             name='Dome Head Dia',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Length of the unthreaded shank'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Pan_Head_Dia',
+    bpy.types.Scene.bf_Pan_Head_Dia = FloatProperty(
             name='Pan Head Dia',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Diameter of the Pan Head'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Thread_Length',
+    bpy.types.Scene.bf_Thread_Length = FloatProperty(
             name='Thread Length',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Length of the Thread'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Major_Dia',
+    bpy.types.Scene.bf_Major_Dia = FloatProperty(
             name='Major Dia',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Outside diameter of the Thread'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Minor_Dia',
+    bpy.types.Scene.bf_Minor_Dia = FloatProperty(
             name='Minor Dia',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Inside diameter of the Thread'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Pitch',
+    bpy.types.Scene.bf_Pitch = FloatProperty(
             name='Pitch',
             min = 0.1,max = 7.0,
             description='Pitch if the thread'
             )
     
-    bpy.types.Scene.IntProperty( attr='bf_Crest_Percent',
+    bpy.types.Scene.bf_Crest_Percent = IntProperty(
             name='Crest Percent',
             min = 1,max = 90,
             description='Percent of the pitch that makes up the Crest'
             )
 
-    bpy.types.Scene.IntProperty( attr='bf_Root_Percent',
+    bpy.types.Scene.bf_Root_Percent = IntProperty(
             name='Root Percent',
             min = 1,max = 90,
             description='Percent of the pitch that makes up the Root'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Hex_Nut_Height',
+    bpy.types.Scene.bf_Hex_Nut_Height = FloatProperty(
             name='Hex Nut Height',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Height of the Hex Nut'
             )
 
-    bpy.types.Scene.FloatProperty( attr='bf_Hex_Nut_Flat_Distance',
+    bpy.types.Scene.bf_Hex_Nut_Flat_Distance = FloatProperty(
             name='Hex Nut Flat Dist',
             min = 0,max = MAX_INPUT_NUMBER,
             description='Flat distance of the Hex Nut'
