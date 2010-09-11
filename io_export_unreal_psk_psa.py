@@ -20,7 +20,7 @@ bl_addon_info = {
     "author": "Darknet/Optimus_P-Fat/Active_Trash/Sinsoft",
     "version": (2,0),
     "blender": (2, 5, 3),
-    "api": 31667,
+    "api": 31847,
     "location": "File > Export > Skeletal Mesh/Animation Data (.psk/.psa)",
     "description": "Export Unreal Engine (.psk)",
     "warning": "",
@@ -1432,33 +1432,32 @@ exporttypedata.append(("0","PSK","Export PSK"))
 exporttypedata.append(("1","PSA","Export PSA"))
 exporttypedata.append(("2","ALL","Export ALL"))
 
-IntProperty= bpy.types.Scene.IntProperty
-
-IntProperty(attr="unrealfpsrate", name="fps rate",
+bpy.types.Scene.unrealfpsrate = IntProperty(
+    name="fps rate",
     description="Set the frame per second (fps) for unreal.",
     default=24,min=1,max=100)
     
-bpy.types.Scene.EnumProperty( attr="unrealexport_settings",
+bpy.types.Scene.unrealexport_settings = EnumProperty(
     name="Export:",
     description="Select a export settings (psk/psa/all)...",
     items = exporttypedata, default = '0')
         
-bpy.types.Scene.BoolProperty( attr="unrealtriangulatebool",
+bpy.types.Scene.unrealtriangulatebool = BoolProperty(
     name="Triangulate Mesh",
     description="Convert Quad to Tri Mesh Boolean...",
     default=False)
     
-bpy.types.Scene.BoolProperty( attr="unrealactionexportall",
+bpy.types.Scene.unrealactionexportall = BoolProperty(
     name="All Actions",
     description="This let you export all actions from current armature.[Not Build Yet]",
     default=False)    
     
-bpy.types.Scene.BoolProperty( attr="unrealexportpsk",
+bpy.types.Scene.unrealexportpsk = BoolProperty(
     name="bool export psa",
     description="bool for exporting this psk format",
     default=False)
     
-bpy.types.Scene.BoolProperty( attr="unrealexportpsa",
+bpy.types.Scene.unrealexportpsa = BoolProperty(
     name="bool export psa",
     description="bool for exporting this psa format",
     default=False)
@@ -1485,17 +1484,17 @@ class ExportUDKAnimData(bpy.types.Operator):
 
     def execute(self, context):
         #check if  skeleton mesh is needed to be exported
-        if (self.properties.pskexportbool):
+        if (self.pskexportbool):
             bpy.context.scene.unrealexportpsk = True
         else:
             bpy.context.scene.unrealexportpsk = False
         #check if  animation data is needed to be exported
-        if (self.properties.psaexportbool):
+        if (self.psaexportbool):
             bpy.context.scene.unrealexportpsa = True
         else:
             bpy.context.scene.unrealexportpsa = False
             
-        write_data(self.properties.filepath, context, self.properties.use_setting)
+        write_data(self.filepath, context, self.use_setting)
         
         self.report({'WARNING', 'INFO'}, exportmessage)
         return {'FINISHED'}

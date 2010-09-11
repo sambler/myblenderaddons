@@ -21,7 +21,7 @@ bl_addon_info = {
     "author": "Nick Keeline(nrk)",
     "version": (0,7),
     "blender": (2, 5, 3),
-    "api": 31667,
+    "api": 31847,
     "location": "Tool Shelf ",
     "description": "Creates Volumetric Clouds",
     "warning": "",
@@ -304,12 +304,12 @@ cloudTypes.append(("2","Cirrus","Generate Cirrus_wispy Cloud"))
 #cloudTypes.append(("3","Nimbus","Generate Nimbus Cloud"))
 
 
-bpy.types.Scene.BoolProperty( attr="cloudparticles",
+bpy.types.Scene.cloudparticles = BoolProperty(
     name="Particles",
     description="Generate Cloud as Particle System",
     default=False)
 
-bpy.types.Scene.EnumProperty( attr="cloud_type",
+bpy.types.Scene.cloud_type = EnumProperty(
     name="Type",
     description="Select the type of cloud to create with material settings",
     items = cloudTypes, default = '0')
