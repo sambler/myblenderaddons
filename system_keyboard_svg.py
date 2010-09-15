@@ -25,7 +25,7 @@ keyboard=[
 ['TAB', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '[', ']', '\\' ],
 ['CAPSLOCK','A','S','D','F','G','H','J','K','L',';',"'",'ENTER'],
 ['SHIFT', 'Z','X','C','V','B','N','M',',','.','/','SHIFT'],
-['CONTROL', 'OSKEY','ALT','SPACE','ALT','OSKEY','MENUKEY','CONTROL']
+['CONTROL', 'ALT','OSKEY','SPACE','OSKEY','ALT','CONTROL','MENUKEY']
 ]
 
 # default dimension of a single key [width, heidgh]
@@ -209,7 +209,7 @@ def createKeyboard(viewtype):
 
 class WM_OT_Keyboardlayout(bpy.types.Operator):
     """
-        Windows manager operator for keyboard leyout export
+        Windows manager operator for keyboard layout export
     """
     bl_idname = "wm.keyboardlayout"
     bl_label = "Keyboard layout (SGV)"
