@@ -32,9 +32,9 @@ How to use:
 bl_addon_info = {
     'name': 'Index Visualiser',
     'author': 'Bartius Crouch',
-    'version': (2,6,1),
+    'version': (2,6,3),
     'blender': (2, 5, 4),
-    'api': 31667,
+    'api': 31878,
     'location': 'View3D > Properties panel > Mesh Display tab',
     'warning': '', # used for warning icon and text in addons panel
     'description': 'Display the indices of vertices, edges and faces '\
@@ -78,11 +78,13 @@ def calc_callback(self, context):
     #bpy.ops.object.editmode_toggle()
     if bpy.context.scene.display_vert_index:
         for v in me.vertices:
-            if v.select or not bpy.context.scene.display_sel_only:
+            if not v.hide and \
+            (v.select or not bpy.context.scene.display_sel_only):
                 locs.append([1.0, 1.0, 1.0, v.index, v.co.copy().resize4D()])
     if bpy.context.scene.display_edge_index:
         for ed in me.edges:
-            if ed.select or not bpy.context.scene.display_sel_only:
+            if not ed.hide and \
+            (ed.select or not bpy.context.scene.display_sel_only):
                 v1, v2 = ed.vertices
                 v1 = me.vertices[v1].co.copy()
                 v2 = me.vertices[v2].co.copy()
@@ -90,7 +92,8 @@ def calc_callback(self, context):
                 locs.append([1.0, 1.0, 0.0, ed.index, loc.resize4D()])
     if bpy.context.scene.display_face_index:
         for f in me.faces:
-            if f.select or not bpy.context.scene.display_sel_only:
+            if not f.hide and \
+            (f.select or not bpy.context.scene.display_sel_only):
                 locs.append([1.0, 0.0, 0.5, f.index, f.center.resize4D()])
                 
     for loc in locs:
@@ -172,14 +175,18 @@ class IndexVisualiser(bpy.types.Operator):
 # properties used by the script
 def init_properties():
     bpy.context.scene["display_indices"] = 0
-    bpy.types.Scene.BoolProperty(attr="display_sel_only", name="Selected only",
+    bpy.types.Scene.display_sel_only = bpy.props.BoolProperty(
+        name="Selected only",
         description="Only display indices of selected vertices/edges/faces",
         default=True)
-    bpy.types.Scene.BoolProperty(attr="display_vert_index", name="Vertices",
+    bpy.types.Scene.display_vert_index = bpy.props.BoolProperty(
+        name="Vertices",
         description="Display vertex indices", default=True)
-    bpy.types.Scene.BoolProperty(attr="display_edge_index", name="Edges",
+    bpy.types.Scene.display_edge_index = bpy.props.BoolProperty(
+        name="Edges",
         description="Display edge indices")
-    bpy.types.Scene.BoolProperty(attr="display_face_index", name="Faces",
+    bpy.types.Scene.display_face_index = bpy.props.BoolProperty(
+        name="Faces",
         description="Display face indices")
 
 
@@ -188,13 +195,17 @@ def clear_properties(full=True):
     # can happen on reload
     if bpy.context.scene is None:
         return
-    props = ["display_indices", "display_sel_only", "display_vert_index",
-        "display_edge_index", "display_face_index", "IndexVisualiser"]
-    if not full:
-        props = ["IndexVisualiser"]
-    for p in props:
-        if p in bpy.context.scene:
-            del bpy.context.scene[p]
+    
+    if "IndexVisualiser" in bpy.context.scene.keys():
+        del bpy.context.scene["IndexVisualiser"]
+    if full:
+        props = ["display_indices", "display_sel_only", "display_vert_index",
+        "display_edge_index", "display_face_index"]
+        for p in props:
+            if p in bpy.types.Scene.bl_rna.properties:
+                exec("del bpy.types.Scene."+p)
+            if p in bpy.context.scene.keys():
+                del bpy.context.scene[p]
 
 
 # defining the panel
@@ -202,6 +213,11 @@ def menu_func(self, context):
     # initialise properties, if necessary
     if "display_indices" not in context.scene.keys():
         init_properties()
+    props = ["display_vert_index", "display_edge_index",
+            "display_face_index", "display_sel_only"]
+    for p in props:
+        if p not in bpy.types.Scene.bl_rna.properties:
+            init_properties()
     
     self.layout.separator()
     col = self.layout.column(align=True)
