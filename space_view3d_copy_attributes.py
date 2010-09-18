@@ -20,17 +20,10 @@
 
 bl_addon_info = {
     'name': 'Copy Attributes Menu',
-<<<<<<< HEAD
-    'author': 'Bassam Kurdali, Fabian Fricke',
-    'version': (0, 39),
-    'blender': (2, 5, 4),
-    'api': 31881,
-=======
     'author': 'Bassam Kurdali, Fabian Fricke, wiseman303',
     'version': (0, 40),
     'blender': (2, 5, 4),
     'api': 31989,
->>>>>>> remotes/trunk
     'location': 'View3D > Ctrl/C',
     'description': 'Copy Attributes Menu from Blender 2.4',
     'wiki_url': 'http://wiki.blender.org/index.php/Extensions:2.5/Py/'\
@@ -184,12 +177,7 @@ def pLokExec(bone, active, context):
         bone.lock_location[index] = state
     for index, state in enumerate(active.lock_rotation):
         bone.lock_rotation[index] = state
-<<<<<<< HEAD
-    for index, state in enumerate(active.lock_rotations_4d):
-        bone.lock_rotations_4d[index] = state
-=======
     bone.lock_rotations_4d = active.lock_rotations_4d
->>>>>>> remotes/trunk
     bone.lock_rotation_w = active.lock_rotation_w
     for index, state in enumerate(active.lock_scale):
         bone.lock_scale[index] = state
@@ -310,16 +298,6 @@ def obSca(ob, active, context):
 
 
 def obDrw(ob, active, context):
-<<<<<<< HEAD
-    ob.max_draw_type = active.max_draw_type
-    ob.draw_axis = active.draw_axis
-    ob.draw_bounds = active.draw_bounds
-    ob.draw_bounds_type = active.draw_bounds_type
-    ob.draw_name = active.draw_name
-    ob.draw_texture_space = active.draw_texture_space
-    ob.draw_transparent = active.draw_transparent
-    ob.draw_wire = active.draw_wire
-=======
     ob.draw_type = active.draw_type
     ob.show_axis = active.show_axis
     ob.show_bounds = active.show_bounds
@@ -328,7 +306,6 @@ def obDrw(ob, active, context):
     ob.show_texture_space = active.show_texture_space
     ob.show_transparent = active.show_transparent
     ob.show_wire = active.show_wire
->>>>>>> remotes/trunk
     ob.empty_draw_type = active.empty_draw_type
     ob.empty_draw_size = active.empty_draw_size
 
@@ -367,13 +344,8 @@ def obLok(ob, active, context):
 
 def obCon(ob, active, context):
     #for consistency with 2.49, delete old constraints first
-<<<<<<< HEAD
-    for index in range(len(ob.constraints.values())-1, -1, -1):
-        ob.constraints.remove(index)
-=======
     for removeconst in ob.constraints:
         ob.constraints.remove(removeconst)
->>>>>>> remotes/trunk
     for old_constraint in  active.constraints.values():
         new_constraint = ob.constraints.new(old_constraint.type)
         generic_copy(old_constraint, new_constraint)
@@ -381,14 +353,9 @@ def obCon(ob, active, context):
 
 
 def obTex(ob, active, context):
-<<<<<<< HEAD
-    if 'texspace_loc' in dir(ob.data) and 'texspace_loc' in dir(active.data):
-        ob.data.texspace_loc[:] = active.data.texspace_loc[:]
-=======
     if 'texspace_location' in dir(ob.data) and 'texspace_location' in dir(
        active.data):
         ob.data.texspace_location[:] = active.data.texspace_location[:]
->>>>>>> remotes/trunk
     if 'texspace_size' in dir(ob.data) and 'texspace_size' in dir(active.data):
         ob.data.texspace_size[:] = active.data.texspace_size[:]
     return('INFO', "texture space copied")
@@ -400,14 +367,9 @@ def obIdx(ob, active, context):
 
 
 def obMod(ob, active, context):
-<<<<<<< HEAD
-    for modifier in ob.modifiers.values():
-        ob.modifiers.remove(modifier) #remove existing before adding new
-=======
     for modifier in ob.modifiers:
         #remove existing before adding new:
         ob.modifiers.remove(modifier)
->>>>>>> remotes/trunk
     for old_modifier in active.modifiers.values():
         new_modifier = ob.modifiers.new(name=old_modifier.name,
            type=old_modifier.type)
@@ -419,22 +381,14 @@ def obWei(ob, active, context):
     me_source = active.data
     me_target = ob.data
     # sanity check: do source and target have the same amount of verts?
-<<<<<<< HEAD
-    if len(me_source.verts) != len(me_target.verts):
-=======
     if len(me_source.vertices) != len(me_target.vertices):
->>>>>>> remotes/trunk
         return('ERROR', "objects have different vertex counts, doing nothing")
     vgroups_IndexName = {}
     for i in range(0, len(active.vertex_groups)):
         groups = active.vertex_groups[i]
         vgroups_IndexName[groups.index] = groups.name
     data = {} # vert_indices, [(vgroup_index, weights)]
-<<<<<<< HEAD
-    for v in me_source.verts:
-=======
     for v in me_source.vertices:
->>>>>>> remotes/trunk
         vg = v.groups
         vi = v.index
         if len(vg) > 0:
@@ -453,15 +407,9 @@ def obWei(ob, active, context):
                     already_present = 1
             # ... if not, then add
             if already_present == 0:
-<<<<<<< HEAD
-                ob.add_vertex_group(name=vgroup_name)
-        # write weights
-        for v in me_target.verts:
-=======
                 ob.vertex_groups.new(name=vgroup_name)
         # write weights
         for v in me_target.vertices:
->>>>>>> remotes/trunk
             for vi_source, vgroupIndex_weight in data.items():
                 if v.index == vi_source:
 
@@ -470,11 +418,7 @@ def obWei(ob, active, context):
                         groups = ob.vertex_groups
                         for vgs in range(0, len(groups)):
                             if groups[vgs].name == groupName:
-<<<<<<< HEAD
-                                ob.add_vertex_to_group(v.index, groups[vgs],
-=======
                                 ob.vertex_groups.assign(v.index, groups[vgs],
->>>>>>> remotes/trunk
                                    vgroupIndex_weight[i][1], "REPLACE")
     return('INFO', "weights copied")
 
@@ -508,13 +452,8 @@ object_copies = (('OBJ_LOC', "Location",
                 "Copy Object Constraints from Active to Selected", obCon),
                 #('OBJ_NLA', "NLA Strips",
                 #"Copy NLA Strips from Active to Selected"),
-<<<<<<< HEAD
-                ('OBJ_TEX', "Texture Space",
-                "Copy Texture Space from Active to Selected", obTex),
-=======
                 #('OBJ_TEX', "Texture Space",
                 #"Copy Texture Space from Active to Selected", obTex),
->>>>>>> remotes/trunk
                 #('OBJ_SUB', "Subsurf Settings",
                 #"Copy Subsurf Setings from Active to Selected"),
                 #('OBJ_SMO', "AutoSmooth",
@@ -615,8 +554,6 @@ class VIEW3D_MT_copypopup(bpy.types.Menu):
         layout.operator("object.copy_selected_constraints")
         layout.operator("object.copy_selected_modifiers")
 
-<<<<<<< HEAD
-=======
 #Begin Mesh copy settings:
 
 
@@ -787,7 +724,6 @@ def _add_tface_buttons(self, context):
     row.operator(MESH_OT_CopyFaceSettings.bl_idname,
                  text="Copy Transp")['mode'] = 'TRANSP'
 
->>>>>>> remotes/trunk
 
 def register():
     ''' mostly to get the keymap working '''
@@ -802,14 +738,11 @@ def register():
     except KeyError:
         kmi = km.items.new('wm.call_menu', 'C', 'PRESS', ctrl=True)
     kmi.properties.name = 'VIEW3D_MT_posecopypopup'
-<<<<<<< HEAD
-=======
     bpy.types.DATA_PT_texface.append(_add_tface_buttons)
     km = bpy.context.window_manager.keyconfigs.active.keymaps['Mesh']
     kmi = km.items.new('wm.call_menu', 'C', 'PRESS')
     kmi.ctrl = True
     kmi.properties.name = 'MESH_MT_CopyFaceSettings'
->>>>>>> remotes/trunk
 
 
 def unregister():
@@ -820,15 +753,12 @@ def unregister():
            item.properties.name == 'VIEW3D_MT_posecopypopup':
             item.idname = 'pose.copy'
             break
-<<<<<<< HEAD
-=======
     bpy.types.DATA_PT_texface.remove(_add_tface_buttons)
     km = bpy.context.window_manager.keyconfigs.active.keymaps['Mesh']
     for kmi in km.items:
         if kmi.idname == 'wm.call_menu':
             if kmi.properties.name == 'MESH_MT_CopyFaceSettings':
                 km.items.remove(kmi)
->>>>>>> remotes/trunk
 
 if __name__ == "__main__":
     register()
