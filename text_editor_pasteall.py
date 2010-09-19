@@ -38,7 +38,11 @@ bl_addon_info = {
     "author": "Dalai Felinto (dfelinto)",
     "version": (0,5),
     "blender": (2, 5, 4),
+<<<<<<< HEAD
     "api": 31865,
+=======
+    "api": 31999,
+>>>>>>> contrib/master
     "location": "Text editor > Properties panel",
     "description": "Send your selection or text to www.pasteall.org",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
