@@ -18,8 +18,6 @@
 
 # <pep8 compliant>
 
-<<<<<<< HEAD
-=======
 bl_addon_info= {
     "name": "Import LightWave Objects",
     "author": "Ken Nign (Ken9)",
@@ -35,7 +33,6 @@ bl_addon_info= {
         "func=detail&aid=23623&group_id=153&atid=469",
     "category": "Import/Export"}
 
->>>>>>> remotes/trunk
 # Copyright (c) Ken Nign 2010
 # ken@virginpi.com
 #
@@ -931,17 +928,12 @@ def build_objects(object_layers, object_surfs, object_tags, object_name, add_sub
         object_layers[-1].name= object_name
         print("Building "+object_name+" Object")
     else:
-<<<<<<< HEAD
-        print("Building "+str(len(object_layers))+" Objects")
-    
-=======
         print("Building %d Objects" % len(object_layers))
 
     # Before adding any meshes or armatures go into Object mode.
     if bpy.ops.object.mode_set.poll():
         bpy.ops.object.mode_set(mode='OBJECT')
 
->>>>>>> remotes/trunk
     for layer_data in object_layers:
         me= bpy.data.meshes.new(layer_data.name)        
         me.vertices.add(len(layer_data.pnts))
