@@ -18,6 +18,24 @@
 
 # <pep8 compliant>
 
+<<<<<<< HEAD
+=======
+bl_addon_info= {
+    "name": "Import LightWave Objects",
+    "author": "Ken Nign (Ken9)",
+    "version": (1, 2),
+    "blender": (2, 5, 3),
+    "api": 31847,
+    "location": "File > Import > LightWave Object (.lwo)",
+    "description": "Imports a LWO file including any UV, Morph and Color maps. Can convert Skelegons to an Armature.",
+    "warning": "",
+    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
+        "Scripts/File_I-O/LightWave_Object",
+    "tracker_url": "https://projects.blender.org/tracker/index.php?"\
+        "func=detail&aid=23623&group_id=153&atid=469",
+    "category": "Import/Export"}
+
+>>>>>>> remotes/trunk
 # Copyright (c) Ken Nign 2010
 # ken@virginpi.com
 #
@@ -865,13 +883,12 @@ def build_armature(layer_data, bones):
         
         if skb_idx in layer_data.bone_rolls:
             xyz= layer_data.bone_rolls[skb_idx].split(' ')
-            vec= mathutils.Vector()
-            vec.x= float(xyz[0])
-            vec.y= float(xyz[1])
-            vec.z= float(xyz[2])
+            vec= mathutils.Vector((float(xyz[0]), float(xyz[1]), float(xyz[2])))
             quat= vec.to_track_quat('Y', 'Z')
-            nb.roll= quat.to_euler('XYZ')[2] * -1
-            # XXX: This code may need a second look and test.
+            nb.roll= max(quat.to_euler('YZX'))
+            if nb.roll == 0.0:
+                nb.roll= min(quat.to_euler('YZX')) * -1
+            # YZX order seems to produce the correct roll value.
         else:
             nb.roll= 0.0
         
@@ -914,8 +931,17 @@ def build_objects(object_layers, object_surfs, object_tags, object_name, add_sub
         object_layers[-1].name= object_name
         print("Building "+object_name+" Object")
     else:
+<<<<<<< HEAD
         print("Building "+str(len(object_layers))+" Objects")
     
+=======
+        print("Building %d Objects" % len(object_layers))
+
+    # Before adding any meshes or armatures go into Object mode.
+    if bpy.ops.object.mode_set.poll():
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+>>>>>>> remotes/trunk
     for layer_data in object_layers:
         me= bpy.data.meshes.new(layer_data.name)        
         me.vertices.add(len(layer_data.pnts))
