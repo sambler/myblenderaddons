@@ -15,290 +15,324 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software Foundation,
-# Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ***** END GPL LICENCE BLOCK *****
 
 bl_addon_info = {
-    'name': '3D View: Align Tools',
-    'author': 'Gabriel Beaudin (gabhead)',
-    'version': (0,13),
-    'blender': (2, 5, 4),
-    'location': 'Tool Shelf',
-    'description': 'Align selected objects to the active object',
-    'wiki_url':
-    'http://wiki.blender.org/index.php/Extensions:2.5/Py/' \
-        'Scripts/3D interaction/Align_Tools',
-    'tracker_url': 'https://projects.blender.org/tracker/index.php?'\
-        'func=detail&aid==22389&group_id=153&atid=468',
-    'category': '3D View'}
+    "name": "Align Tools",
+    "author": "Gabriel Beaudin (gabhead)",
+    "version": (0,1),
+    "blender": (2, 5, 3),
+    "api": 31965,
+    "location": "Tool Shelf",
+    "description": "Align selected objects to the active object",
+    "warning": "",
+    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
+        "Scripts/3D interaction/Align_Tools",
+    "tracker_url": "https://projects.blender.org/tracker/index.php?"\
+        "func=detail&aid==22389&group_id=153&atid=468",
+    "category": "3D View"}
 
+"""Align Selected Objects"""
 
 import bpy
-from bpy.props import *
-#import Mathutils
-sce = bpy.context.scene
 
-##interface
-######################
 
 class AlignUi(bpy.types.Panel):
-    bl_label = "Align Tools"
-    bl_context = "objectmode"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
-    
+
+    bl_label = "Align Tools"
+    bl_context = "objectmode"
+
     def draw(self, context):
         layout = self.layout
-        obj = bpy.context.object
-        sce = bpy.context.scene
-        items_list = [("Min", "Minimum", "Minimum"),
-                  ("Max", "Maximum", "Maximum",),
-                  ("Center","Center","Center"),
-                  ("Origin","Origin","Origin")]
+        obj = context.object
 
-        bpy.types.Scene.SrcLocation = EnumProperty(name="SrcLocation",
-                                 items=items_list,
-                                 description="SrcLocation",
-                                 default="Origin")
+        if obj != None:
+            row = layout.row()
+            row.label(text="Active object is: ", icon='OBJECT_DATA')
+            row = layout.row()
+            row.label(obj.name, icon='EDITMODE_HLT')
+        
+        box = layout.separator()
+        
+        col = layout.column()
+        col.label(text="Align Loc + Rot:", icon='MANIPUL')
 
-        items_list = [("Min", "Minimum", "Minimum"),
-                  ("Max", "Maximum", "Maximum",),
-                  ("Center","Center","Center"),
-                  ("Origin","Origin","Origin")]
+        
+        col = layout.column(align=False)
+        col.operator("object.AlignObjects",text="XYZ")
+        
+        col = layout.column()
+        col.label(text="Align Location:", icon='MAN_TRANS')
 
-        bpy.types.Scene.ActLocation = EnumProperty(
-                                 name="ActLocation",
-                                 items=items_list,
-                                 description="ActLocation",
-                                 default="Origin")
+        col = layout.column_flow(columns=5,align=True)
+        col.operator("object.AlignObjectsLocationX",text="X")
+        col.operator("object.AlignObjectsLocationY",text="Y")
+        col.operator("object.AlignObjectsLocationZ",text="Z")
+        col.operator("object.AlignObjectsLocationAll",text="All")
 
-        bpy.types.Scene.Aling_LocationX = BoolProperty(
-            name="Aling_LocationX",
-            attr="Aling_LocationX",
-            description="Aling_LocationX",
-            default=0)
+        col = layout.column()
+        col.label(text="Align Rotation:", icon='MAN_ROT')
 
-        bpy.types.Scene.Aling_LocationY=BoolProperty(
-            name="Aling_LocationY",
-            attr="Aling_LocationY",
-            description="Aling_LocationY",
-            default=0)
+        col = layout.column_flow(columns=5,align=True)
+        col.operator("object.AlignObjectsRotationX",text="X")
+        col.operator("object.AlignObjectsRotationY",text="Y")
+        col.operator("object.AlignObjectsRotationZ",text="Z")
+        col.operator("object.AlignObjectsRotationAll",text="All")
+        
+        col = layout.column()
+        col.label(text="Align Scale:", icon='MAN_SCALE')
 
-        bpy.types.Scene.Aling_LocationZ=BoolProperty(
-            name="Aling_LocationZ",
-            attr="Aling_LocationZ",
-            description="Aling_LocationZ",
-            default=0)
+        col = layout.column_flow(columns=5,align=True)
+        col.operator("object.AlignObjectsScaleX",text="X")
+        col.operator("object.AlignObjectsScaleY",text="Y")
+        col.operator("object.AlignObjectsScaleZ",text="Z")
+        col.operator("object.AlignObjectsScaleAll",text="All")
 
-        bpy.types.Scene.Aling_RotationX=BoolProperty(
-            name="Aling_RotationX",
-            attr="Aling_RotationX",
-            description="Aling_LocationX",
-            default=0)
 
-        bpy.types.Scene.Aling_RotationY=BoolProperty(
-            name="Aling_RotationY",
-            attr="Aling_RotationY",
-            description="Aling_LocationY",
-            default=0)
-
-        bpy.types.Scene.Aling_RotationZ=BoolProperty(
-            name="Aling_RotationZ",
-            attr="Aling_RotationZ",
-            description="Aling_LocationZ",
-            default=0)
-
-        bpy.types.Scene.Aling_ScaleX=BoolProperty(
-            name="Aling_ScaleX",
-            attr="Aling_ScaleX",
-            description="Aling_LocationX",
-            default=0)
-
-        bpy.types.Scene.Aling_ScaleY=BoolProperty(
-            name="Aling_ScaleY",
-            attr="Aling_ScaleY",
-            description="Aling_LocationY",
-            default=0)
-
-        bpy.types.Scene.Aling_ScaleZ=BoolProperty(
-            name="Aling_ScaleZ",
-            attr="Aling_ScaleZ",
-            description="Aling_LocationZ",
-            default=0)
-
-        if len(bpy.context.selected_objects)>1:
-            
-            col = layout.column()
-            bo = layout.box()
-            bo.prop_menu_enum(data=sce,property="SrcLocation",text=str((len(bpy.context.selected_objects))-1)+" objects: "+sce.SrcLocation,icon='OBJECT_DATA')
-            if bpy.context.object != None:
-                bo.prop_menu_enum(data=sce,property="ActLocation",text="To: "+obj.name+": "+sce.ActLocation,icon='OBJECT_DATA')
-
-            col = layout.column()
-            col.label(text="Align Location:", icon='MAN_TRANS')
-        		
-            col = layout.column_flow(columns=3,align=True)
-            col.prop(sce,"Aling_LocationX",text="X")
-            col.prop(sce,"Aling_LocationY",text="Y")
-            col.prop(sce,"Aling_LocationZ",text="Z")
-
-            col = layout.column()
-            col.label(text="Align Rotation:", icon='MAN_ROT')
-
-            col = layout.column_flow(columns=3,align=True)
-            col.prop(sce,"Aling_RotationX",text="X")
-            col.prop(sce,"Aling_RotationY",text="Y")
-            col.prop(sce,"Aling_RotationZ",text="Z")
-
-            col = layout.column()
-            col.label(text="Align Scale:", icon='MAN_SCALE')
-
-            col = layout.column_flow(columns=3,align=True)
-            col.prop(sce,"Aling_ScaleX",text="X")
-            col.prop(sce,"Aling_ScaleY",text="Y")
-            col.prop(sce,"Aling_ScaleZ",text="Z")
-
-            col = layout.column(align=False)
-            col.operator("object.AlignObjects",text="Align")
-##Methods
-##################
-
-##Get World Verts location
-
-def VertCoordSysLocalToWorld(obj):
-    NewList = []
-
-    for i in obj.data.vertices:
-        WorldVert=(obj.matrix_world*i.co)-obj.location
-        NewList.append(WorldVert)
-    return NewList
-
-##Create World bound_box
-def CreateWorldBoundBox(obj):
-    World_bound_box = []
-    Xlist=[]
-    Ylist=[]
-    Zlist=[]
-    
-    #separate X Y and Z
-    for i in VertCoordSysLocalToWorld(obj):
-        Xlist.append(i.x)
-        Ylist.append(i.y)
-        Zlist.append(i.z)
-    
-    # Sort all values
-    Xlist = sorted(Xlist)
-    Ylist = sorted(Ylist)
-    Zlist = sorted(Zlist)
-    # assing Minimum and maximum values
-    Xmin = Xlist[0]
-    Xmax = Xlist[-1]
-    Ymin = Ylist[0]
-    Ymax = Ylist[-1]
-    Zmin = Zlist[0]
-    Zmax = Zlist[-1]
-    World_bound_box = [Xmin,Xmax,Ymin,Ymax,Zmin,Zmax]
-    return World_bound_box
-##Align
+##Align all
 def main(context):
-    sce = bpy.context.scene
-    obj = bpy.context.object
-    The_i_OffSet=[]
-    TheActiveObjOffset=[]
-    activeObjWorldBoundBox = CreateWorldBoundBox(obj)
-    
     for i in bpy.context.selected_objects:
-        if i != obj:
-            
-            i_World_bound_box = CreateWorldBoundBox(i)
-            i_minX = i_World_bound_box[0]
-            i_maxX = i_World_bound_box[1]
-            i_minY = i_World_bound_box[2]
-            i_maxY = i_World_bound_box[3]
-            i_minZ = i_World_bound_box[4]
-            i_maxZ = i_World_bound_box[5]
-            Act_minX = activeObjWorldBoundBox[0]
-            Act_maxX = activeObjWorldBoundBox[1]
-            Act_minY = activeObjWorldBoundBox[2]
-            Act_maxY = activeObjWorldBoundBox[3]
-            Act_minZ = activeObjWorldBoundBox[4]
-            Act_maxZ = activeObjWorldBoundBox[5]
-            imin = [i_minX,i_minY,i_minZ]
-            imax = [i_maxX,i_maxY,i_maxZ]
-            actmin = [Act_minX,Act_minY,Act_minZ]
-            actmax = [Act_maxX,Act_maxY,Act_maxZ]
-            
-            if sce.SrcLocation == "Min":
-                The_i_OffSet = imin
-            if sce.SrcLocation == "Max":
-                The_i_OffSet = imax
-            if sce.SrcLocation == "Center":
-                i.location = [0,0,0]
-                iCenterX = ((imin[0]+imax[0])/2.0)
-                iCenterY = ((imin[1]+imax[1])/2.0)
-                iCenterZ = ((imin[2]+imax[2])/2.0)
-                
-                The_i_OffSet = [iCenterX,iCenterY,iCenterZ]
-            if sce.SrcLocation == "Origin":
-                The_i_OffSet = [0,0,0]
-            
-            if sce.ActLocation == "Min":
-                TheActiveObjOffset = actmin
-            if sce.ActLocation == "Max":
-                TheActiveObjOffset = actmax
-            if sce.ActLocation == "Center":
-                CenterX = ((actmin[0]+actmax[0])/2.0)
-                CenterY = ((actmin[1]+actmax[1])/2.0)
-                CenterZ = ((actmin[2]+actmax[2])/2.0)
-                TheActiveObjOffset = [CenterX,CenterY,CenterZ]
-            if sce.ActLocation == "Origin":
-                TheActiveObjOffset = [0,0,0]
-            
-            #Locations
-            if sce.Aling_LocationX == True:
-                i.location.x = (obj.location[0] + The_i_OffSet[0] + TheActiveObjOffset[0])
-            if sce.Aling_LocationY == True:
-                i.location.y = (obj.location[1] + The_i_OffSet[1] + TheActiveObjOffset[1])
-            if sce.Aling_LocationZ == True:
-                i.location.z = (obj.location[2] + The_i_OffSet[2] + TheActiveObjOffset[2])
-            #Rotations
-            if sce.Aling_RotationX == True:
-                i.rotation_euler.x = bpy.context.active_object.rotation_euler.x
-            if sce.Aling_RotationY == True:
-                i.rotation_euler.y = bpy.context.active_object.rotation_euler.y
-            if sce.Aling_RotationZ == True:
-                i.rotation_euler.z = bpy.context.active_object.rotation_euler.z
-            #Scales
-            if sce.Aling_ScaleX == True:
-                i.scale.x = bpy.context.active_object.scale.x
-            if sce.Aling_ScaleY == True:
-                i.scale.y = bpy.context.active_object.scale.y
-            if sce.Aling_ScaleZ == True:
-                i.scale.z = bpy.context.active_object.scale.z
-    
-## Classes Op
-## Align
+        i.location = bpy.context.active_object.location
+        i.rotation_euler = bpy.context.active_object.rotation_euler
+
+## Align Location
+
+def LocAll(context):
+    for i in bpy.context.selected_objects:
+        i.location = bpy.context.active_object.location
+
+def LocX(context):
+    for i in bpy.context.selected_objects:
+        i.location.x = bpy.context.active_object.location.x
+
+def LocY(context):
+    for i in bpy.context.selected_objects:
+        i.location.y = bpy.context.active_object.location.y
+
+def LocZ(context):
+    for i in bpy.context.selected_objects:
+        i.location.z = bpy.context.active_object.location.z
+
+## Aling Rotation
+def RotAll(context):
+    for i in bpy.context.selected_objects:
+        i.rotation_euler = bpy.context.active_object.rotation_euler
+
+def RotX(context):
+    for i in bpy.context.selected_objects:
+        i.rotation_euler.x = bpy.context.active_object.rotation_euler.x
+
+def RotY(context):
+    for i in bpy.context.selected_objects:
+        i.rotation_euler.y = bpy.context.active_object.rotation_euler.y
+
+def RotZ(context):
+    for i in bpy.context.selected_objects:
+        i.rotation_euler.z = bpy.context.active_object.rotation_euler.z
+## Aling Scale
+def ScaleAll(context):
+    for i in bpy.context.selected_objects:
+        i.scale = bpy.context.active_object.scale
+
+def ScaleX(context):
+    for i in bpy.context.selected_objects:
+        i.scale.x = bpy.context.active_object.scale.x
+
+def ScaleY(context):
+    for i in bpy.context.selected_objects:
+        i.scale.y = bpy.context.active_object.scale.y
+
+def ScaleZ(context):
+    for i in bpy.context.selected_objects:
+        i.scale.z = bpy.context.active_object.scale.z
+
+## Classes
+
+## Align All Rotation And Location
 class AlignOperator(bpy.types.Operator):
+    ''''''
     bl_idname = "object.AlignObjects"
     bl_label = "Align Selected To Active"
-    
+
     @classmethod
-    def poll(self, context):
+    def poll(cls, context):
         return context.active_object != None
 
     def execute(self, context):
         main(context)
         return {'FINISHED'}
 
+#######################Align Location########################
+## Align LocationAll
+class AlignLocationOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsLocationAll"
+    bl_label = "Align Selected Location To Active"
 
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        LocAll(context)
+        return {'FINISHED'}
+## Align LocationX
+class AlignLocationXOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsLocationX"
+    bl_label = "Align Selected Location X To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        LocX(context)
+        return {'FINISHED'}
+## Align LocationY
+class AlignLocationYOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsLocationY"
+    bl_label = "Align Selected Location Y To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        LocY(context)
+        return {'FINISHED'}
+## Align LocationZ
+class AlignLocationZOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsLocationZ"
+    bl_label = "Align Selected Location Z To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        LocZ(context)
+        return {'FINISHED'}
+
+#######################Align Rotation########################
+## Align RotationAll
+class AlignRotationOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsRotationAll"
+    bl_label = "Align Selected Rotation To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        RotAll(context)
+        return {'FINISHED'}
+## Align RotationX
+class AlignRotationXOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsRotationX"
+    bl_label = "Align Selected Rotation X To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        RotX(context)
+        return {'FINISHED'}
+## Align RotationY
+class AlignRotationYOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsRotationY"
+    bl_label = "Align Selected Rotation Y To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        RotY(context)
+        return {'FINISHED'}
+## Align RotationZ
+class AlignRotationZOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsRotationZ"
+    bl_label = "Align Selected Rotation Z To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        RotZ(context)
+        return {'FINISHED'}
+#######################Align Scale########################
+## Scale All
+class AlignScaleOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsScaleAll"
+    bl_label = "Align Selected Scale To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        ScaleAll(context)
+        return {'FINISHED'}
+## Align ScaleX
+class AlignScaleXOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsScaleX"
+    bl_label = "Align Selected Scale X To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        ScaleX(context)
+        return {'FINISHED'}
+## Align ScaleY
+class AlignScaleYOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsScaleY"
+    bl_label = "Align Selected Scale Y To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        ScaleY(context)
+        return {'FINISHED'}
+## Align ScaleZ
+class AlignScaleZOperator(bpy.types.Operator):
+    ''''''
+    bl_idname = "object.AlignObjectsScaleZ"
+    bl_label = "Align Selected Scale Z To Active"
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object != None
+
+    def execute(self, context):
+        ScaleZ(context)
+        return {'FINISHED'}
+
+## registring
 def register():
     pass
 
-
 def unregister():
     pass
-
 
 if __name__ == "__main__":
     register()
