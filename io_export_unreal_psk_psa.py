@@ -641,6 +641,7 @@ def triangulateNMesh(object):
 		bpy.context.scene.unrealtriangulatebool = True
 		print("Triangulate Mesh Done!")
 	else:
+		bpy.context.scene.unrealtriangulatebool = False
 		print("No need to convert tri mesh.")
 		me_ob = object
 	return me_ob
@@ -687,7 +688,7 @@ def parse_meshes(blender_meshes, psk_file):
 	print ("----- parsing meshes -----")
 	print("Number of Object Meshes:",len(blender_meshes))
 	for current_obj in blender_meshes: #number of mesh that should be one mesh here
-	
+		bpy.ops.object.mode_set(mode='EDIT')
 		current_obj = triangulateNMesh(current_obj)
 		#print(dir(current_obj))
 		print("Mesh Name:",current_obj.name)
@@ -763,7 +764,7 @@ def parse_meshes(blender_meshes, psk_file):
 							uv = [faceUV.uv[i][0],faceUV.uv[i][1]] #OR bottom works better # 24 for cube
 							#uv = list(faceUV.uv[i]) #30 just cube    
 					else:
-						print ("No UVs?")
+						#print ("No UVs?")
 						uv = [0.0, 0.0]
 					#print("UV >",uv)
 					#uv = [0.0, 0.0] #over ride uv that is not fixed
@@ -850,7 +851,29 @@ def parse_meshes(blender_meshes, psk_file):
 					dindex0 = current_face.vertices[0];
 					dindex1 = current_face.vertices[1];
 					dindex2 = current_face.vertices[2];
+					print(dir(current_mesh.vertices[dindex0]))
+					#current_mesh.vertices[dindex0].co.x = 0;
+					#current_mesh.vertices[dindex0].co.y = 0;
+					#current_mesh.vertices[dindex0].co.z = 0;
+					#current_mesh.vertices[dindex1].co.x = 0;
+					#current_mesh.vertices[dindex1].co.y = 0;
+					#current_mesh.vertices[dindex1].co.z = 0;
+					#current_mesh.vertices[dindex2].co.x = 0;
+					#current_mesh.vertices[dindex2].co.y = 0;
+					#current_mesh.vertices[dindex2].co.z = 0;
+					
+					current_mesh.vertices[dindex0].select = True
+					current_mesh.vertices[dindex1].select = True
+					current_mesh.vertices[dindex2].select = True
+					
+					#print(dir(current_mesh))
+					
+					#current_mesh.vertices[dindex1] = 0
+					#current_mesh.vertices[dindex2] = 0
+					#print(dir(current_face))
 					raise RuntimeError("normal vector coplanar with face! points:", current_mesh.vertices[dindex0].co, current_mesh.vertices[dindex1].co, current_mesh.vertices[dindex2].co)
+				#print(dir(current_face))
+				current_face.select = True
 				#print((current_face.use_smooth))
 				#not sure if this right
 				#tri.SmoothingGroups
@@ -977,7 +1000,7 @@ def parse_bone(blender_bone, psk_file, psa_file, parent_id, is_root_bone, parent
 		
 		quat = make_fquat_default(rot_mat.to_quat())
 		
-	print ("[[======= FINAL POSITION:", set_position)
+	#print ("[[======= FINAL POSITION:", set_position)
 	final_parent_id = parent_id
 	
 	#RG/RE -
@@ -1037,6 +1060,9 @@ def parse_armature(blender_armature, psk_file, psa_file):
 	
 	#magic 0 sized root bone for UT - this is where all armature dummy bones will attach
 	#dont increment nbone here because we initialize it to 1 (hackity hackity hack)
+	
+	print(dir(bpy))
+	#bpy.types.report({'INFO'}, exportmessage)
 
 	#count top level bones first. NOT EFFICIENT.
 	child_count = 0
@@ -1114,17 +1140,14 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
 		print("Exporting all action:",bpy.context.scene.unrealactionexportall)
 		print("[==== Action list Start====]")
 		
-		actionlist = []
-		
 		print("Number of Action set(s):",len(bpy.data.actions))
 		
 		for action in bpy.data.actions:#current number action sets
 			print("========>>>>>")
 			print("Action Name:",action.name)
-			actionlist.append(action.name)
-			print("Groups:")
-			for bone in action.groups:
-				print("> Name: ",bone.name)
+			#print("Groups:")
+			#for bone in action.groups:
+				#print("> Name: ",bone.name)
 				#print(dir(bone))
 			
 		print("[==== Action list End ====]")
@@ -1144,10 +1167,10 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
 		print("[=========================]")
 		
 		for ActionNLA in bpy.data.actions:
-		
+			print("\n==== Action Set ====")
 			nobone = 0
 			baction = True
-			print("\nChecking actions matching groups with bone names...")
+			#print("\nChecking actions matching groups with bone names...")
 			#Check if the bone names matches the action groups names
 			for group in ActionNLA.groups:
 				for abone in bonenames:
@@ -1157,10 +1180,11 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
 						break
 			#if action groups matches the bones length and names matching the gourps do something
 			if (len(ActionNLA.groups) == len(bonenames)) and (nobone == len(ActionNLA.groups)):
-				print("Action Set found for this Armature Object: Action set Name: ",ActionNLA.name)
+				print("Action Set match: Pass")
 				baction = True
 			else:
-				print("Action Set does not match for this Armature Object! , Action set Name: " ,ActionNLA.name)
+				print("Action Set match: Fail")
+				print("Action Name:",ActionNLA.name)
 				baction = False
 			
 			if baction == True:
@@ -1190,8 +1214,7 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
 					
 				#this deal with action export control
 				if bHaveAction == True:
-					print("")
-					print("==== Action Set ====")
+					
 					print("Action Name:",action_name)
 					#look for min and max frame that current set keys
 					framemin, framemax = act.frame_range
@@ -1452,7 +1475,7 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
 	
 exportmessage = "Export Finish"        
 		
-def fs_callback(filename, context, user_setting):
+def fs_callback(filename, context):
 	#this deal with repeat export and the reset settings
 	global bonedata, BBCount, nbone, exportmessage
 	bonedata = []#clear array
@@ -1612,11 +1635,11 @@ def fs_callback(filename, context, user_setting):
 		#DONE
 		print ("PSK/PSA Export Complete")
 
-def write_data(path, context, user_setting):
+def write_data(path, context):
 	print("//============================")
 	print("// running psk/psa export...")
 	print("//============================")
-	fs_callback(path, context, user_setting)
+	fs_callback(path, context)
 	pass
 
 from bpy.props import *
@@ -1669,7 +1692,6 @@ class ExportUDKAnimData(bpy.types.Operator):
 	# to the class instance from the operator settings before calling.
 
 	filepath = StringProperty(name="File Path", description="Filepath used for exporting the PSA file", maxlen= 1024, default= "")
-	use_setting = BoolProperty(name="No Options Yet", description="No Options Yet", default= True)
 	pskexportbool = BoolProperty(name="Export PSK", description="Export Skeletal Mesh", default= True)
 	psaexportbool = BoolProperty(name="Export PSA", description="Export Action Set (Animation Data)", default= True)
 	actionexportall = BoolProperty(name="All Actions", description="This will export all the actions that matches the current armature.", default=False)
@@ -1690,7 +1712,12 @@ class ExportUDKAnimData(bpy.types.Operator):
 		else:
 			bpy.context.scene.unrealexportpsa = False
 			
-		write_data(self.filepath, context, self.use_setting)
+		if (self.actionexportall):
+			bpy.context.scene.unrealactionexportall = True
+		else:
+			bpy.context.scene.unrealactionexportall = False
+		
+		write_data(self.filepath, context)
 		
 		self.report({'WARNING', 'INFO'}, exportmessage)
 		return {'FINISHED'}
@@ -1699,7 +1726,6 @@ class ExportUDKAnimData(bpy.types.Operator):
 		wm = context.window_manager
 		wm.add_fileselect(self)
 		return {'RUNNING_MODAL'}
-
 
 class VIEW3D_PT_unrealtools_objectmode(bpy.types.Panel):
 	bl_space_type = "VIEW_3D"
@@ -1765,7 +1791,7 @@ class OBJECT_OT_UnrealExport(bpy.types.Operator):
 			print("Exporting ALL...")
 
 		default_path = os.path.splitext(bpy.data.filepath)[0] + ".psk"
-		fs_callback(default_path, bpy.context, False)
+		fs_callback(default_path, bpy.context)
 		
 		#self.report({'WARNING', 'INFO'}, exportmessage)
 		self.report({'INFO'}, exportmessage)
