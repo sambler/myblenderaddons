@@ -79,7 +79,7 @@ import chunk
 
 import bpy
 import mathutils
-from geometry import PolyFill
+from mathutils.geometry import PolyFill
 
 
 class _obj_layer():
