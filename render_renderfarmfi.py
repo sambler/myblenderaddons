@@ -462,7 +462,7 @@ class OreSession:
         if totFrames != 0:
             done = math.floor((self.frames / totFrames)*100)
         else:
-            done = math.floor((self.frames / totFrames+0.01)*100)
+            done = math.floor((self.frames / (totFrames+0.01))*100)
         
         if done > 100:
             done = 100
