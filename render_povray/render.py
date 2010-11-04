@@ -188,14 +188,9 @@ def write_pov(filename, scene=None, info_callback=None):
             if material.pov_caustics_enable:
                 if material.pov_fake_caustics:
                     file.write('\tcaustics %.3g\n' % material.pov_fake_caustics_power)
-                    #material.pov_photons_refraction=0
                 if material.pov_photons_refraction:
-                    material.pov_fake_caustics=0 #How to deactivate fake caustics when refr photons on?
-
                     file.write('\tdispersion %.3g\n' % material.pov_photons_dispersion) #Default of 1 means no dispersion
-                    
-                #bpy.types.MATERIAL_PT_povray_caustics.Display = 1 - bpy.types.MATERIAL_PT_povray_caustics.Display
-        #mat = context.material
+            #TODO        
             # Other interior args
             # fade_distance 2
             # fade_power [Value]
@@ -570,17 +565,19 @@ def write_pov(filename, scene=None, info_callback=None):
                     samples_y = lamp.shadow_ray_samples_y
 
                 file.write('\tarea_light <%d,0,0>,<0,0,%d> %d, %d\n' % (size_x, size_y, samples_x, samples_y))
-                if lamp.shadow_ray_sampling_method == 'CONSTANT_JITTERED':
+                if lamp.shadow_ray_sample_method == 'CONSTANT_JITTERED':
                     if lamp.jitter:
                         file.write('\tjitter\n')
                 else:
                     file.write('\tadaptive 1\n')
                     file.write('\tjitter\n')
 
-            if lamp.shadow_method == 'NOSHADOW':
+            if lamp.type == 'HEMI':#HEMI never has any shadow attribute
                 file.write('\tshadowless\n')
+            elif lamp.shadow_method == 'NOSHADOW':
+                    file.write('\tshadowless\n')
 
-            if lamp.type != 'SUN' and lamp.type!='AREA':#Sun shouldn't be attenuated. and area lights have no falloff attribute so they are put to type 2 attenuation a little higher above.
+            if lamp.type != 'SUN' and lamp.type!='AREA' and lamp.type!='HEMI':#Sun shouldn't be attenuated. Hemi and area lights have no falloff attribute so they are put to type 2 attenuation a little higher above.
                 file.write('\tfade_distance %.6f\n' % (lamp.distance / 5) )
                 if lamp.falloff_type == 'INVERSE_SQUARE':
                     file.write('\tfade_power %d\n' % 2) # Use blenders lamp quad equivalent
