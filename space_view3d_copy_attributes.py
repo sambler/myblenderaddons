@@ -21,15 +21,15 @@
 bl_addon_info = {
     'name': 'Copy Attributes Menu',
     'author': 'Bassam Kurdali, Fabian Fricke, wiseman303',
-    'version': (0, 40),
-    'blender': (2, 5, 4),
-    'api': 32411,
+    'version': (0, 41),
+    'blender': (2, 5, 5),
+    'api': 33215,
     'location': 'View3D > Ctrl/C',
     'description': 'Copy Attributes Menu from Blender 2.4',
     'wiki_url': 'http://wiki.blender.org/index.php/Extensions:2.5/Py/'\
         'Scripts/3D_interaction/Copy_Attributes_Menu',
     'tracker_url': 'https://projects.blender.org/tracker/index.php?'\
-        'func=detail&aid=22588&group_id=153&atid=468',
+        'func=detail&aid=22588&group_id=153&atid=469',
     'category': '3D View'}
 
 __bpydoc__ = """
@@ -146,7 +146,7 @@ def pLocLocExec(bone, active, context):
 
 
 def pLocRotExec(bone, active, context):
-    rotcopy(bone, active.matrix_local.rotation_part())
+    rotcopy(bone, active.matrix_basis.rotation_part())
 
 
 def pLocScaExec(bone, active, context):
