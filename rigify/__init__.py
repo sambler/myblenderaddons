@@ -28,12 +28,13 @@ bl_addon_info = {
     "category": "Rigging"}
 
 if "bpy" in locals():
-    reload(generate)
-    reload(ui)
-    reload(utils)
-    reload(metarig_menu)
+    import imp
+    imp.reload(generate)
+    imp.reload(ui)
+    imp.reload(utils)
+    imp.reload(metarig_menu)
 else:
-    from rigify import generate, ui, utils, metarig_menu
+    from . import generate, ui, utils, metarig_menu
 
 import bpy
 import bpy_types
@@ -124,9 +125,10 @@ def register():
     bpy.types.PoseBone.rigify_type = bpy.props.StringProperty(name="Rigify Type", description="Rig type for this bone.")
     bpy.types.PoseBone.rigify_parameters = bpy.props.CollectionProperty(type=RigifyParameters)
 
-    bpy.types.Scene.rigify_collection = bpy.props.EnumProperty(items=col_enum_list, default="All", name="Rigify Active Collection", description="The selected rig collection")
-    bpy.types.Scene.rigify_types = bpy.props.CollectionProperty(type=RigifyName)
-    bpy.types.Scene.rigify_active_type = bpy.props.IntProperty(name="Rigify Active Type", description="The selected rig type.")
+    IDStore = bpy.types.WindowManager
+    IDStore.rigify_collection = bpy.props.EnumProperty(items=col_enum_list, default="All", name="Rigify Active Collection", description="The selected rig collection")
+    IDStore.rigify_types = bpy.props.CollectionProperty(type=RigifyName)
+    IDStore.rigify_active_type = bpy.props.IntProperty(name="Rigify Active Type", description="The selected rig type.")
 
     metarig_menu.register()
 
@@ -135,9 +137,10 @@ def unregister():
     del bpy.types.PoseBone.rigify_type
     del bpy.types.PoseBone.rigify_parameters
 
-    del bpy.types.Scene.rigify_collection
-    del bpy.types.Scene.rigify_types
-    del bpy.types.Scene.rigify_active_type
+    IDStore = bpy.types.WindowManager
+    del IDStore.rigify_collection
+    del IDStore.rigify_types
+    del IDStore.rigify_active_type
 
     metarig_menu.unregister()
 
