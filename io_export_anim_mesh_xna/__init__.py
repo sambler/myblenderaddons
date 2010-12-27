@@ -1,16 +1,3 @@
-bl_addon_info = {
-    "name": "Blender to XNA",
-    "author": "John C Brown, JCBDigger (@MistyManor)",
-    "version": (1,1),
-    "blender": (2, 5, 5),
-    "api": 32738,
-    "location": "File > Export > XNA FBX Animated Model",
-    "description": "Export the model and animations for use in XNA",
-    "warning": "",
-    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/File_I-O/Blender-toXNA",
-    "tracker_url": "https://projects.blender.org/tracker/index.php?func=detail&aid=25013&group_id=153&atid=469",
-    "category": "Import/Export"}
-
 # ***** BEGIN GPL LICENSE BLOCK *****
 #
 # This program is free software; you can redistribute it and/or
@@ -27,11 +14,28 @@ bl_addon_info = {
 #
 # ***** END GPL LICENCE BLOCK *****
 
+bl_addon_info = {
+    "name": "Blender to XNA",
+    "author": "John C Brown, JCBDigger (@MistyManor)",
+    "version": (1, 1),
+    "blender": (2, 5, 5),
+    "api": 32738,
+    "location": "File > Export > XNA FBX Animated Model",
+    "description": "Export the model and animations for use in XNA",
+    "warning": "",
+    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
+        "Scripts/Import-Export/Blender-toXNA",
+    "tracker_url": "https://projects.blender.org/tracker/index.php?"\
+        "func=detail&aid=25013&group_id=153&atid=469",
+    "category": "Import-Export"}
+
+
 # This script uses spaces for indents NOT tabs.
+
 """
 Blender to XNA
 
-http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/File_I-O/Blender-toXNA
+http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/Import-Export/Blender-toXNA
 """
 
 # To support reload properly, try to access a package var, if it's there, reload everything
