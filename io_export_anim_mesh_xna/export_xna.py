@@ -2496,10 +2496,13 @@ Takes:  {''')
 
                 # Set the action active
                 for my_bone in ob_arms:
-                    if ob.animation_data and blenAction in my_bone.blenActionList:
-                        ob.animation_data.action = blenAction
-                        # print '\t\tSetting Action!', blenAction
-                # scene.update(1)
+                    # From the original FBX exporter but some people have reported problems where all the
+                    # animations exported are the same (JCB)
+                    #if ob.animation_data and blenAction in my_bone.blenActionList:
+                    #    ob.animation_data.action = blenAction
+                    # This change was proposed by Evan Todd (30 Dec.2010)
+                    if my_bone.blenObject.animation_data and blenAction in my_bone.blenActionList:
+                        my_bone.blenObject.animation_data.action = blenAction
 
             #file.write('\n\t\tFileName: "Default_Take.tak"') # ??? - not sure why this is needed
             #file.write('\n\t\tFileName: "%s.tak"' % sane_name_mapping_take[blenAction.name]) # ??? - not sure why this is needed
