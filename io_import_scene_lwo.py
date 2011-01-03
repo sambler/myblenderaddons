@@ -71,7 +71,7 @@ import chunk
 
 import bpy
 import mathutils
-from mathutils.geometry import PolyFill
+from mathutils.geometry import tesselate_polygon
 
 
 class _obj_layer(object):
@@ -1140,7 +1140,7 @@ def build_objects(object_layers, object_surfs, object_tags, object_name, add_sub
                 v_locs= []
                 for vi in range(len(ng)):
                     v_locs.append(mathutils.Vector(layer_data.pnts[ngons[ng_key][vi]]))
-                tris= PolyFill([v_locs])
+                tris= tesselate_polygon([v_locs])
                 me.faces.add(len(tris))
                 for tri in tris:
                     face= me.faces[face_offset]
@@ -1242,8 +1242,10 @@ class IMPORT_OT_lwo(bpy.types.Operator):
 def menu_func(self, context):
     self.layout.operator(IMPORT_OT_lwo.bl_idname, text="LightWave Object (.lwo)")
 
+
 def register():
     bpy.types.INFO_MT_file_import.append(menu_func)
+
 
 def unregister():
     bpy.types.INFO_MT_file_import.remove(menu_func)
