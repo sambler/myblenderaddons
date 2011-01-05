@@ -1745,6 +1745,7 @@ def export_fbx(operator, context, filepath="",
         if ob_arms_orig_rest:
             for ob_base in bpy.data.objects:
                 if ob_base.type == 'ARMATURE':
+                    # v2.56 was ob_base.update(scene) changed after to ob_base.update() (Campbell Barton)
                     ob_base.update()
 
             # This causes the makeDisplayList command to effect the mesh
@@ -1872,6 +1873,7 @@ def export_fbx(operator, context, filepath="",
         if ob_arms_orig_rest:
             for ob_base in bpy.data.objects:
                 if ob_base.type == 'ARMATURE':
+                    # v2.56 was ob_base.update(scene) changed after to ob_base.update() (Campbell Barton)
                     ob_base.update()
             # This causes the makeDisplayList command to effect the mesh
             scene.frame_set(scene.frame_current)
@@ -2756,6 +2758,7 @@ Takes:  {''')
         if ob_arms_orig_rest:
             for ob_base in bpy.data.objects:
                 if ob_base.type == 'ARMATURE':
+                    # v2.56 was ob_base.update(scene) changed after to ob_base.update() (Campbell Barton)
                     ob_base.update()
             # This causes the makeDisplayList command to effect the mesh
             scene.frame_set(scene.frame_current)
