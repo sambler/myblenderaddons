@@ -22,7 +22,7 @@ Blender to XNA
 
 This script is an exporter to the Autodesk FBX file format suitable for use with Microsoft XNA.
 
-http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/File_I-O/Blender-toXNA
+http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/Import-Export/Blender-toXNA
 """
 
 import os
@@ -347,7 +347,7 @@ def export_fbx(operator, context, filepath="",
     print('\nFBX export starting... %r' % filepath)
     start_time = time.clock()
     try:
-        file = open(filepath, 'w')
+        file = open(filepath, 'w', encoding='utf8')
     except:
         return False
 
@@ -1024,14 +1024,11 @@ def export_fbx(operator, context, filepath="",
     # If the image and the blend file are on different drives the function
     #   relativePath = os.path.relpath(path1, path2)
     # will throw an exception when trying to calculate the relative file paths.
-    # To avoid this all output files are assumed to be in the same folder. (JCB)
     def copy_image(image):
         # The full path to the image file
         fn = bpy.path.abspath(image.filepath)
         # Just the file name of the image file
         fn_strip = os.path.basename(fn)
-        # This assumes that the image file is in the same folder as the FBX file (JCB)
-        rel = fn_strip
         # Copy the image to the destination folder
         if EXP_IMAGE_COPY:
             # Add the image filename to the output folder as previously calculated
@@ -1039,8 +1036,12 @@ def export_fbx(operator, context, filepath="",
             # Do not overwrite existing files
             if not os.path.exists(fn_abs_dest):
                 shutil.copy(fn, fn_abs_dest)
-        #else:
-        #    rel = os.path.relpath(fn, basepath)
+        elif bpy.path.is_subdir(fn, basepath):
+            # Check it is a subdirectory to avoid the exception thrown for different drives
+            rel = os.path.relpath(fn, basepath)
+        else:
+            # This assumes that the image file is in the same folder as the FBX file
+            rel = fn
 
         return (rel, fn_strip)
 
@@ -1238,17 +1239,17 @@ def export_fbx(operator, context, filepath="",
         me = my_mesh.blenData
 
         # if there are non NULL materials on this mesh
-        if my_mesh.blenMaterials:	do_materials = True
-        else:						do_materials = False
-
-        if my_mesh.blenTextures:	do_textures = True
-        else:						do_textures = False
-
+        do_materials = bool(my_mesh.blenMaterials)
+        do_textures = bool(my_mesh.blenTextures)
         do_uvs = bool(me.uv_textures)
-
 
         file.write('\n\tModel: "Model::%s", "Mesh" {' % my_mesh.fbxName)
         file.write('\n\t\tVersion: 232') # newline is added in write_object_props
+
+        # convert into lists once (CB)
+        me_vertices = me.vertices[:]
+        me_edges = me.edges[:]
+        me_faces = me.faces[:]
 
         poseMatrix = write_object_props(my_mesh.blenObject, None, my_mesh.parRelMatrix())[3]
         pose_items.append((my_mesh.fbxName, poseMatrix))
@@ -1264,38 +1265,41 @@ def export_fbx(operator, context, filepath="",
         file.write('\n\t\tVertices: ')
         i=-1
 
-        for v in me.vertices:
-            if i==-1:
-                file.write('%.6f,%.6f,%.6f' % tuple(v.co));	i=0
+        for v in me_vertices:
+            if i == -1:
+                file.write('%.6f,%.6f,%.6f' % v.co[:])
+                i = 0
             else:
-                if i==7:
-                    file.write('\n\t\t');	i=0
-                file.write(',%.6f,%.6f,%.6f'% tuple(v.co))
+                if i == 7:
+                    file.write('\n\t\t')
+                    i = 0
+                file.write(',%.6f,%.6f,%.6f'% v.co[:])
             i+=1
 
         file.write('\n\t\tPolygonVertexIndex: ')
         i=-1
-        for f in me.faces:
+        for f in me_faces:
             fi = f.vertices[:]
-
             # last index XORd w. -1 indicates end of face
-            fi[-1] = fi[-1] ^ -1
-            fi = tuple(fi)
-
-            if i==-1:
-                if len(fi) == 3:	file.write('%i,%i,%i' % fi )
-                else:				file.write('%i,%i,%i,%i' % fi )
-                i=0
+            if i == -1:
+                if len(fi) == 3:
+                    file.write('%i,%i,%i' % (fi[0], fi[1], fi[2] ^ -1))
+                else:
+                    file.write('%i,%i,%i,%i' % (fi[0], fi[1], fi[2], fi[3] ^ -1))
+                i = 0
             else:
-                if i==13:
+                if i == 13:
                     file.write('\n\t\t')
-                    i=0
-                if len(fi) == 3:	file.write(',%i,%i,%i' % fi )
-                else:				file.write(',%i,%i,%i,%i' % fi )
-            i+=1
+                    i = 0
+                if len(fi) == 3:
+                    file.write(',%i,%i,%i' % (fi[0], fi[1], fi[2] ^ -1))
+                else:
+                    file.write(',%i,%i,%i,%i' % (fi[0], fi[1], fi[2], fi[3] ^ -1))
+            i += 1
+
 
         # write loose edges as faces.
-        for ed in me.edges:
+        for ed in me_edges:
             if ed.is_loose:
                 ed_val = ed.vertices[:]
                 ed_val = ed_val[0], ed_val[-1] ^ -1
@@ -1314,7 +1318,7 @@ def export_fbx(operator, context, filepath="",
         if Include_Edges:
             file.write('\n\t\tEdges: ')
             i=-1
-            for ed in me.edges:
+            for ed in me_edges:
                     if i==-1:
                         file.write('%i,%i' % (ed.vertices[0], ed.vertices[1]))
                         i=0
@@ -1336,13 +1340,13 @@ def export_fbx(operator, context, filepath="",
             Normals: ''')
 
         i=-1
-        for v in me.vertices:
+        for v in me_vertices:
             if i==-1:
-                file.write('%.15f,%.15f,%.15f' % tuple(v.normal));	i=0
+                file.write('%.15f,%.15f,%.15f' % v.normal[:]);	i=0
             else:
                 if i==2:
                     file.write('\n			 ');	i=0
-                file.write(',%.15f,%.15f,%.15f' % tuple(v.normal))
+                file.write(',%.15f,%.15f,%.15f' % v.normal[:])
             i+=1
         file.write('\n\t\t}')
 
@@ -1358,7 +1362,7 @@ def export_fbx(operator, context, filepath="",
                 Smoothing: ''')
 
             i=-1
-            for f in me.faces:
+            for f in me_faces:
                 if i==-1:
                     file.write('%i' % f.use_smooth);	i=0
                 else:
@@ -1380,7 +1384,7 @@ def export_fbx(operator, context, filepath="",
                     Smoothing: ''')
 
                 i=-1
-                for ed in me.edges:
+                for ed in me_edges:
                     if i==-1:
                         file.write('%i' % (ed.use_edge_sharp));	i=0
                     else:
@@ -1394,10 +1398,10 @@ def export_fbx(operator, context, filepath="",
         # small utility function
         # returns a slice of data depending on number of face verts
         # data is either a MeshTextureFace or MeshColor
-        def face_data(data, face):
-            totvert = len(f.vertices)
-
-            return data[:totvert]
+#        def face_data(data, face):
+#            totvert = len(f.vertices)
+#
+#           return data[:totvert]
 
 
         # Write VertexColor Layers
@@ -1418,21 +1422,22 @@ def export_fbx(operator, context, filepath="",
                 i = -1
                 ii = 0 # Count how many Colors we write
 
-                for f, cf in zip(me.faces, collayer.data):
-                    colors = [cf.color1, cf.color2, cf.color3, cf.color4]
+                for fi, cf in enumerate(collayer.data):
+                    if len(me_faces[fi].vertices) == 4:
+                        colors = cf.color1[:], cf.color2[:], cf.color3[:], cf.color4[:]
+                    else:
+                        colors = cf.color1[:], cf.color2[:], cf.color3[:]
 
-                    # determine number of verts
-                    colors = face_data(colors, f)
 
                     for col in colors:
                         if i==-1:
-                            file.write('%.4f,%.4f,%.4f,1' % tuple(col))
+                            file.write('%.4f,%.4f,%.4f,1' % col)
                             i=0
                         else:
                             if i==7:
                                 file.write('\n\t\t\t\t')
                                 i=0
-                            file.write(',%.4f,%.4f,%.4f,1' % tuple(col))
+                            file.write(',%.4f,%.4f,%.4f,1' % col)
                         i+=1
                         ii+=1 # One more Color
 
@@ -1475,13 +1480,13 @@ def export_fbx(operator, context, filepath="",
                     # workaround, since uf.uv iteration is wrong atm
                     for uv in uf.uv:
                         if i==-1:
-                            file.write('%.6f,%.6f' % tuple(uv))
+                            file.write('%.6f,%.6f' % uv[:])
                             i=0
                         else:
                             if i==7:
-                                file.write('\n			 ')
+                                file.write('\n\t\t\t ')
                                 i=0
-                            file.write(',%.6f,%.6f' % tuple(uv))
+                            file.write(',%.6f,%.6f' % uv[:])
                         i+=1
                         ii+=1 # One more UV
 
@@ -1585,11 +1590,10 @@ def export_fbx(operator, context, filepath="",
                 if me.uv_textures.active:
                     uv_faces = me.uv_textures.active.data
                 else:
-                    uv_faces = [None] * len(me.faces)
+                    uv_faces = [None] * len(me_faces)
 
                 i=-1
-                for f, uf in zip(me.faces, uv_faces):
-# 				for f in me.faces:
+                for f, uf in zip(me_faces, uv_faces):
                     try:	mat = mats[f.material_index]
                     except:mat = None
 
@@ -1745,7 +1749,6 @@ def export_fbx(operator, context, filepath="",
         if ob_arms_orig_rest:
             for ob_base in bpy.data.objects:
                 if ob_base.type == 'ARMATURE':
-                    # v2.56 was ob_base.update(scene) changed after to ob_base.update() (Campbell Barton)
                     ob_base.update()
 
             # This causes the makeDisplayList command to effect the mesh
@@ -1838,6 +1841,10 @@ def export_fbx(operator, context, filepath="",
 
                         if armob and armob not in ob_arms:
                             ob_arms.append(armob)
+                            
+                        # Warning for scaled, mesh objects with armatures
+                        if abs(ob.scale[0] - 1.0) > 0.05 or abs(ob.scale[1] - 1.0) > 0.05 or abs(ob.scale[1] - 1.0) > 0.05:
+                            operator.report('WARNING', "Object '%s' has a scale of (%.3f, %.3f, %.3f), Armature deformation will not work as expected!, Apply Scale to fix." % ((ob.name,) + tuple(ob.scale)))
 
                     else:
                         blenParentBoneName = armob = None
@@ -1873,7 +1880,6 @@ def export_fbx(operator, context, filepath="",
         if ob_arms_orig_rest:
             for ob_base in bpy.data.objects:
                 if ob_base.type == 'ARMATURE':
-                    # v2.56 was ob_base.update(scene) changed after to ob_base.update() (Campbell Barton)
                     ob_base.update()
             # This causes the makeDisplayList command to effect the mesh
             scene.frame_set(scene.frame_current)
@@ -1918,7 +1924,9 @@ def export_fbx(operator, context, filepath="",
 
             # The mesh uses this bones armature!
             if my_bone.fbxArm == my_mesh.fbxArm:
-                my_bone.blenMeshes[my_mesh.fbxName] = me
+                # Changed for 2.56a (CB)
+                if my_bone.blenBone.use_deform:
+                    my_bone.blenMeshes[my_mesh.fbxName] = me
 
 
                 # parent bone: replace bone names with our class instances
@@ -2496,15 +2504,10 @@ Takes:  {''')
                 # Start the take (JCB)
                 file.write('\n\tTake: "%s" {' % takeName)
 
-                # Set the action active
-                for my_bone in ob_arms:
-                    # From the original FBX exporter but some people have reported problems where all the
-                    # animations exported are the same (JCB)
-                    #if ob.animation_data and blenAction in my_bone.blenActionList:
-                    #    ob.animation_data.action = blenAction
-                    # This change was proposed by Evan Todd (30 Dec.2010)
-                    if my_bone.blenObject.animation_data and blenAction in my_bone.blenActionList:
-                        my_bone.blenObject.animation_data.action = blenAction
+                # Set the action active (CB)
+                for my_arm in ob_arms:
+                    if my_arm.blenObject.animation_data and blenAction in my_arm.blenActionList:
+                        my_arm.blenObject.animation_data.action = blenAction
 
             #file.write('\n\t\tFileName: "Default_Take.tak"') # ??? - not sure why this is needed
             #file.write('\n\t\tFileName: "%s.tak"' % sane_name_mapping_take[blenAction.name]) # ??? - not sure why this is needed
@@ -2666,10 +2669,10 @@ Takes:  {''')
             file.write('\n\t}')
 
             # end action loop. set original actions
-            # do this after every loop incase actions effect each other.
-            for my_bone in ob_arms:
-                if my_bone.blenObject.animation_data:
-                    my_bone.blenObject.animation_data.action = my_bone.blenAction
+            # do this after every loop incase actions effect each other (CB)
+            for my_arm in ob_arms:
+                if my_arm.blenObject.animation_data:
+                    my_arm.blenObject.animation_data.action = my_arm.blenAction
 
         file.write('\n}')
 
@@ -2737,10 +2740,13 @@ Takes:  {''')
     file.write('\n}')
     file.write('\n')
 
-    # Incase sombody imports this, clean up by clearing global dicts
+    # Clean up by clearing global dictionaries
+    # XXX These should not be global (CB)
     sane_name_mapping_ob.clear()
     sane_name_mapping_mat.clear()
     sane_name_mapping_tex.clear()
+    sane_name_mapping_take.clear()
+    sane_name_mapping_group.clear()
 
     ob_arms[:] =	[]
     ob_bones[:] =	[]
@@ -2750,7 +2756,9 @@ Takes:  {''')
     ob_null[:] =	[]
 
     # Tidy up
-    # Reset the armature pose_positions back to how they were before we started
+    file.close()
+
+    # Reset the armature pose_positions back to how they were before we started (JCB)
     if EXP_ARMATURE:
         for i, arm in enumerate(bpy.data.armatures):
             arm.pose_position = ob_arms_orig_rest[i]
@@ -2758,15 +2766,12 @@ Takes:  {''')
         if ob_arms_orig_rest:
             for ob_base in bpy.data.objects:
                 if ob_base.type == 'ARMATURE':
-                    # v2.56 was ob_base.update(scene) changed after to ob_base.update() (Campbell Barton)
                     ob_base.update()
             # This causes the makeDisplayList command to effect the mesh
             scene.frame_set(scene.frame_current)
-    
-    
+
     print('export finished in %.4f sec.' % (time.clock() - start_time))
     return {'FINISHED'}
-
 
 
 # ** User interface
@@ -2900,7 +2905,6 @@ class ExportFBXanimated(bpy.types.Operator, ExportHelper):
 # package manages registering (__init__.py)
 
 
-
 # ***** HISTORY *****
 #
 # Campbell Barton (Ideasman42) 
@@ -2929,95 +2933,29 @@ class ExportFBXanimated(bpy.types.Operator, ExportHelper):
 
 # ** TODO ** (JCB)
 #
-# On hold - Use sub menus from the Export menu
-#       See the space_view3d_copy_attributes script for an example.
-#       Unable to get this to work reverted to the previous 3 menus
-#       I need simpler instructions or more appropriate sample code
-#       For my purposes the menus are more user friendly with three separate options not on a sub menu.
+# - Change the angle convertion method
+#       See tuple_rad_to_deg() in the 2.56a export_fbx
+# - Change to trap armature meshes correctly
+#       See my_ob.setPoseFrame(i, fake=True) in the 2.56a export_fbx
+# - Be specific about the properties of objects used is:
+#       my_object_generic
+# - Reverse the rotation of the CAMERA in various places
+# - Use matrix.decompose() rather that matrix.translation_part() in various places
 # On hold - Remove Optimise Keyframes it unnecessarily complicates the script
 
 # ** Ideas for others ** (JCB)
 #
 # - Use the Free AutoDesk FBX SDK which supports Python
  
-# == Tasks for inclusion in the Blender Trunk (JCB) from mindrones (Luca)
+# == Tasks for API changes 2.56 to 2.56a == (JCB)
 #
-# Done - Added a separate more detailed change log for the benefit of the Blender devs.  
-#       see ChangeLog.htm
-# Done - Rename the package to the standard format
-#       io_anim_mesh_xna
-# Done - In the package folder use the following naming convention
-#       __inti__.py
-#       export.py
-# Done - Move and reduce these comment lines
-# Done - Join together unnecessary continuation lines ending \
-#            __slots__ was the only one I could find and that came from the original script.
-# Done - Change the wiki references to the Blender wiki and not the external project
-
- 
-# == Completed tidy up tasks and other fixes (JCB)
-#
-# Done - Export the animations without the MESH and textures
-#       Just export the bones, armature and take(s)
-# Done - Use one script for all exports
-# Done - Reduce the frames used in the Rest pose take for the model to the minimum
-# Done - Disable the keyframe optimise options
-# Done - Reset the pose_position back to how it was before the script started
-# Done - Stop the script erroring if the images are on a different drive to the output
-# Done - Added an option to include smoothing data (default = false)
-# Done - Added an option to include edge data (default = false)
-# Done - Move the user interface in to the this file
-# Done - Change the title to XNA FBX Model
-# Done - Remove the options for setting scale and rotation
-# Done - Set the GLOBAL_MATRIX to identity
-# Done - Move the script to the io_export_xna folder
-# Done - Register the fbx script in the __init__.py script
-# Done - Remove batch support
-
-# == Completed tasks to make the output similar to working sample FBX files (JCB)
-#
-# Done - The Armature MUST be the root LimbNode
-#       This being null instead of LimbNode is what caused the leaning of 
-#       the animations!
-# Done - Added back this commented out line
-#        It is in the Relations: section of the FBX file.
-#           file.write('\n\tPose: "Pose::BIND_POSES", "BindPose" {\n\t}')
-# Done - Change object_tx()
-#             Remove the rotation applied to the armature
-# Done - Change the takes so they use the same code as the 2.4x XNA FBX script
-#             Part done
-#             Changed to C,n instead of L
-# Done OK - Make it export just the current take if all actions is not selected
-# Done OK - Remove the Default_Take
-#             There is no requirement to have a take at all
-# Done OK - Remove 'Blend_Root'
-#             As far as I can tell there is no need for any form of root object.
-#             A valid model can be as simple as a single mesh connected to the scene.
-# Done OK - Make the armature the root instead of Blend_Root
-# Done OK - Connect the armature to the scene not to root
-# Done OK - Check that the first bone is connected to the armature object not to root
-# Done OK - Connect all the objects (meshes) to the scene not to the armature
-# Done OK - Change 'Limb' to 'LimbNode'
-# Done OK - Make the armature a LimbNode instead of a null
-
-# Prior tasks (Unknown author)
-#
-# All line numbers correspond to original export_fbx.py (under release/scripts)
-# - Draw.PupMenu alternative in 2.5?, temporarily replaced PupMenu with print
-# - get rid of bpy.path.clean_name somehow
-# + fixed: isinstance(inst, bpy.types.*) doesn't work on RNA objects: line 565
-# + get rid of BPyObject_getObjectArmature, move it in RNA?
-# - BATCH_ENABLE and BATCH_GROUP options: line 327
-# - implement all BPyMesh_* used here with RNA
-# - getDerivedObjects is not fully replicated with .dupli* funcs
-# - talk to Campbell, this code won't work? lines 1867-1875
-# - don't know what those colbits are, do we need them? they're said to be deprecated in DNA_object_types.h: 1886-1893
-# - no hq normals: 1900-1901
-
-# Incomplete (Unknown author)
-#
-# - bpy.data.remove_scene: line 366
-# - bpy.sys.time move to bpy.sys.util?
-# - new scene creation, activation: lines 327-342, 368
-# - uses bpy.path.abspath, *.relpath - replace at least relpath
-
+# done - Convert me.faces etc. to to lists me_faces etc.
+#       See from line 1454 in the 2.56a export_fbx
+# done - close the file
+# done - clear all global sane_name_mappings
+# done - change ob_base.update(scene)  to ob_base.update() (CB)
+# done - change the file open to specify the type as in:
+#       file = open(filepath, 'w', encoding='utf8')
+# done - change relative path code
+#       See line 1239 of the original 2.56a export_fbx file
+# done - add warning for scaled objects

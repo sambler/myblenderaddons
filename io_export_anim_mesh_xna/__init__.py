@@ -17,16 +17,16 @@
 bl_addon_info = {
     "name": "Blender to XNA",
     "author": "John C Brown, JCBDigger (@MistyManor)",
-    "version": (1, 1),
-    "blender": (2, 5, 5),
-    "api": 32738,
+    "version": (1, 2),
+    "blender": (2, 5, 6),
+    "api": 34076,
     "location": "File > Export > XNA FBX Animated Model",
     "description": "Export the model and animations for use in XNA",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
         "Scripts/Import-Export/Blender-toXNA",
     "tracker_url": "https://projects.blender.org/tracker/index.php?"\
-        "func=detail&aid=25013&group_id=153&atid=469",
+        "func=detail&aid=25013",
     "category": "Import-Export"}
 
 
