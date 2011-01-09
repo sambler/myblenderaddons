@@ -22,7 +22,7 @@ Blender to XNA
 
 This script is an exporter to the Autodesk FBX file format suitable for use with Microsoft XNA.
 
-http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/File_I-O/Blender-toXNA
+http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/Import-Export/Blender-toXNA
 """
 
 import os

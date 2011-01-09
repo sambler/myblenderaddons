@@ -17,9 +17,9 @@
 bl_addon_info = {
     "name": "Blender to XNA",
     "author": "John C Brown, JCBDigger (@MistyManor)",
-    "version": (1, 1),
-    "blender": (2, 5, 5),
-    "api": 32738,
+    "version": (1, 2),
+    "blender": (2, 5, 6),
+    "api": 34076,
     "location": "File > Export > XNA FBX Animated Model",
     "description": "Export the model and animations for use in XNA",
     "warning": "",
