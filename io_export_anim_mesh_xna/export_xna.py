@@ -213,7 +213,7 @@ def export_fbx(operator, context, filepath="",
     # http://www.blender.org/documentation/249PythonDoc/Mathutils.Matrix-class.html
     # There is probably a built in function to get the Identity matrix but I 
     # could not find it in the documentation quickly enough.
-    GLOBAL_MATRIX = Matrix([1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,1])
+    GLOBAL_MATRIX = Matrix(((1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1)))
     
     if bpy.ops.object.mode_set.poll():
         bpy.ops.object.mode_set(mode='OBJECT')
