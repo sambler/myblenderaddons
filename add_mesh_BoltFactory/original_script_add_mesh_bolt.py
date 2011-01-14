@@ -16,7 +16,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-bl_addon_info = {
+bl_info = {
     'name': 'Add Mesh: Bolt',
     'author': 'Aaron Keith',
     'version': '3.00',
