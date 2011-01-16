@@ -14,7 +14,7 @@
 #
 # ***** END GPL LICENCE BLOCK *****
 
-bl_addon_info = {
+bl_info = {
     "name": "Blender to XNA",
     "author": "John C Brown, JCBDigger (@MistyManor)",
     "version": (1, 2),

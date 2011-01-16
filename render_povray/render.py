@@ -30,6 +30,7 @@ if pltfrm.architecture()[0] == '64bit':
 else:
     bitness = 32
 
+
 ##############################SF###########################
 ##############find image texture 
 def splitExt(path):
@@ -41,7 +42,7 @@ def splitExt(path):
 
 
 def imageFormat(imgF):
-    ext = ""
+    ext = ''
     ext_orig = splitExt(imgF)
     if ext_orig == 'JPG' or ext_orig == 'JPEG': ext='jpeg'
     if ext_orig == 'GIF': ext = 'gif'
@@ -64,7 +65,7 @@ def imgMap(ts):
     if ts.mapping=='TUBE':image_map= ' map_type 2 '
     #if ts.mapping=='?':image_map= ' map_type 3 '# map_type 3 and 4 in development (?) for Povray, currently they just seem to default back to Flat (type 0)
     #if ts.mapping=='?':image_map= ' map_type 4 '# map_type 3 and 4 in development (?) for Povray, currently they just seem to default back to Flat (type 0)
-    if ts.texture.use_interpolation: image_map+= " interpolate 2 "
+    if ts.texture.use_interpolation: image_map+= ' interpolate 2 '
     if ts.texture.extension == 'CLIP': image_map+=' once '
     #image_map+='}'
     #if ts.mapping=='CUBE':image_map+= 'warp { cubic } rotate <-90,0,180>' #no direct cube type mapping. Though this should work in POV 3.7 it doesn't give that good results(best suited to environment maps?)
@@ -76,7 +77,7 @@ def imgMapBG(wts):
     if wts.texture_coords== 'VIEW':image_mapBG= ' map_type 0 ' #texture_coords refers to the mapping of world textures
     if wts.texture_coords=='ANGMAP':image_mapBG= ' map_type 1 '
     if wts.texture_coords=='TUBE':image_mapBG= ' map_type 2 '
-    if wts.texture.use_interpolation: image_mapBG+= " interpolate 2 "
+    if wts.texture.use_interpolation: image_mapBG+= ' interpolate 2 '
     if wts.texture.extension == 'CLIP': image_mapBG+=' once '
     #image_mapBG+='}'
     #if wts.mapping=='CUBE':image_mapBG+= 'warp { cubic } rotate <-90,0,180>' #no direct cube type mapping. Though this should work in POV 3.7 it doesn't give that good results(best suited to environment maps?)
@@ -87,7 +88,7 @@ def splitFile(path):
     idx = path.rfind('/')
     if idx == -1:
         idx = path.rfind('\\')
-    return path[idx:].replace("/", "").replace("\\", "")
+    return path[idx:].replace('/', '').replace('\\', '')
 
 def splitPath(path):
     idx = path.rfind('/')
@@ -152,9 +153,12 @@ def safety(name, Level):
 ##############end safety string name material
 ##############################EndSF###########################
 
+TabLevel = 0
+
 def write_pov(filename, scene=None, info_callback=None):
     import mathutils
-    file = open(filename, 'w')
+    #file = filename
+    file = open(filename.name, 'w')
 
     # Only for testing
     if not scene:
@@ -163,6 +167,32 @@ def write_pov(filename, scene=None, info_callback=None):
     render = scene.render
     world = scene.world
     global_matrix = mathutils.Matrix.Rotation(-pi / 2.0, 4, 'X')
+
+    def setTab(tabtype, spaces):
+        TabStr = ''
+        if tabtype == '0':
+            TabStr = ''
+        elif tabtype == '1': 
+            TabStr = '\t'
+        elif tabtype == '2':
+            TabStr = spaces * ' '
+        return TabStr
+
+    Tab = setTab(scene.pov_indentation_character, scene.pov_indentation_spaces)
+
+    def tabWrite(str_o):
+        global TabLevel
+        brackets = str_o.count('{') - str_o.count('}')
+        if brackets < 0:
+            TabLevel = TabLevel + brackets 
+        if TabLevel < 0:
+            print('Indentation Warning: TabLevel = %s' % TabLevel)
+            TabLevel = 0
+        if TabLevel >= 1: 
+            file.write('%s' % Tab * TabLevel)
+        file.write(str_o)
+        if brackets > 0:
+            TabLevel = TabLevel + brackets 
 
     def uniqueName(name, nameSeq):
 
@@ -178,7 +208,7 @@ def write_pov(filename, scene=None, info_callback=None):
         return name
 
     def writeMatrix(matrix):
-        file.write('\tmatrix <%.6f, %.6f, %.6f,  %.6f, %.6f, %.6f,  %.6f, %.6f, %.6f,  %.6f, %.6f, %.6f>\n' %\
+        tabWrite('matrix <%.6f, %.6f, %.6f,  %.6f, %.6f, %.6f,  %.6f, %.6f, %.6f,  %.6f, %.6f, %.6f>\n' %\
         (matrix[0][0], matrix[0][1], matrix[0][2], matrix[1][0], matrix[1][1], matrix[1][2], matrix[2][0], matrix[2][1], matrix[2][2], matrix[3][0], matrix[3][1], matrix[3][2]))
 
     def writeObjectMaterial(material):
@@ -189,34 +219,37 @@ def write_pov(filename, scene=None, info_callback=None):
         if material: #and material.transparency_method == 'RAYTRACE':#Commented out: always write IOR to be able to use it for SSS, Fresnel reflections...
             #But there can be only one!
             if material.subsurface_scattering.use:#SSS IOR get highest priority
-                file.write('\tinterior { ior %.6f\n' % material.subsurface_scattering.ior)
+                tabWrite('interior {\n')
+                tabWrite('ior %.6f\n' % material.subsurface_scattering.ior)
             elif material.pov_mirror_use_IOR:#Then the raytrace IOR taken from raytrace transparency properties and used for reflections if IOR Mirror option is checked
-                file.write('\tinterior { ior %.6f\n' % material.raytrace_transparency.ior)
+                tabWrite('interior {\n')
+                tabWrite('ior %.6f\n' % material.raytrace_transparency.ior)
             else:
-                file.write('\tinterior { ior %.6f\n' % material.raytrace_transparency.ior)
+                tabWrite('interior {\n')
+                tabWrite('ior %.6f\n' % material.raytrace_transparency.ior)
                 
             pov_fake_caustics = False
             pov_photons_refraction = False
             pov_photons_reflection = False
                 
-            if material.pov_refraction_type=="0":
+            if material.pov_refraction_type=='0':
                 pov_fake_caustics = False
                 pov_photons_refraction = False
                 pov_photons_reflection = True #should respond only to proper checkerbox
-            elif material.pov_refraction_type=="1":
+            elif material.pov_refraction_type=='1':
                 pov_fake_caustics = True
                 pov_photons_refraction = False
-            elif material.pov_refraction_type=="2":
+            elif material.pov_refraction_type=='2':
                 pov_fake_caustics = False
                 pov_photons_refraction = True
 
-            #If only Raytrace transparency is set, its IOR will be used for refraction, but user can set up "un-physical" fresnel reflections in raytrace mirror parameters. 
-            #Last, if none of the above is specified, user can set up "un-physical" fresnel reflections in raytrace mirror parameters. And pov IOR defaults to 1. 
+            #If only Raytrace transparency is set, its IOR will be used for refraction, but user can set up 'un-physical' fresnel reflections in raytrace mirror parameters. 
+            #Last, if none of the above is specified, user can set up 'un-physical' fresnel reflections in raytrace mirror parameters. And pov IOR defaults to 1. 
             if material.pov_caustics_enable:
                 if pov_fake_caustics:
-                    file.write('\tcaustics %.3g\n' % material.pov_fake_caustics_power)
+                    tabWrite('caustics %.3g\n' % material.pov_fake_caustics_power)
                 if pov_photons_refraction:
-                    file.write('\tdispersion %.3g\n' % material.pov_photons_dispersion) #Default of 1 means no dispersion
+                    tabWrite('dispersion %.3g\n' % material.pov_photons_dispersion) #Default of 1 means no dispersion
             #TODO        
             # Other interior args
             # if material.use_transparency and material.transparency_method == 'RAYTRACE':
@@ -225,41 +258,46 @@ def write_pov(filename, scene=None, info_callback=None):
             # fade_color
 
             # (variable) dispersion_samples (constant count for now)
-            file.write('\t}\n')
+            tabWrite('}\n')
             if pov_photons_refraction or pov_photons_reflection:
-                file.write('\tphotons{\n')
-                file.write('\t\ttarget\n')
+                tabWrite('photons{\n')
+                tabWrite('target\n')
                 if pov_photons_refraction:
-                    file.write('\t\trefraction on\n')
+                    tabWrite('refraction on\n')
                 if pov_photons_reflection:
-                    file.write('\t\treflection on\n')
-                file.write('\t}\n')
+                    tabWrite('reflection on\n')
+                tabWrite('}\n')
                 
     materialNames = {}
     DEF_MAT_NAME = 'Default'
 
     def writeMaterial(material):
         # Assumes only called once on each material
-
         if material:
             name_orig = material.name
         else:
             name_orig = DEF_MAT_NAME
 
         name = materialNames[name_orig] = uniqueName(bpy.path.clean_name(name_orig), materialNames)
-
+        comments = scene.pov_comments_enable
 
         ##################Several versions of the finish: Level conditions are variations for specular/Mirror texture channel map with alternative finish of 0 specular and no mirror reflection
         # Level=1 Means No specular nor Mirror reflection
         # Level=2 Means translation of spec and mir levels for when no map influences them
         # Level=3 Means Maximum Spec and Mirror 
         def povHasnoSpecularMaps(Level):
-            if Level == 2:
-                file.write('#declare %s = finish {\n' % safety(name, Level = 2))
-            elif Level == 1:
-                file.write('#declare %s = finish {\n' % safety(name, Level = 1))
+            if Level == 1:
+                tabWrite('#declare %s = finish {' % safety(name, Level = 1))
+                if comments: file.write('  //No specular nor Mirror reflection\n')
+                else: tabWrite('\n')
+            elif Level == 2:
+                tabWrite('#declare %s = finish {' % safety(name, Level = 2))
+                if comments: file.write('  //translation of spec and mir levels for when no map influences them\n')
+                else: tabWrite('\n')
             elif Level == 3:
-                file.write('#declare %s = finish {\n' % safety(name, Level = 3))
+                tabWrite('#declare %s = finish {' % safety(name, Level = 3))
+                if comments: file.write('  //Maximum Spec and Mirror\n')
+                else: tabWrite('\n')
 
 
             if material:
@@ -274,7 +312,7 @@ def write_pov(filename, scene=None, info_callback=None):
                     if (frontDiffuse + backDiffuse) <= 1.0:
                         pass
                     elif frontDiffuse==backDiffuse:
-                        frontDiffuse = backDiffuse = 0.5 # Try to respect the user's "intention" by comparing the two values but bringing the total back to one
+                        frontDiffuse = backDiffuse = 0.5 # Try to respect the user's 'intention' by comparing the two values but bringing the total back to one
                     elif frontDiffuse>backDiffuse:       # Let the highest value stay the highest value
                         backDiffuse = 1-(1-frontDiffuse)
                     else:
@@ -291,87 +329,87 @@ def write_pov(filename, scene=None, info_callback=None):
                 #####################################Diffuse Shader######################################
                 # Not used for Full spec (Level=3) of the shader
                 if material.diffuse_shader == 'OREN_NAYAR' and Level != 3:
-                    file.write('\tbrilliance %.3g\n' % (0.9+material.roughness))#blender roughness is what is generally called oren nayar Sigma, and brilliance in povray
+                    tabWrite('brilliance %.3g\n' % (0.9+material.roughness))#blender roughness is what is generally called oren nayar Sigma, and brilliance in povray
 
                 if material.diffuse_shader == 'TOON' and Level != 3:
-                    file.write('\tbrilliance %.3g\n' % (0.01+material.diffuse_toon_smooth*0.25))
+                    tabWrite('brilliance %.3g\n' % (0.01+material.diffuse_toon_smooth*0.25))
                     frontDiffuse*=0.5 #Lower diffuse and increase specular for toon effect seems to look better in povray
                 
                 if material.diffuse_shader == 'MINNAERT' and Level != 3:
-                    #file.write('\taoi %.3g\n' % material.darkness)
+                    #tabWrite('aoi %.3g\n' % material.darkness)
                     pass #let's keep things simple for now
                 if material.diffuse_shader == 'FRESNEL' and Level != 3:
-                    #file.write('\taoi %.3g\n' % material.diffuse_fresnel_factor)
+                    #tabWrite('aoi %.3g\n' % material.diffuse_fresnel_factor)
                     pass #let's keep things simple for now
                 if material.diffuse_shader == 'LAMBERT' and Level != 3:
-                    file.write('\tbrilliance 1.8\n') #trying to best match lambert attenuation by that constant brilliance value
+                    tabWrite('brilliance 1.8\n') #trying to best match lambert attenuation by that constant brilliance value
 
                 if Level == 2:   
                     ####################################Specular Shader######################################
                     if material.specular_shader == 'COOKTORR' or material.specular_shader == 'PHONG':#No difference between phong and cook torrence in blender HaHa!
-                        file.write('\tphong %.3g\n' % (material.specular_intensity))
-                        file.write('\tphong_size %.3g\n'% (material.specular_hardness / 2 + 0.25)) 
+                        tabWrite('phong %.3g\n' % (material.specular_intensity))
+                        tabWrite('phong_size %.3g\n'% (material.specular_hardness / 2 + 0.25)) 
 
-                    if material.specular_shader == 'BLINN':#Povray "specular" keyword corresponds to a Blinn model, without the ior.
-                        file.write('\tspecular %.3g\n' % (material.specular_intensity * (material.specular_ior/4))) #Use blender Blinn's IOR just as some factor for spec intensity
-                        file.write('\troughness %.3g\n' % roughness) 
+                    if material.specular_shader == 'BLINN':#Povray 'specular' keyword corresponds to a Blinn model, without the ior.
+                        tabWrite('specular %.3g\n' % (material.specular_intensity * (material.specular_ior/4))) #Use blender Blinn's IOR just as some factor for spec intensity
+                        tabWrite('roughness %.3g\n' % roughness) 
                         #Could use brilliance 2(or varying around 2 depending on ior or factor) too.
 
 
                     if material.specular_shader == 'TOON':
-                        file.write('\tphong %.3g\n' % (material.specular_intensity * 2))
-                        file.write('\tphong_size %.3g\n' % (0.1+material.specular_toon_smooth / 2)) #use extreme phong_size
+                        tabWrite('phong %.3g\n' % (material.specular_intensity * 2))
+                        tabWrite('phong_size %.3g\n' % (0.1+material.specular_toon_smooth / 2)) #use extreme phong_size
 
 
                     if material.specular_shader == 'WARDISO':
-                        file.write('\tspecular %.3g\n' % (material.specular_intensity / (material.specular_slope+0.0005))) #find best suited default constant for brilliance Use both phong and specular for some values.
-                        file.write('\troughness %.4g\n' % (0.0005+material.specular_slope/10)) #find best suited default constant for brilliance Use both phong and specular for some values.
-                        file.write('\tbrilliance %.4g\n' % (1.8-material.specular_slope*1.8)) #find best suited default constant for brilliance Use both phong and specular for some values.
+                        tabWrite('specular %.3g\n' % (material.specular_intensity / (material.specular_slope+0.0005))) #find best suited default constant for brilliance Use both phong and specular for some values.
+                        tabWrite('roughness %.4g\n' % (0.0005+material.specular_slope/10)) #find best suited default constant for brilliance Use both phong and specular for some values.
+                        tabWrite('brilliance %.4g\n' % (1.8-material.specular_slope*1.8)) #find best suited default constant for brilliance Use both phong and specular for some values.
                         
 
                     
                     #########################################################################################
                 elif Level == 1:
-                    file.write('\tspecular 0\n')
+                    tabWrite('specular 0\n')
                 elif Level == 3:
-                    file.write('\tspecular 1\n')
-                file.write('\tdiffuse %.3g %.3g\n' % (frontDiffuse, backDiffuse))
+                    tabWrite('specular 1\n')
+                tabWrite('diffuse %.3g %.3g\n' % (frontDiffuse, backDiffuse))
 
 
-                file.write('\tambient %.3g\n' % material.ambient)
-                #file.write('\tambient rgb <%.3g, %.3g, %.3g>\n' % tuple([c*material.ambient for c in world.ambient_color])) # povray blends the global value
-                file.write('\temission %.3g\n' % material.emit) #New in povray 3.7
+                tabWrite('ambient %.3g\n' % material.ambient)
+                #tabWrite('ambient rgb <%.3g, %.3g, %.3g>\n' % tuple([c*material.ambient for c in world.ambient_color])) # povray blends the global value
+                tabWrite('emission %.3g\n' % material.emit) #New in povray 3.7
                 
-                #file.write('\troughness %.3g\n' % roughness) #povray just ignores roughness if there's no specular keyword
+                #tabWrite('roughness %.3g\n' % roughness) #povray just ignores roughness if there's no specular keyword
                 
                 if material.pov_conserve_energy:
-                    file.write('\tconserve_energy\n')#added for more realistic shading. Needs some checking to see if it really works. --Maurice.
+                    tabWrite('conserve_energy\n')#added for more realistic shading. Needs some checking to see if it really works. --Maurice.
 
                 # 'phong 70.0 '
                 if Level != 1:
                     if material.raytrace_mirror.use:
                         raytrace_mirror = material.raytrace_mirror
                         if raytrace_mirror.reflect_factor:
-                            file.write('\treflection {\n')
-                            file.write('\t\trgb <%.3g, %.3g, %.3g>' % tuple(material.mirror_color))
+                            tabWrite('reflection {\n')
+                            tabWrite('rgb <%.3g, %.3g, %.3g>' % tuple(material.mirror_color))
                             if material.pov_mirror_metallic:
-                                file.write('\t\tmetallic %.3g' % (raytrace_mirror.reflect_factor))
+                                tabWrite('metallic %.3g' % (raytrace_mirror.reflect_factor))
                             if material.pov_mirror_use_IOR: #WORKING ?
-                                file.write('\t\tfresnel 1 ')#Removed from the line below: gives a more physically correct material but needs proper IOR. --Maurice
-                            file.write('\t\tfalloff %.3g exponent %.3g} ' % (raytrace_mirror.fresnel, raytrace_mirror.fresnel_factor))
+                                tabWrite('fresnel 1 ')#Removed from the line below: gives a more physically correct material but needs proper IOR. --Maurice
+                            tabWrite('falloff %.3g exponent %.3g} ' % (raytrace_mirror.fresnel, raytrace_mirror.fresnel_factor))
 
                 if material.subsurface_scattering.use:
                     subsurface_scattering = material.subsurface_scattering
-                    file.write('\tsubsurface { <%.3g, %.3g, %.3g>, <%.3g, %.3g, %.3g> }\n' % (sqrt(subsurface_scattering.radius[0])*1.5, sqrt(subsurface_scattering.radius[1])*1.5, sqrt(subsurface_scattering.radius[2])*1.5, 1-subsurface_scattering.color[0], 1-subsurface_scattering.color[1], 1-subsurface_scattering.color[2]))
+                    tabWrite('subsurface { <%.3g, %.3g, %.3g>, <%.3g, %.3g, %.3g> }\n' % (sqrt(subsurface_scattering.radius[0])*1.5, sqrt(subsurface_scattering.radius[1])*1.5, sqrt(subsurface_scattering.radius[2])*1.5, 1-subsurface_scattering.color[0], 1-subsurface_scattering.color[1], 1-subsurface_scattering.color[2]))
 
                 if material.pov_irid_enable:
-                    file.write('\tirid { %.4g thickness %.4g turbulence %.4g }' % (material.pov_irid_amount, material.pov_irid_thickness, material.pov_irid_turbulence))
+                    tabWrite('irid { %.4g thickness %.4g turbulence %.4g }' % (material.pov_irid_amount, material.pov_irid_thickness, material.pov_irid_turbulence))
 
             else:
-                file.write('\tdiffuse 0.8\n')
-                file.write('\tphong 70.0\n')
+                tabWrite('diffuse 0.8\n')
+                tabWrite('phong 70.0\n')
                 
-                #file.write('\tspecular 0.2\n')
+                #tabWrite('specular 0.2\n')
 
 
             # This is written into the object
@@ -380,13 +418,13 @@ def write_pov(filename, scene=None, info_callback=None):
                 'interior { ior %.3g} ' % material.raytrace_transparency.ior
             '''
 
-            #file.write('\t\t\tcrand 1.0\n') # Sand granyness
-            #file.write('\t\t\tmetallic %.6f\n' % material.spec)
-            #file.write('\t\t\tphong %.6f\n' % material.spec)
-            #file.write('\t\t\tphong_size %.6f\n' % material.spec)
-            #file.write('\t\t\tbrilliance %.6f ' % (material.specular_hardness/256.0) # Like hardness
+            #tabWrite('crand 1.0\n') # Sand granyness
+            #tabWrite('metallic %.6f\n' % material.spec)
+            #tabWrite('phong %.6f\n' % material.spec)
+            #tabWrite('phong_size %.6f\n' % material.spec)
+            #tabWrite('brilliance %.6f ' % (material.specular_hardness/256.0) # Like hardness
 
-            file.write('}\n')
+            tabWrite('}\n\n')
 
         # Level=1 Means No specular nor Mirror reflection
         povHasnoSpecularMaps(Level=1)
@@ -407,32 +445,32 @@ def write_pov(filename, scene=None, info_callback=None):
 
         # compute resolution
         Qsize = float(render.resolution_x) / float(render.resolution_y)
-        file.write('#declare camLocation  = <%.6f, %.6f, %.6f>;\n' % (matrix[3][0], matrix[3][1], matrix[3][2]))
-        file.write('#declare camLookAt = <%.6f, %.6f, %.6f>;\n' % tuple([degrees(e) for e in matrix.rotation_part().to_euler()]))
+        tabWrite('#declare camLocation  = <%.6f, %.6f, %.6f>;\n' % (matrix[3][0], matrix[3][1], matrix[3][2]))
+        tabWrite('#declare camLookAt = <%.6f, %.6f, %.6f>;\n' % tuple([degrees(e) for e in matrix.rotation_part().to_euler()]))
 
-        file.write('camera {\n')
+        tabWrite('camera {\n')
         if scene.pov_baking_enable and active_object and active_object.type=='MESH':
-            file.write('\tmesh_camera{ 1 3\n') # distribution 3 is what we want here
-            file.write('\t\tmesh{%s}\n' % active_object.name)
-            file.write('\t}\n')
-            file.write('location <0,0,.01>')
-            file.write('direction <0,0,-1>')
+            tabWrite('mesh_camera{ 1 3\n') # distribution 3 is what we want here
+            tabWrite('mesh{%s}\n' % active_object.name)
+            tabWrite('}\n')
+            tabWrite('location <0,0,.01>')
+            tabWrite('direction <0,0,-1>')
         # Using standard camera otherwise
         else:
-            file.write('\tlocation  <0, 0, 0>\n')
-            file.write('\tlook_at  <0, 0, -1>\n')
-            file.write('\tright <%s, 0, 0>\n' % - Qsize)
-            file.write('\tup <0, 1, 0>\n')
-            file.write('\tangle  %f \n' % (360.0 * atan(16.0 / camera.data.lens) / pi))
+            tabWrite('location  <0, 0, 0>\n')
+            tabWrite('look_at  <0, 0, -1>\n')
+            tabWrite('right <%s, 0, 0>\n' % - Qsize)
+            tabWrite('up <0, 1, 0>\n')
+            tabWrite('angle  %f \n' % (360.0 * atan(16.0 / camera.data.lens) / pi))
 
-            file.write('\trotate  <%.6f, %.6f, %.6f>\n' % tuple([degrees(e) for e in matrix.rotation_part().to_euler()]))
-            file.write('\ttranslate <%.6f, %.6f, %.6f>\n' % (matrix[3][0], matrix[3][1], matrix[3][2]))
+            tabWrite('rotate  <%.6f, %.6f, %.6f>\n' % tuple([degrees(e) for e in matrix.rotation_part().to_euler()]))
+            tabWrite('translate <%.6f, %.6f, %.6f>\n' % (matrix[3][0], matrix[3][1], matrix[3][2]))
             if focal_point != 0:
-                file.write('\taperture 0.25\n') # fixed blur amount for now to do, add slider a button? 
-                file.write('\tblur_samples 96 128\n')
-                file.write('\tvariance 1/10000\n')
-                file.write('\tfocal_point <0, 0, %f>\n' % focal_point)
-        file.write('}\n')
+                tabWrite('aperture 0.25\n') # fixed blur amount for now to do, add slider a button? 
+                tabWrite('blur_samples 96 128\n')
+                tabWrite('variance 1/10000\n')
+                tabWrite('focal_point <0, 0, %f>\n' % focal_point)
+        tabWrite('}\n')
 
     def exportLamps(lamps):
         # Get all lamps
@@ -443,30 +481,30 @@ def write_pov(filename, scene=None, info_callback=None):
 
             color = tuple([c * lamp.energy *2 for c in lamp.color]) # Colour is modified by energy #muiltiplie by 2 for a better match --Maurice
 
-            file.write('light_source {\n')
-            file.write('\t< 0,0,0 >\n')
-            file.write('\tcolor rgb<%.3g, %.3g, %.3g>\n' % color)
+            tabWrite('light_source {\n')
+            tabWrite('< 0,0,0 >\n')
+            tabWrite('color rgb<%.3g, %.3g, %.3g>\n' % color)
 
             if lamp.type == 'POINT': # Point Lamp
                 pass
             elif lamp.type == 'SPOT': # Spot
-                file.write('\tspotlight\n')
+                tabWrite('spotlight\n')
 
                 # Falloff is the main radius from the centre line
-                file.write('\tfalloff %.2f\n' % (degrees(lamp.spot_size) / 2.0)) # 1 TO 179 FOR BOTH
-                file.write('\tradius %.6f\n' % ((degrees(lamp.spot_size) / 2.0) * (1.0 - lamp.spot_blend)))
+                tabWrite('falloff %.2f\n' % (degrees(lamp.spot_size) / 2.0)) # 1 TO 179 FOR BOTH
+                tabWrite('radius %.6f\n' % ((degrees(lamp.spot_size) / 2.0) * (1.0 - lamp.spot_blend)))
 
                 # Blender does not have a tightness equivilent, 0 is most like blender default.
-                file.write('\ttightness 0\n') # 0:10f
+                tabWrite('tightness 0\n') # 0:10f
 
-                file.write('\tpoint_at  <0, 0, -1>\n')
+                tabWrite('point_at  <0, 0, -1>\n')
             elif lamp.type == 'SUN':
-                file.write('\tparallel\n')
-                file.write('\tpoint_at  <0, 0, -1>\n') # *must* be after 'parallel'
+                tabWrite('parallel\n')
+                tabWrite('point_at  <0, 0, -1>\n') # *must* be after 'parallel'
 
             elif lamp.type == 'AREA':
-                file.write('\tfade_distance %.6f\n' % (lamp.distance / 5) )
-                file.write('\tfade_power %d\n' % 2) #  Area lights have no falloff type, so always use blenders lamp quad equivalent for those?
+                tabWrite('fade_distance %.6f\n' % (lamp.distance / 5) )
+                tabWrite('fade_power %d\n' % 2) #  Area lights have no falloff type, so always use blenders lamp quad equivalent for those?
                 size_x = lamp.size
                 samples_x = lamp.shadow_ray_samples_x
                 if lamp.shape == 'SQUARE':
@@ -476,33 +514,33 @@ def write_pov(filename, scene=None, info_callback=None):
                     size_y = lamp.size_y
                     samples_y = lamp.shadow_ray_samples_y
 
-                file.write('\tarea_light <%d,0,0>,<0,0,%d> %d, %d\n' % (size_x, size_y, samples_x, samples_y))
+                tabWrite('area_light <%d,0,0>,<0,0,%d> %d, %d\n' % (size_x, size_y, samples_x, samples_y))
                 if lamp.shadow_ray_sample_method == 'CONSTANT_JITTERED':
                     if lamp.jitter:
-                        file.write('\tjitter\n')
+                        tabWrite('jitter\n')
                 else:
-                    file.write('\tadaptive 1\n')
-                    file.write('\tjitter\n')
+                    tabWrite('adaptive 1\n')
+                    tabWrite('jitter\n')
 
             if lamp.type == 'HEMI':#HEMI never has any shadow attribute
-                file.write('\tshadowless\n')
+                tabWrite('shadowless\n')
             elif lamp.shadow_method == 'NOSHADOW':
-                    file.write('\tshadowless\n')
+                    tabWrite('shadowless\n')
 
             if lamp.type != 'SUN' and lamp.type!='AREA' and lamp.type!='HEMI':#Sun shouldn't be attenuated. Hemi and area lights have no falloff attribute so they are put to type 2 attenuation a little higher above.
-                file.write('\tfade_distance %.6f\n' % (lamp.distance / 5) )
+                tabWrite('fade_distance %.6f\n' % (lamp.distance / 5) )
                 if lamp.falloff_type == 'INVERSE_SQUARE':
-                    file.write('\tfade_power %d\n' % 2) # Use blenders lamp quad equivalent
+                    tabWrite('fade_power %d\n' % 2) # Use blenders lamp quad equivalent
                 elif lamp.falloff_type == 'INVERSE_LINEAR':
-                    file.write('\tfade_power %d\n' % 1) # Use blenders lamp linear
+                    tabWrite('fade_power %d\n' % 1) # Use blenders lamp linear
                 elif lamp.falloff_type == 'CONSTANT': #Supposing using no fade power keyword would default to constant, no attenuation.
                     pass
                 elif lamp.falloff_type == 'CUSTOM_CURVE': #Using Custom curve for fade power 3 for now.
-                    file.write('\tfade_power %d\n' % 4)
+                    tabWrite('fade_power %d\n' % 4)
 
             writeMatrix(matrix)
 
-            file.write('}\n')
+            tabWrite('}\n')
 ##################################################################################################################################
 #Wip to be Used for fresnel, but not tested yet.
 ##################################################################################################################################
@@ -547,8 +585,8 @@ def write_pov(filename, scene=None, info_callback=None):
             meta = ob.data
             importance=ob.pov_importance_value              
 
-            file.write('blob {\n')
-            file.write('\t\tthreshold %.4g\n' % meta.threshold)
+            tabWrite('blob {\n')
+            tabWrite('threshold %.4g\n' % meta.threshold)
 
             try:
                 material = meta.materials[0] # lame! - blender cant do enything else.
@@ -568,16 +606,16 @@ def write_pov(filename, scene=None, info_callback=None):
 
                 if elem.type == 'BALL':
 
-                    file.write('\tsphere { <%.6g, %.6g, %.6g>, %.4g, %.4g ' % (loc.x, loc.y, loc.z, elem.radius, stiffness))
+                    tabWrite('sphere { <%.6g, %.6g, %.6g>, %.4g, %.4g ' % (loc.x, loc.y, loc.z, elem.radius, stiffness))
 
                     # After this wecould do something simple like...
-                    # 	"pigment {Blue} }"
+                    # 	'pigment {Blue} }'
                     # except we'll write the color
 
                 elif elem.type == 'ELLIPSOID':
                     # location is modified by scale
-                    file.write('\tsphere { <%.6g, %.6g, %.6g>, %.4g, %.4g ' % (loc.x / elem.size_x, loc.y / elem.size_y, loc.z / elem.size_z, elem.radius, stiffness))
-                    file.write('scale <%.6g, %.6g, %.6g> ' % (elem.size_x, elem.size_y, elem.size_z))
+                    tabWrite('sphere { <%.6g, %.6g, %.6g>, %.4g, %.4g ' % (loc.x / elem.size_x, loc.y / elem.size_y, loc.z / elem.size_z, elem.radius, stiffness))
+                    tabWrite('scale <%.6g, %.6g, %.6g> ' % (elem.size_x, elem.size_y, elem.size_z))
 
                 if material:
                     diffuse_color = material.diffuse_color
@@ -589,21 +627,23 @@ def write_pov(filename, scene=None, info_callback=None):
 
                     material_finish = materialNames[material.name]
 
-                    file.write('pigment {rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>} finish {%s} }\n' % \
+                    tabWrite('pigment {rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>} finish {%s} }\n' % \
                         (diffuse_color[0], diffuse_color[1], diffuse_color[2], 1.0 - material.alpha, trans, safety(material_finish, Level=2)))
 
                 else:
-                    file.write('pigment {rgb<1 1 1>} finish {%s} }\n' % DEF_MAT_NAME)		# Write the finish last.
+                    tabWrite('pigment {rgb<1 1 1>} finish {%s} }\n' % DEF_MAT_NAME)		# Write the finish last.
 
             writeObjectMaterial(material)
 
             writeMatrix(global_matrix * ob.matrix_world)
             #Importance for radiosity sampling added here: 
-            file.write('\tradiosity { importance %3g }\n' % importance)
+            tabWrite('radiosity { \n')
+            tabWrite('importance %3g \n' % importance)
+            tabWrite('}\n')
             
-            file.write('}\n') #End of Metaball block
+            tabWrite('}\n') #End of Metaball block
 
-            file.write('}\n')
+            tabWrite('}\n')
 
     objectNames = {}
     DEF_OBJ_NAME = 'Default'
@@ -659,13 +699,16 @@ def write_pov(filename, scene=None, info_callback=None):
             quadCount = sum(1 for f in faces_verts if len(f) == 4)
 
             # Use named declaration to allow reference e.g. for baking. MR
-            file.write('#declare %s=\n' % name) 
-            file.write('mesh2 {\n')
-            file.write('\tvertex_vectors {\n')
-            file.write('\t\t%s' % (len(me.vertices))) # vert count
+            tabWrite('#declare %s=\n' % name) 
+            tabWrite('mesh2 {\n')
+            tabWrite('vertex_vectors {\n')
+            tabWrite('%s' % (len(me.vertices))) # vert count
+            
             for v in me.vertices:
-                file.write(',\n\t\t<%.6f, %.6f, %.6f>' % tuple(v.co)) # vert count
-            file.write('\n  }\n')
+                file.write(',\n')
+                tabWrite('<%.6f, %.6f, %.6f>' % tuple(v.co)) # vert count
+            file.write('\n')
+            tabWrite('}\n')
 
 
             # Build unique Normal list
@@ -681,14 +724,16 @@ def write_pov(filename, scene=None, info_callback=None):
                     key = faces_normals[fi]
                     uniqueNormals[key] = [-1]
 
-            file.write('\tnormal_vectors {\n')
-            file.write('\t\t%d' % len(uniqueNormals)) # vert count
+            tabWrite('normal_vectors {\n')
+            tabWrite('%d' % len(uniqueNormals)) # vert count
             idx = 0
             for no, index in uniqueNormals.items():
-                file.write(',\n\t\t<%.6f, %.6f, %.6f>' % no) # vert count
+                file.write(',\n')
+                tabWrite('<%.6f, %.6f, %.6f>' % no) # vert count
                 index[0] = idx
                 idx += 1
-            file.write('\n  }\n')
+            file.write('\n')
+            tabWrite('}\n')
 
 
             # Vertex colours
@@ -708,21 +753,23 @@ def write_pov(filename, scene=None, info_callback=None):
                     for uv in uvs:
                         uniqueUVs[tuple(uv)] = [-1]
 
-                file.write('\tuv_vectors {\n')
+                tabWrite('uv_vectors {\n')
                 #print unique_uvs
-                file.write('\t\t%s' % (len(uniqueUVs))) # vert count
+                tabWrite('%s' % (len(uniqueUVs))) # vert count
                 idx = 0
                 for uv, index in uniqueUVs.items():
-                    file.write(',\n\t\t<%.6f, %.6f>' % uv)
+                    file.write(',\n')
+                    tabWrite('<%.6f, %.6f>' % uv)
                     index[0] = idx
                     idx += 1
                 '''
                 else:
                     # Just add 1 dummy vector, no real UV's
-                    file.write('\t\t1') # vert count
+                    tabWrite('1') # vert count
                     file.write(',\n\t\t<0.0, 0.0>')
                 '''
-                file.write('\n  }\n')
+                file.write('\n')
+                tabWrite('}\n')
 
 
             if me.vertex_colors:
@@ -762,11 +809,11 @@ def write_pov(filename, scene=None, info_callback=None):
 
 
             # Vert Colours
-            file.write('\ttexture_list {\n')
-            file.write('\t\t%s' % (len(vertCols))) # vert count
+            tabWrite('texture_list {\n')
+            tabWrite('%s' % (len(vertCols))) # vert count
             idx = 0
+            
             for col, index in vertCols.items():
-
                 if me_materials:
                     material = me_materials[col[3]]
                     material_finish = materialNames[material.name]
@@ -795,7 +842,7 @@ def write_pov(filename, scene=None, info_callback=None):
                                 colvalue = t.default_value
                                 t_dif = t
                                 if t_dif.texture.pov_tex_gamma_enable:
-                                    imgGamma = (" gamma %.3g " % t_dif.texture.pov_tex_gamma_value)
+                                    imgGamma = (' gamma %.3g ' % t_dif.texture.pov_tex_gamma_value)
                             if t.use_map_specular or t.use_map_raymir: 
                                 texturesSpec = image_filename
                                 colvalue = t.default_value
@@ -817,15 +864,17 @@ def write_pov(filename, scene=None, info_callback=None):
 
 
                 ##############################################################################################################
-                file.write('\n\t\ttexture {') #THIS AREA NEEDS TO LEAVE THE TEXTURE OPEN UNTIL ALL MAPS ARE WRITTEN DOWN.   --MR                      
+                tabWrite('\n')
+                tabWrite('texture {\n') #THIS AREA NEEDS TO LEAVE THE TEXTURE OPEN UNTIL ALL MAPS ARE WRITTEN DOWN.   --MR                      
 
 
                 ##############################################################################################################
                 if material.diffuse_shader == 'MINNAERT':
-                    file.write('\n\t\t\taoi')
-                    file.write('\n\t\t\ttexture_map {')
-                    file.write('\n\t\t\t\t[%.3g finish {diffuse %.3g}]' % ((material.darkness/2), (2-material.darkness)))
-                    file.write('\n\t\t\t\t[%.3g' % (1-(material.darkness/2)))
+                    tabWrite('\n')
+                    tabWrite('aoi\n')
+                    tabWrite('texture_map {\n')
+                    tabWrite('[%.3g finish {diffuse %.3g}]\n' % ((material.darkness/2), (2-material.darkness)))
+                    tabWrite('[%.3g' % (1-(material.darkness/2)))
 ######TO OPTIMIZE? or present a more elegant way? At least make it work!##################################################################
                 #If Fresnel gets removed from 2.5, why bother?
                 if material.diffuse_shader == 'FRESNEL':
@@ -838,7 +887,7 @@ def write_pov(filename, scene=None, info_callback=None):
 ##                        b=lamp.Rotation[1]
 ##                        c=lamp.Rotation[2]
 ##                        lampLookAt=tuple (x,y,z)
-##                        lampLookAt[3]= 0.0 #Put "target" of the lamp on the floor plane to elimianate one unknown value
+##                        lampLookAt[3]= 0.0 #Put 'target' of the lamp on the floor plane to elimianate one unknown value
 ##                                   degrees(atan((lampLocation - lampLookAt).y/(lampLocation - lampLookAt).z))=lamp.rotation[0]
 ##                                   degrees(atan((lampLocation - lampLookAt).z/(lampLocation - lampLookAt).x))=lamp.rotation[1]
 ##                                   degrees(atan((lampLocation - lampLookAt).x/(lampLocation - lampLookAt).y))=lamp.rotation[2]
@@ -849,128 +898,136 @@ def write_pov(filename, scene=None, info_callback=None):
 
                                 #color = tuple([c * lamp.energy for c in lamp.color]) # Colour is modified by energy                        
                         
-
-                    file.write('\n\t\t\tslope { lampTarget }')
-                    file.write('\n\t\t\ttexture_map {')
-                    file.write('\n\t\t\t\t[%.3g finish {diffuse %.3g}]' % ((material.diffuse_fresnel/2), (2-material.diffuse_fresnel_factor)))
-                    file.write('\n\t\t\t\t[%.3g' % (1-(material.diffuse_fresnel/2)))
+                    tabWrite('\n')
+                    tabWrite('slope { lampTarget }\n')
+                    tabWrite('texture_map {\n')
+                    tabWrite('[%.3g finish {diffuse %.3g}]\n' % ((material.diffuse_fresnel/2), (2-material.diffuse_fresnel_factor)))
+                    tabWrite('[%.3g\n' % (1-(material.diffuse_fresnel/2)))
               
                 
                 #if material.diffuse_shader == 'FRESNEL': pigment pattern aoi pigment and texture map above, the rest below as one of its entry
                 ##########################################################################################################################            
                 if texturesSpec !='':
-                    file.write('\n\t\t\t\tpigment_pattern {')
-                    mappingSpec = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_spec.offset.x / 10 ,t_spec.offset.y / 10 ,t_spec.offset.z / 10, t_spec.scale.x / 2.25, t_spec.scale.y / 2.25, t_spec.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
-                    file.write('\n\t\t\t\t\tuv_mapping image_map{%s \"%s\" %s}%s}' % (imageFormat(texturesSpec) ,texturesSpec ,imgMap(t_spec),mappingSpec))
-                    file.write('\n\t\t\t\t\t\ttexture_map {')
-                    file.write('\n\t\t\t\t\t\t\t[0 ')
+                    tabWrite('\n')
+                    tabWrite('pigment_pattern {\n')
+                    mappingSpec = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_spec.offset.x / 10 ,t_spec.offset.y / 10 ,t_spec.offset.z / 10, t_spec.scale.x / 2.25, t_spec.scale.y / 2.25, t_spec.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
+                    tabWrite('uv_mapping image_map{%s \"%s\" %s}%s}\n' % (imageFormat(texturesSpec) ,texturesSpec ,imgMap(t_spec),mappingSpec))
+                    tabWrite('texture_map {\n')
+                    tabWrite('[0 \n')
 
                 if texturesDif == '':
                     if texturesAlpha !='':
-                        mappingAlpha = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
-                        file.write('\n\t\t\t\tpigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}' % (imageFormat(texturesAlpha) ,texturesAlpha ,imgMap(t_alpha),mappingAlpha))
-                        file.write('\n\t\t\t\t\tpigment_map {')
-                        file.write('\n\t\t\t\t\t\t[0 color rgbft<0,0,0,1,1>]')
-                        file.write('\n\t\t\t\t\t\t[1 color rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>]\n\t\t\t\t\t}' % (col[0], col[1], col[2], 1.0 - material.alpha, trans))
-                        file.write('\n\t\t\t\t}')
+                        tabWrite('\n')
+                        mappingAlpha = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
+                        tabWrite('pigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}\n' % (imageFormat(texturesAlpha) ,texturesAlpha ,imgMap(t_alpha),mappingAlpha))
+                        tabWrite('pigment_map {\n')
+                        tabWrite('[0 color rgbft<0,0,0,1,1>]\n')
+                        tabWrite('[1 color rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>]\n'  % (col[0], col[1], col[2], 1.0 - material.alpha, trans) )
+                        tabWrite('}\n')
+                        tabWrite('}\n')
 
                     else:
 
-                        file.write('\n\t\t\t\tpigment {rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>}' % (col[0], col[1], col[2], 1.0 - material.alpha, trans))
+                        tabWrite('pigment {rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>}\n' % (col[0], col[1], col[2], 1.0 - material.alpha, trans))
 
                     if texturesSpec !='':
-                        file.write('finish {%s}' % (safety(material_finish, Level=1)))# Level 1 is no specular
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=1)))# Level 1 is no specular
                         
                     else:
-                        file.write('finish {%s}' % (safety(material_finish, Level=2)))# Level 2 is translated spec
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=2)))# Level 2 is translated spec
 
                 else:
-                    mappingDif = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_dif.offset.x / 10 ,t_dif.offset.y / 10 ,t_dif.offset.z / 10, t_dif.scale.x / 2.25, t_dif.scale.y / 2.25, t_dif.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
+                    mappingDif = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_dif.offset.x / 10 ,t_dif.offset.y / 10 ,t_dif.offset.z / 10, t_dif.scale.x / 2.25, t_dif.scale.y / 2.25, t_dif.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
                     if texturesAlpha !='':
-                        mappingAlpha = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
-                        file.write('\n\t\t\t\tpigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}' % (imageFormat(texturesAlpha),texturesAlpha,imgMap(t_alpha),mappingAlpha))
-                        file.write('\n\t\t\t\t\tpigment_map {\n\t\t\t\t\t\t[0 color rgbft<0,0,0,1,1>]')
-                        file.write('\n\t\t\t\t\t\t[1 uv_mapping image_map {%s \"%s\" %s}%s]\n\t\t\t\t}' % (imageFormat(texturesDif),texturesDif,(imgGamma + imgMap(t_dif)),mappingDif))
-                        file.write('\n\t\t\t\t}')
+                        mappingAlpha = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
+                        tabWrite('pigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}\n' % (imageFormat(texturesAlpha),texturesAlpha,imgMap(t_alpha),mappingAlpha))
+                        tabWrite('pigment_map {\n')
+                        tabWrite('[0 color rgbft<0,0,0,1,1>]\n')
+                        tabWrite('[1 uv_mapping image_map {%s \"%s\" %s}%s]\n' % (imageFormat(texturesDif),texturesDif,(imgGamma + imgMap(t_dif)),mappingDif))
+                        tabWrite('}\n' )
+                        tabWrite('}\n')
 
                     else:
-                        file.write("\n\t\t\t\tpigment {uv_mapping image_map {%s \"%s\" %s}%s}" % (imageFormat(texturesDif),texturesDif,(imgGamma + imgMap(t_dif)),mappingDif))
+                        tabWrite('pigment {uv_mapping image_map {%s \"%s\" %s}%s}\n' % (imageFormat(texturesDif),texturesDif,(imgGamma + imgMap(t_dif)),mappingDif))
 
                     if texturesSpec !='':
-                        file.write('finish {%s}' % (safety(material_finish, Level=1)))# Level 1 is no specular
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=1)))# Level 1 is no specular
                             
                     else:
-                        file.write('finish {%s}' % (safety(material_finish, Level=2)))# Level 2 is translated specular
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=2)))# Level 2 is translated specular
 
                     ## scale 1 rotate y*0
-                    #imageMap = ("{image_map {%s \"%s\" %s }" % (imageFormat(textures),textures,imgMap(t_dif)))
-                    #file.write("\n\t\t\tuv_mapping pigment %s} %s finish {%s}" % (imageMap,mapping,safety(material_finish)))
-                    #file.write("\n\t\t\tpigment {uv_mapping image_map {%s \"%s\" %s}%s} finish {%s}" % (imageFormat(texturesDif),texturesDif,imgMap(t_dif),mappingDif,safety(material_finish)))
+                    #imageMap = ('{image_map {%s \"%s\" %s }\n' % (imageFormat(textures),textures,imgMap(t_dif)))
+                    #tabWrite('uv_mapping pigment %s} %s finish {%s}\n' % (imageMap,mapping,safety(material_finish)))
+                    #tabWrite('pigment {uv_mapping image_map {%s \"%s\" %s}%s} finish {%s}\n' % (imageFormat(texturesDif),texturesDif,imgMap(t_dif),mappingDif,safety(material_finish)))
                 if texturesNorm !='':
                     ## scale 1 rotate y*0
-                    mappingNor = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_nor.offset.x / 10 ,t_nor.offset.y / 10 ,t_nor.offset.z / 10, t_nor.scale.x / 2.25, t_nor.scale.y / 2.25, t_nor.scale.z / 2.25))
-                    #imageMapNor = ("{bump_map {%s \"%s\" %s mapping}" % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor)))
+                    mappingNor = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_nor.offset.x / 10 ,t_nor.offset.y / 10 ,t_nor.offset.z / 10, t_nor.scale.x / 2.25, t_nor.scale.y / 2.25, t_nor.scale.z / 2.25))
+                    #imageMapNor = ('{bump_map {%s \"%s\" %s mapping}' % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor)))
                     #We were not using the above maybe we should?
-                    file.write("\n\t\t\t\tnormal {uv_mapping bump_map {%s \"%s\" %s  bump_size %.4g }%s}" % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor),(t_nor.normal_factor * 10),mappingNor))
+                    tabWrite('normal {uv_mapping bump_map {%s \"%s\" %s  bump_size %.4g }%s}\n' % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor),(t_nor.normal_factor * 10),mappingNor))
                 if texturesSpec !='':                
-                    file.write('\n\t\t\t\t\t\t\t]')
+                    tabWrite(']\n')
                 ################################Second index for mapping specular max value##################################################################################################
-                    file.write('\n\t\t\t\t\t\t\t[1 ')
+                    tabWrite('[1 \n')
 
                 if texturesDif == '':
                     if texturesAlpha !='':
-                        mappingAlpha = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
-                        file.write('\n\t\t\t\tpigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}' % (imageFormat(texturesAlpha) ,texturesAlpha ,imgMap(t_alpha),mappingAlpha))
-                        file.write('\n\t\t\t\t\tpigment_map {')
-                        file.write('\n\t\t\t\t\t\t[0 color rgbft<0,0,0,1,1>]')
-                        file.write('\n\t\t\t\t\t\t[1 color rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>]\n\t\t\t\t\t}' % (col[0], col[1], col[2], 1.0 - material.alpha, trans))
-                        file.write('\n\t\t\t\t}')
+                        mappingAlpha = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
+                        tabWrite('pigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}\n' % (imageFormat(texturesAlpha) ,texturesAlpha ,imgMap(t_alpha),mappingAlpha))
+                        tabWrite('pigment_map {\n')
+                        tabWrite('[0 color rgbft<0,0,0,1,1>]\n')
+                        tabWrite('[1 color rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>]\n' % (col[0], col[1], col[2], 1.0 - material.alpha, trans))
+                        tabWrite('}\n')
+                        tabWrite('}\n')
 
                     else:
-                        file.write('\n\t\t\t\tpigment {rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>}' % (col[0], col[1], col[2], 1.0 - material.alpha, trans))
+                        tabWrite('pigment {rgbft<%.3g, %.3g, %.3g, %.3g, %.3g>}\n' % (col[0], col[1], col[2], 1.0 - material.alpha, trans))
 
                     if texturesSpec !='':
-                        file.write('finish {%s}' % (safety(material_finish, Level=3)))# Level 3 is full specular
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=3)))# Level 3 is full specular
                         
                     else:
-                        file.write('finish {%s}' % (safety(material_finish, Level=2)))# Level 2 is translated specular
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=2)))# Level 2 is translated specular
 
                 else:
-                    mappingDif = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_dif.offset.x / 10 ,t_dif.offset.y / 10 ,t_dif.offset.z / 10, t_dif.scale.x / 2.25, t_dif.scale.y / 2.25, t_dif.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal.
+                    mappingDif = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_dif.offset.x / 10 ,t_dif.offset.y / 10 ,t_dif.offset.z / 10, t_dif.scale.x / 2.25, t_dif.scale.y / 2.25, t_dif.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal.
                     if texturesAlpha !='':
-                        mappingAlpha = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
-                        file.write('\n\t\t\t\tpigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}' % (imageFormat(texturesAlpha),texturesAlpha,imgMap(t_alpha),mappingAlpha))
-                        file.write('\n\t\t\t\tpigment_map {\n\t\t\t\t\t[0 color rgbft<0,0,0,1,1>]')
-                        file.write('\n\t\t\t\t\t\t[1 uv_mapping image_map {%s \"%s\" %s}%s]\n\t\t\t\t\t}' % (imageFormat(texturesDif),texturesDif,(imgMap(t_dif)+imgGamma),mappingDif))
-                        file.write('\n\t\t\t\t}')
+                        mappingAlpha = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_alpha.offset.x / 10 ,t_alpha.offset.y / 10 ,t_alpha.offset.z / 10, t_alpha.scale.x / 2.25, t_alpha.scale.y / 2.25, t_alpha.scale.z / 2.25)) #strange that the translation factor for scale is not the same as for translate. ToDo: verify both matches with blender internal. 
+                        tabWrite('pigment {pigment_pattern {uv_mapping image_map{%s \"%s\" %s}%s}\n' % (imageFormat(texturesAlpha),texturesAlpha,imgMap(t_alpha),mappingAlpha))
+                        tabWrite('pigment_map {\n')
+                        tabWrite('[0 color rgbft<0,0,0,1,1>]\n')
+                        tabWrite('[1 uv_mapping image_map {%s \"%s\" %s}%s]\n' % (imageFormat(texturesDif),texturesDif,(imgMap(t_dif)+imgGamma),mappingDif))
+                        tabWrite('}\n')
+                        tabWrite('}\n')
 
                     else:
-                        file.write("\n\t\t\tpigment {uv_mapping image_map {%s \"%s\" %s}%s}" % (imageFormat(texturesDif),texturesDif,(imgGamma + imgMap(t_dif)),mappingDif))
+                        tabWrite('pigment {uv_mapping image_map {%s \"%s\" %s}%s}\n' % (imageFormat(texturesDif),texturesDif,(imgGamma + imgMap(t_dif)),mappingDif))
                     if texturesSpec !='':
-                        file.write('finish {%s}' % (safety(material_finish, Level=3)))# Level 3 is full specular
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=3)))# Level 3 is full specular
                     else:
-                        file.write('finish {%s}' % (safety(material_finish, Level=2)))# Level 2 is translated specular
+                        tabWrite('finish {%s}\n' % (safety(material_finish, Level=2)))# Level 2 is translated specular
 
                     ## scale 1 rotate y*0
-                    #imageMap = ("{image_map {%s \"%s\" %s }" % (imageFormat(textures),textures,imgMap(t_dif)))
-                    #file.write("\n\t\t\tuv_mapping pigment %s} %s finish {%s}" % (imageMap,mapping,safety(material_finish)))
-                    #file.write("\n\t\t\tpigment {uv_mapping image_map {%s \"%s\" %s}%s} finish {%s}" % (imageFormat(texturesDif),texturesDif,imgMap(t_dif),mappingDif,safety(material_finish)))
+                    #imageMap = ('{image_map {%s \"%s\" %s }' % (imageFormat(textures),textures,imgMap(t_dif)))
+                    #file.write('\n\t\t\tuv_mapping pigment %s} %s finish {%s}' % (imageMap,mapping,safety(material_finish)))
+                    #file.write('\n\t\t\tpigment {uv_mapping image_map {%s \"%s\" %s}%s} finish {%s}' % (imageFormat(texturesDif),texturesDif,imgMap(t_dif),mappingDif,safety(material_finish)))
                 if texturesNorm !='':
                     ## scale 1 rotate y*0
-                    mappingNor = (" translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>" % (t_nor.offset.x / 10 ,t_nor.offset.y / 10 ,t_nor.offset.z / 10, t_nor.scale.x / 2.25, t_nor.scale.y / 2.25, t_nor.scale.z / 2.25))
-                    #imageMapNor = ("{bump_map {%s \"%s\" %s mapping}" % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor)))
+                    mappingNor = (' translate <%.4g-0.75,%.4g-0.75,%.4g-0.75> scale <%.4g,%.4g,%.4g>\n' % (t_nor.offset.x / 10 ,t_nor.offset.y / 10 ,t_nor.offset.z / 10, t_nor.scale.x / 2.25, t_nor.scale.y / 2.25, t_nor.scale.z / 2.25))
+                    #imageMapNor = ('{bump_map {%s \"%s\" %s mapping}' % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor)))
                     #We were not using the above maybe we should?
-                    file.write("\n\t\t\t\tnormal {uv_mapping bump_map {%s \"%s\" %s  bump_size %.4g }%s}" % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor),(t_nor.normal_factor * 10),mappingNor))
+                    tabWrite('normal {uv_mapping bump_map {%s \"%s\" %s  bump_size %.4g }%s}\n' % (imageFormat(texturesNorm),texturesNorm,imgMap(t_nor),(t_nor.normal_factor * 10),mappingNor))
                 if texturesSpec !='':                
-                    file.write('\n\t\t\t\t\t\t\t]')
+                    tabWrite(']\n')
 
-                    file.write('\n\t\t\t\t}') 
+                    tabWrite('}\n') 
 
                 #End of slope/ior texture_map
                 if material.diffuse_shader == 'MINNAERT' or material.diffuse_shader == 'FRESNEL':
-                    file.write('\n\t\t\t\t]')
-                    file.write('\n\t\t\t}')                          
-                file.write('\n\t\t}') #THEN IT CAN CLOSE IT   --MR
+                    tabWrite(']\n')
+                    tabWrite('}\n')                          
+                tabWrite('}\n') #THEN IT CAN CLOSE IT   --MR
                 
 
                 ############################################################################################################
@@ -978,11 +1035,12 @@ def write_pov(filename, scene=None, info_callback=None):
                 index[0] = idx
                 idx += 1
 
-            file.write('\n\t}\n')
+            file.write('\n')
+            tabWrite('}\n')
 
             # Face indicies
-            file.write('\tface_indices {\n')
-            file.write('\t\t%d' % (len(me.faces) + quadCount)) # faces count
+            tabWrite('face_indices {\n')
+            tabWrite('%d' % (len(me.faces) + quadCount)) # faces count
             for fi, f in enumerate(me.faces):
                 fv = faces_verts[fi]
                 material_index = f.material_index
@@ -1002,7 +1060,8 @@ def write_pov(filename, scene=None, info_callback=None):
 
                 if not me_materials or me_materials[material_index] is None: # No materials
                     for i1, i2, i3 in indicies:
-                        file.write(',\n\t\t<%d,%d,%d>' % (fv[i1], fv[i2], fv[i3])) # vert count
+                        file.write(',\n')
+                        tabWrite('<%d,%d,%d>' % (fv[i1], fv[i2], fv[i3])) # vert count
                 else:
                     material = me_materials[material_index]
                     for i1, i2, i3 in indicies:
@@ -1021,14 +1080,16 @@ def write_pov(filename, scene=None, info_callback=None):
                             diffuse_color = material.diffuse_color
                             ci1 = ci2 = ci3 = vertCols[diffuse_color[0], diffuse_color[1], diffuse_color[2], f.material_index][0]
 
-                        file.write(',\n\t\t<%d,%d,%d>, %d,%d,%d' % (fv[i1], fv[i2], fv[i3], ci1, ci2, ci3)) # vert count
+                        file.write(',\n')
+                        tabWrite('<%d,%d,%d>, %d,%d,%d' % (fv[i1], fv[i2], fv[i3], ci1, ci2, ci3)) # vert count
 
 
-            file.write('\n  }\n')
+            file.write('\n')
+            tabWrite('}\n')
 
             # normal_indices indicies
-            file.write('\tnormal_indices {\n')
-            file.write('\t\t%d' % (len(me.faces) + quadCount)) # faces count
+            tabWrite('normal_indices {\n')
+            tabWrite('%d' % (len(me.faces) + quadCount)) # faces count
             for fi, fv in enumerate(faces_verts):
 
                 if len(fv) == 4:
@@ -1038,19 +1099,22 @@ def write_pov(filename, scene=None, info_callback=None):
 
                 for i1, i2, i3 in indicies:
                     if f.use_smooth:
-                        file.write(',\n\t\t<%d,%d,%d>' %\
+                        file.write(',\n')
+                        tabWrite('<%d,%d,%d>' %\
                         (uniqueNormals[verts_normals[fv[i1]]][0],\
                          uniqueNormals[verts_normals[fv[i2]]][0],\
                          uniqueNormals[verts_normals[fv[i3]]][0])) # vert count
                     else:
                         idx = uniqueNormals[faces_normals[fi]][0]
-                        file.write(',\n\t\t<%d,%d,%d>' % (idx, idx, idx)) # vert count
+                        file.write(',\n')
+                        tabWrite('<%d,%d,%d>' % (idx, idx, idx)) # vert count
 
-            file.write('\n  }\n')
+            file.write('\n')
+            tabWrite('}\n')
 
             if uv_layer:
-                file.write('\tuv_indices {\n')
-                file.write('\t\t%d' % (len(me.faces) + quadCount)) # faces count
+                tabWrite('uv_indices {\n')
+                tabWrite('%d' % (len(me.faces) + quadCount)) # faces count
                 for fi, fv in enumerate(faces_verts):
 
                     if len(fv) == 4:
@@ -1065,11 +1129,13 @@ def write_pov(filename, scene=None, info_callback=None):
                         uvs = tuple(uv.uv1), tuple(uv.uv2), tuple(uv.uv3)
 
                     for i1, i2, i3 in indicies:
-                        file.write(',\n\t\t<%d,%d,%d>' %\
+                        file.write(',\n')
+                        tabWrite('<%d,%d,%d>' %\
                         (uniqueUVs[uvs[i1]][0],\
                          uniqueUVs[uvs[i2]][0],\
                          uniqueUVs[uvs[i3]][0]))
-                file.write('\n  }\n')
+                file.write('\n')
+                file.write('}\n')
 
             if me.materials:
                 try:
@@ -1081,10 +1147,12 @@ def write_pov(filename, scene=None, info_callback=None):
             writeMatrix(matrix)
             
             #Importance for radiosity sampling added here: 
-            file.write('\tradiosity { importance %3g }\n' % importance) 
+            tabWrite('radiosity { \n')
+            tabWrite('importance %3g \n' % importance)
+            tabWrite('}\n') 
 
-            file.write('}\n') # End of mesh block
-            file.write('%s\n' % name) # Use named declaration to allow reference e.g. for baking. MR
+            tabWrite('}\n') # End of mesh block
+            tabWrite('%s\n' % name) # Use named declaration to allow reference e.g. for baking. MR
 
             bpy.data.meshes.remove(me)
 
@@ -1101,13 +1169,13 @@ def write_pov(filename, scene=None, info_callback=None):
             if not world.use_sky_blend:
                 #Non fully transparent background could premultiply alpha and avoid anti-aliasing display issue: 
                 if render.alpha_mode == 'PREMUL' or render.alpha_mode == 'PREMUL' :
-                    file.write('background {rgbt<%.3g, %.3g, %.3g, 0.75>}\n' % (tuple(world.horizon_color)))
+                    tabWrite('background {rgbt<%.3g, %.3g, %.3g, 0.75>}\n' % (tuple(world.horizon_color)))
                 #Currently using no alpha with Sky option:
                 elif render.alpha_mode == 'SKY':
-                    file.write('background {rgbt<%.3g, %.3g, %.3g, 0>}\n' % (tuple(world.horizon_color)))
+                    tabWrite('background {rgbt<%.3g, %.3g, %.3g, 0>}\n' % (tuple(world.horizon_color)))
                 #StraightAlpha:
                 else:
-                    file.write('background {rgbt<%.3g, %.3g, %.3g, 1>}\n' % (tuple(world.horizon_color)))
+                    tabWrite('background {rgbt<%.3g, %.3g, %.3g, 1>}\n' % (tuple(world.horizon_color)))
 
                     
             worldTexCount=0
@@ -1122,144 +1190,174 @@ def write_pov(filename, scene=None, info_callback=None):
                         #colvalue = t.default_value
                         t_blend = t
                     #commented below was an idea to make the Background image oriented as camera taken here: http://news.povray.org/povray.newusers/thread/%3Cweb.4a5cddf4e9c9822ba2f93e20@news.povray.org%3E/
-                    #mappingBlend = (" translate <%.4g,%.4g,%.4g> rotate z*degrees(atan((camLocation - camLookAt).x/(camLocation - camLookAt).y)) rotate x*degrees(atan((camLocation - camLookAt).y/(camLocation - camLookAt).z)) rotate y*degrees(atan((camLocation - camLookAt).z/(camLocation - camLookAt).x)) scale <%.4g,%.4g,%.4g>b" % (t_blend.offset.x / 10 ,t_blend.offset.y / 10 ,t_blend.offset.z / 10, t_blend.scale.x ,t_blend.scale.y ,t_blend.scale.z))#replace 4/3 by the ratio of each image found by some custom or existing function
+                    #mappingBlend = (' translate <%.4g,%.4g,%.4g> rotate z*degrees(atan((camLocation - camLookAt).x/(camLocation - camLookAt).y)) rotate x*degrees(atan((camLocation - camLookAt).y/(camLocation - camLookAt).z)) rotate y*degrees(atan((camLocation - camLookAt).z/(camLocation - camLookAt).x)) scale <%.4g,%.4g,%.4g>b' % (t_blend.offset.x / 10 ,t_blend.offset.y / 10 ,t_blend.offset.z / 10, t_blend.scale.x ,t_blend.scale.y ,t_blend.scale.z))#replace 4/3 by the ratio of each image found by some custom or existing function
                     #using camera rotation valuesdirectly from blender seems much easier
-                    if t_blend.texture_coords!='ANGMAP':
-                        mappingBlend = (" translate <%.4g-0.5,%.4g-0.5,%.4g-0.5> rotate<0,0,0>  scale <%.4g,%.4g,%.4g>" % (t_blend.offset.x / 10 ,t_blend.offset.y / 10 ,t_blend.offset.z / 10, t_blend.scale.x*0.85 , t_blend.scale.y*0.85 , t_blend.scale.z*0.85 ))
-                        #The initial position and rotation of the pov camera is probably creating the rotation offset should look into it someday but at least background won't rotate with the camera now. 
+                    if t_blend.texture_coords=='ANGMAP':
+                        mappingBlend = ('')
                     else:
-                        mappingBlend = ("")
+                        mappingBlend = (' translate <%.4g-0.5,%.4g-0.5,%.4g-0.5> rotate<0,0,0>  scale <%.4g,%.4g,%.4g>' % (t_blend.offset.x / 10 ,t_blend.offset.y / 10 ,t_blend.offset.z / 10, t_blend.scale.x*0.85 , t_blend.scale.y*0.85 , t_blend.scale.z*0.85 ))
+                        #The initial position and rotation of the pov camera is probably creating the rotation offset should look into it someday but at least background won't rotate with the camera now. 
                     #Putting the map on a plane would not introduce the skysphere distortion and allow for better image scale matching but also some waay to chose depth and size of the plane relative to camera.
-                    file.write('sky_sphere {\n')            
-                    file.write('\tpigment {\n')
-                    file.write("\t\timage_map{%s \"%s\" %s}\n\t}\n\t%s\n" % (imageFormat(texturesBlend),texturesBlend,imgMapBG(t_blend),mappingBlend))
-                    file.write('}\n')  
-                    #file.write('\t\tscale 2\n')
-                    #file.write('\t\ttranslate -1\n')
+                    tabWrite('sky_sphere {\n')            
+                    tabWrite('pigment {\n')
+                    tabWrite('image_map{%s \"%s\" %s}\n' % (imageFormat(texturesBlend),texturesBlend,imgMapBG(t_blend)))
+                    tabWrite('}\n')
+                    tabWrite('%s\n' % (mappingBlend))
+                    tabWrite('}\n')  
+                    #tabWrite('scale 2\n')
+                    #tabWrite('translate -1\n')
       
             #For only Background gradient        
         
             if worldTexCount==0:
                 if world.use_sky_blend:
-                    file.write('sky_sphere {\n')            
-                    file.write('\tpigment {\n')
-                    file.write('\t\tgradient y\n')#maybe Should follow the advice of POV doc about replacing gradient for skysphere..5.5
-                    file.write('\t\tcolor_map {\n')
+                    tabWrite('sky_sphere {\n')            
+                    tabWrite('pigment {\n')
+                    tabWrite('gradient y\n')#maybe Should follow the advice of POV doc about replacing gradient for skysphere..5.5
+                    tabWrite('color_map {\n')
                     if render.alpha_mode == 'STRAIGHT':
-                        file.write('\t\t\t[0.0 rgbt<%.3g, %.3g, %.3g, 1>]\n' % (tuple(world.horizon_color)))
-                        file.write('\t\t\t[1.0 rgbt<%.3g, %.3g, %.3g, 1>]\n' % (tuple(world.zenith_color)))
+                        tabWrite('[0.0 rgbt<%.3g, %.3g, %.3g, 1>]\n' % (tuple(world.horizon_color)))
+                        tabWrite('[1.0 rgbt<%.3g, %.3g, %.3g, 1>]\n' % (tuple(world.zenith_color)))
                     elif render.alpha_mode == 'PREMUL':
-                        file.write('\t\t\t[0.0 rgbt<%.3g, %.3g, %.3g, 0.99>]\n' % (tuple(world.horizon_color)))
-                        file.write('\t\t\t[1.0 rgbt<%.3g, %.3g, %.3g, 0.99>]\n' % (tuple(world.zenith_color))) #aa premult not solved with transmit 1
+                        tabWrite('[0.0 rgbt<%.3g, %.3g, %.3g, 0.99>]\n' % (tuple(world.horizon_color)))
+                        tabWrite('[1.0 rgbt<%.3g, %.3g, %.3g, 0.99>]\n' % (tuple(world.zenith_color))) #aa premult not solved with transmit 1
                     else:
-                        file.write('\t\t\t[0.0 rgbt<%.3g, %.3g, %.3g, 0>]\n' % (tuple(world.horizon_color)))
-                        file.write('\t\t\t[1.0 rgbt<%.3g, %.3g, %.3g, 0>]\n' % (tuple(world.zenith_color)))
-                    file.write('\t\t}\n')
-                    file.write('\t}\n')
-                    file.write('}\n')
-                    #sky_sphere alpha (transmit) is not translating into image alpha the same way as "background"
+                        tabWrite('[0.0 rgbt<%.3g, %.3g, %.3g, 0>]\n' % (tuple(world.horizon_color)))
+                        tabWrite('[1.0 rgbt<%.3g, %.3g, %.3g, 0>]\n' % (tuple(world.zenith_color)))
+                    tabWrite('}\n')
+                    tabWrite('}\n')
+                    tabWrite('}\n')
+                    #sky_sphere alpha (transmit) is not translating into image alpha the same way as 'background'
 
-            if world.light_settings.use_indirect_light:
-                scene.pov_radio_enable=1 
+            #if world.light_settings.use_indirect_light:
+            #    scene.pov_radio_enable=1 
                 
-            #Maybe change the above to scene.pov_radio_enable = world.light_settings.use_indirect_light ?
-
+            #Maybe change the above to a funtion copyInternalRenderer settings when user pushes a button, then:
+            #scene.pov_radio_enable = world.light_settings.use_indirect_light 
+            #and other such translations but maybe this would not be allowed either?
 
         ###############################################################
 
         mist = world.mist_settings
 
         if mist.use_mist:
-            file.write('fog {\n')
-            file.write('\tdistance %.6f\n' % mist.depth)
-            file.write('\tcolor rgbt<%.3g, %.3g, %.3g, %.3g>\n' % (tuple(world.horizon_color) + (1 - mist.intensity,)))
-            #file.write('\tfog_offset %.6f\n' % mist.start)
-            #file.write('\tfog_alt 5\n')
-            #file.write('\tturbulence 0.2\n')
-            #file.write('\tturb_depth 0.3\n')
-            file.write('\tfog_type 1\n')
-            file.write('}\n')
+            tabWrite('fog {\n')
+            tabWrite('distance %.6f\n' % mist.depth)
+            tabWrite('color rgbt<%.3g, %.3g, %.3g, %.3g>\n' % (tuple(world.horizon_color) + (1 - mist.intensity,)))
+            #tabWrite('fog_offset %.6f\n' % mist.start)
+            #tabWrite('fog_alt 5\n')
+            #tabWrite('turbulence 0.2\n')
+            #tabWrite('turb_depth 0.3\n')
+            tabWrite('fog_type 1\n')
+            tabWrite('}\n')
         if scene.pov_media_enable:
-            file.write('media {\n')
-            file.write('\tscattering { 1, rgb %.3g}\n' % scene.pov_media_color)
-            file.write('\tsamples %.d\n' % scene.pov_media_samples)
-            file.write('}\n')
+            tabWrite('media {\n')
+            tabWrite('scattering { 1, rgb %.3g}\n' % scene.pov_media_color)
+            tabWrite('samples %.d\n' % scene.pov_media_samples)
+            tabWrite('}\n')
 
     def exportGlobalSettings(scene):
 
-        file.write('global_settings {\n')
-        file.write('\tassumed_gamma 1.0\n')
-        file.write('\tmax_trace_level %d\n' % scene.pov_max_trace_level)
+        tabWrite('global_settings {\n')
+        tabWrite('assumed_gamma 1.0\n')
+        tabWrite('max_trace_level %d\n' % scene.pov_max_trace_level)
 
         if scene.pov_radio_enable:
-            file.write('\tradiosity {\n')
-            file.write("\t\tadc_bailout %.4g\n" % scene.pov_radio_adc_bailout)
-            file.write("\t\talways_sample %d\n" % scene.pov_radio_always_sample)
-            file.write("\t\tbrightness %.4g\n" % scene.pov_radio_brightness)
-            file.write("\t\tcount %d\n" % scene.pov_radio_count)
-            file.write("\t\terror_bound %.4g\n" % scene.pov_radio_error_bound)
-            file.write("\t\tgray_threshold %.4g\n" % scene.pov_radio_gray_threshold)
-            file.write("\t\tlow_error_factor %.4g\n" % scene.pov_radio_low_error_factor)
-            file.write("\t\tmedia %d\n" % scene.pov_radio_media)
-            file.write("\t\tminimum_reuse %.4g\n" % scene.pov_radio_minimum_reuse)
-            file.write("\t\tnearest_count %d\n" % scene.pov_radio_nearest_count)
-            file.write("\t\tnormal %d\n" % scene.pov_radio_normal)
-            file.write("\t\tpretrace_start %.3g\n" % scene.pov_radio_pretrace_start)
-            file.write("\t\tpretrace_end %.3g\n" % scene.pov_radio_pretrace_end)
-            file.write("\t\trecursion_limit %d\n" % scene.pov_radio_recursion_limit)
-            file.write('\t}\n')
+            tabWrite('radiosity {\n')
+            tabWrite('adc_bailout %.4g\n' % scene.pov_radio_adc_bailout)
+            tabWrite('always_sample %d\n' % scene.pov_radio_always_sample)
+            tabWrite('brightness %.4g\n' % scene.pov_radio_brightness)
+            tabWrite('count %d\n' % scene.pov_radio_count)
+            tabWrite('error_bound %.4g\n' % scene.pov_radio_error_bound)
+            tabWrite('gray_threshold %.4g\n' % scene.pov_radio_gray_threshold)
+            tabWrite('low_error_factor %.4g\n' % scene.pov_radio_low_error_factor)
+            tabWrite('media %d\n' % scene.pov_radio_media)
+            tabWrite('minimum_reuse %.4g\n' % scene.pov_radio_minimum_reuse)
+            tabWrite('nearest_count %d\n' % scene.pov_radio_nearest_count)
+            tabWrite('normal %d\n' % scene.pov_radio_normal)
+            tabWrite('pretrace_start %.3g\n' % scene.pov_radio_pretrace_start)
+            tabWrite('pretrace_end %.3g\n' % scene.pov_radio_pretrace_end)
+            tabWrite('recursion_limit %d\n' % scene.pov_radio_recursion_limit)
+            tabWrite('}\n')
         once=1
         for material in bpy.data.materials:
             if material.subsurface_scattering.use and once:
-                file.write("\tmm_per_unit %.6f\n" % (material.subsurface_scattering.scale * (-100) + 15))#In pov, the scale has reversed influence compared to blender. these number should correct that
+                tabWrite('mm_per_unit %.6f\n' % (material.subsurface_scattering.scale * (-100) + 15))#In pov, the scale has reversed influence compared to blender. these number should correct that
                 once=0 #In povray, the scale factor for all subsurface shaders needs to be the same
 
         if world: 
-            file.write("\tambient_light rgb<%.3g, %.3g, %.3g>\n" % tuple(world.ambient_color))
+            tabWrite('ambient_light rgb<%.3g, %.3g, %.3g>\n' % tuple(world.ambient_color))
 
         if material.pov_photons_refraction or material.pov_photons_reflection:
-            file.write("\tphotons {\n")
-            file.write("\t\tspacing 0.003\n")
-            file.write("\t\tmax_trace_level 5\n")
-            file.write("\t\tadc_bailout 0.1\n")
-            file.write("\t\tgather 30, 150\n")
+            tabWrite('photons {\n')
+            tabWrite('spacing 0.003\n')
+            tabWrite('max_trace_level 5\n')
+            tabWrite('adc_bailout 0.1\n')
+            tabWrite('gather 30, 150\n')
+            tabWrite('}\n')
 
-            
-            file.write("\t}\n")
+        tabWrite('}\n')
 
-        file.write('}\n')
-
-
+        
+    sel = scene.objects
+    comments = scene.pov_comments_enable
+    if comments: file.write('//---------------------------------------------\n//--Exported with Povray exporter for Blender--\n//---------------------------------------------\n')
+    if comments: file.write('\n//--Global settings and background--\n\n')
+    
+    exportGlobalSettings(scene)
+    
+    if comments: file.write('\n')
+    
+    exportWorld(scene.world)
+    
+    if comments: file.write('\n//--Cameras--\n\n')
+    
+    exportCamera()
+    
+    if comments: file.write('\n//--Lamps--\n\n')
+    
+    exportLamps([l for l in sel if l.type == 'LAMP'])
+    
+    if comments: file.write('\n//--Material Definitions--\n\n')
+    
     # Convert all materials to strings we can access directly per vertex.
+    #exportMaterials()
     writeMaterial(None) # default material
-
     for material in bpy.data.materials:
         writeMaterial(material)
 
+    if comments: file.write('\n')
+    if comments: file.write('//--Meta objects--\n\n')  # <- How can this be written only if the scene contains META?
     
-    #exportMaterials()
-    sel = scene.objects
-    exportLamps([l for l in sel if l.type == 'LAMP'])
     exportMeta([l for l in sel if l.type == 'META'])
+    
+    if comments: file.write('\n')  # <- How can this be written only if the scene contains META?
+    if comments: file.write('//--Mesh objecs--\n\n')
+    
     exportMeshs(scene, sel)
-    exportCamera()
-    exportWorld(scene.world)
-    exportGlobalSettings(scene)
+    #What follow used to happen here:
+    #exportCamera()
+    #exportWorld(scene.world)
+    #exportGlobalSettings(scene)
+    # MR:..and the order was important for an attempt to implement pov 3.7 baking (mesh camera) comment for the record
+    # CR: Baking should be a special case than. If "baking", than we could change the order.
 
+    #print('pov file closed %s' % file.closed)
     file.close()
+    #print('pov file closed %s' % file.closed)
     
 
 
 def write_pov_ini(filename_ini, filename_pov, filename_image):
     scene = bpy.data.scenes[0]
     render = scene.render
-
+    
     x = int(render.resolution_x * render.resolution_percentage * 0.01)
     y = int(render.resolution_y * render.resolution_percentage * 0.01)
 
-    file = open(filename_ini, 'w')
-    file.write('Input_File_Name="%s"\n' % filename_pov)
-    file.write('Output_File_Name="%s"\n' % filename_image)
+    file = open(filename_ini.name, 'w')
+    file.write("Input_File_Name='%s'\n" % filename_pov.name)
+    file.write("Output_File_Name='%s'\n" % filename_image.name)
 
     file.write('Width=%d\n' % x)
     file.write('Height=%d\n' % y)
@@ -1292,21 +1390,24 @@ def write_pov_ini(filename_ini, filename_pov, filename_image):
     else:
         file.write('Antialias=0\n')
     file.write('Version=3.7')
+    #print('ini file closed %s' % file.closed)
     file.close()
+    #print('ini file closed %s' % file.closed)
 
 
 class PovrayRender(bpy.types.RenderEngine):
     bl_idname = 'POVRAY_RENDER'
-    bl_label = "Povray 3.7"
+    bl_label = 'Povray 3.7'
     DELAY = 0.05
-
+    
     def _export(self, scene):
         import tempfile
-
-        self._temp_file_in = tempfile.mktemp(suffix='.pov')
-        self._temp_file_out = tempfile.mktemp(suffix='.png')#PNG with POV 3.7, can show the background color with alpha. In the long run using the Povray interactive preview like bishop 3D could solve the preview for all formats.
-        #self._temp_file_out = tempfile.mktemp(suffix='.tga')
-        self._temp_file_ini = tempfile.mktemp(suffix='.ini')
+        
+        # mktemp is Deprecated since version 2.3, replaced with NamedTemporaryFile() #CR
+        self._temp_file_in = tempfile.NamedTemporaryFile(suffix='.pov', delete=False)
+        self._temp_file_out = tempfile.NamedTemporaryFile(suffix='.png', delete=False)#PNG with POV 3.7, can show the background color with alpha. In the long run using the Povray interactive preview like bishop 3D could solve the preview for all formats.
+        #self._temp_file_out = tempfile.NamedTemporaryFile(suffix='.tga', delete=False)
+        self._temp_file_ini = tempfile.NamedTemporaryFile(suffix='.ini', delete=False)
         '''
         self._temp_file_in = '/test.pov'
         self._temp_file_out = '/test.png'#PNG with POV 3.7, can show the background color with alpha. In the long run using the Povray interactive preview like bishop 3D could solve the preview for all formats.
@@ -1315,24 +1416,28 @@ class PovrayRender(bpy.types.RenderEngine):
         '''
 
         def info_callback(txt):
-            self.update_stats("", "POVRAY 3.7: " + txt)
+            self.update_stats('', 'POVRAY 3.7: ' + txt)
 
         write_pov(self._temp_file_in, scene, info_callback)
 
-    def _render(self):
+    def _render(self, scene):
 
         try:
-            os.remove(self._temp_file_out) # so as not to load the old file
+            os.remove(self._temp_file_out.name) # so as not to load the old file
         except OSError:
             pass
 
         write_pov_ini(self._temp_file_ini, self._temp_file_in, self._temp_file_out)
 
-        print ("***-STARTING-***")
+        print ('***-STARTING-***')
 
-        pov_binary = "povray"
+        pov_binary = 'povray'
         
         extra_args = []
+        
+        if scene.pov_command_line_switches != "":
+            for newArg in scene.pov_command_line_switches.split(' '):
+                extra_args.append(newArg)
         
         if sys.platform == 'win32':
             import winreg
@@ -1344,44 +1449,52 @@ class PovrayRender(bpy.types.RenderEngine):
                 pov_binary = winreg.QueryValueEx(regKey, 'Home')[0] + '\\bin\\pvengine'
         else:
             # DH - added -d option to prevent render window popup which leads to segfault on linux
-            extra_args.append("-d")
+            extra_args.append('-d')
 
+        # print('Extra Args: ' + str(extra_args))
+        
         if 1:
             # TODO, when povray isnt found this gives a cryptic error, would be nice to be able to detect if it exists
             try:
-                self._process = subprocess.Popen([pov_binary, self._temp_file_ini] + extra_args) # stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                self._process = subprocess.Popen([pov_binary, self._temp_file_ini.name] + extra_args) # stdout=subprocess.PIPE, stderr=subprocess.PIPE
             except OSError:
                 # TODO, report api
                 print("POVRAY 3.7: could not execute '%s', possibly povray isn't installed" % pov_binary)
                 import traceback
                 traceback.print_exc()
-                print ("***-DONE-***")
+                print ('***-DONE-***')
                 return False
 
         else:
             # This works too but means we have to wait until its done
-            os.system('%s %s' % (pov_binary, self._temp_file_ini))
+            os.system('%s %s' % (pov_binary, self._temp_file_ini.name))
 
-        # print ("***-DONE-***")
+        # print ('***-DONE-***')
         return True
 
     def _cleanup(self):
         for f in (self._temp_file_in, self._temp_file_ini, self._temp_file_out):
+            #print('Name: %s' % f.name)
+            #print('File closed %s' % f.closed)
+            f.close() # Why do I have to close them again? Without closeing the pov and ini files are not deletable. PNG is not closable!
             try:
-                os.remove(f)
+                os.unlink(f.name)
+                #os.remove(f.name)
             except OSError:  #was that the proper error type?
+                #print('Couldn't remove/unlink TEMP file %s' % f.name)
                 pass
+            print('')
 
-        self.update_stats("", "")
+        self.update_stats('', '')
 
     def render(self, scene):
 
-        self.update_stats("", "POVRAY 3.7: Exporting data from Blender")
+        self.update_stats('', 'POVRAY 3.7: Exporting data from Blender')
         self._export(scene)
-        self.update_stats("", "POVRAY 3.7: Parsing File")
+        self.update_stats('', 'POVRAY 3.7: Parsing File')
 
-        if not self._render():
-            self.update_stats("", "POVRAY 3.7: Not found")
+        if not self._render(scene):
+            self.update_stats('', 'POVRAY 3.7: Not found')
             return
 
         r = scene.render
@@ -1399,48 +1512,48 @@ class PovrayRender(bpy.types.RenderEngine):
         y = int(r.resolution_y * r.resolution_percentage * 0.01)
 
         # Wait for the file to be created
-        while not os.path.exists(self._temp_file_out):
-            # print("***POV WAITING FOR FILE***")
+        while not os.path.exists(self._temp_file_out.name):
+            # print('***POV WAITING FOR FILE***')
             if self.test_break():
                 try:
                     self._process.terminate()
-                    print("***POV INTERRUPTED***")
+                    print('***POV INTERRUPTED***')
                 except OSError:
                     pass
                 break
             
             poll_result = self._process.poll()
             if poll_result is not None:
-                print("***POV PROCESS FAILED : %s ***" % poll_result)
-                self.update_stats("", "POVRAY 3.7: Failed")
+                print('***POV PROCESS FAILED : %s ***' % poll_result)
+                self.update_stats('', 'POVRAY 3.7: Failed')
                 break
 
             time.sleep(self.DELAY)
 
-        if os.path.exists(self._temp_file_out):
-            # print("***POV FILE OK***")
-            self.update_stats("", "POVRAY 3.7: Rendering")
+        if os.path.exists(self._temp_file_out.name):
+            # print('***POV FILE OK***')
+            self.update_stats('', 'POVRAY 3.7: Rendering')
 
             prev_size = -1
 
             def update_image():
-                # print("***POV UPDATING IMAGE***")
+                # print('***POV UPDATING IMAGE***')
                 result = self.begin_result(0, 0, x, y)
                 lay = result.layers[0]
                 # possible the image wont load early on.
                 try:
-                    lay.load_from_file(self._temp_file_out)
+                    lay.load_from_file(self._temp_file_out.name)
                 except SystemError:
                     pass
                 self.end_result(result)
 
             # Update while povray renders
             while True:
-                # print("***POV RENDER LOOP***")
+                # print('***POV RENDER LOOP***')
 
                 # test if povray exists
                 if self._process.poll() is not None:
-                    print("***POV PROCESS FINISHED***")
+                    print('***POV PROCESS FINISHED***')
                     update_image()
                     break
 
@@ -1448,7 +1561,7 @@ class PovrayRender(bpy.types.RenderEngine):
                 if self.test_break():
                     try:
                         self._process.terminate()
-                        print("***POV PROCESS INTERRUPTED***")
+                        print('***POV PROCESS INTERRUPTED***')
                     except OSError:
                         pass
 
@@ -1459,7 +1572,7 @@ class PovrayRender(bpy.types.RenderEngine):
 
 
                 # check if the file updated
-                new_size = os.path.getsize(self._temp_file_out)
+                new_size = os.path.getsize(self._temp_file_out.name)
 
                 if new_size != prev_size:
                     update_image()
@@ -1467,9 +1580,10 @@ class PovrayRender(bpy.types.RenderEngine):
 
                 time.sleep(self.DELAY)
         else:
-            print("***POV FILE NOT FOUND***")
+            print('***POV FILE NOT FOUND***')
         
-        print("***POV FINISHED***")
+        print('***POV FINISHED***')
+        #time.sleep(self.DELAY)
         self._cleanup()
 
 
