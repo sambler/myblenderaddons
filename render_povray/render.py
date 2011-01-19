@@ -430,14 +430,19 @@ def write_pov(filename, scene=None, info_callback=None):
         povHasnoSpecularMaps(Level=2)
 
         if material: 
+            special_texture_found = False
             for t in material.texture_slots:
                 if t and t.texture.type == 'IMAGE' and t.use and t.texture.image and (t.use_map_specular or t.use_map_raymir or t.use_map_normal or t.use_map_alpha): 
-                    # Level=1 Means No specular nor Mirror reflection
-                    povHasnoSpecularMaps(Level=1)
-
-                    # Level=3 Means Maximum Spec and Mirror
-                    povHasnoSpecularMaps(Level=3)
+                    special_texture_found = True
                     continue # Some texture found
+            
+            if special_texture_found:
+                # Level=1 Means No specular nor Mirror reflection
+                povHasnoSpecularMaps(Level=1)
+
+                # Level=3 Means Maximum Spec and Mirror
+                povHasnoSpecularMaps(Level=3)
+                    
 
     def exportCamera():
         camera = scene.camera
