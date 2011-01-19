@@ -426,14 +426,18 @@ def write_pov(filename, scene=None, info_callback=None):
 
             tabWrite('}\n\n')
 
-        # Level=1 Means No specular nor Mirror reflection
-        povHasnoSpecularMaps(Level=1)
-
         # Level=2 Means translation of spec and mir levels for when no map influences them
         povHasnoSpecularMaps(Level=2)
-        
-        # Level=3 Means Maximum Spec and Mirror
-        povHasnoSpecularMaps(Level=3)
+
+        if material: 
+            for t in material.texture_slots:
+                if t and t.texture.type == 'IMAGE' and t.use and t.texture.image and (t.use_map_specular or t.use_map_raymir or t.use_map_normal or t.use_map_alpha): 
+                    # Level=1 Means No specular nor Mirror reflection
+                    povHasnoSpecularMaps(Level=1)
+
+                    # Level=3 Means Maximum Spec and Mirror
+                    povHasnoSpecularMaps(Level=3)
+                    continue # Some texture found
 
     def exportCamera():
         camera = scene.camera
@@ -1350,11 +1354,9 @@ def write_pov(filename, scene=None, info_callback=None):
             writeMaterial(material)
     if comments: file.write('\n')
 
-    # if comments: file.write('//--Blob objects--\n\n')
     exportMeta([l for l in sel if l.type == 'META'])
-    # if comments: file.write('\n')
 
-    if comments: file.write('//--Mesh objecs--\n')
+    if comments: file.write('//--Mesh objects--\n')
     
     exportMeshs(scene, sel)
     #What follow used to happen here:
