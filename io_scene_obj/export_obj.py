@@ -212,7 +212,7 @@ def write_nurb(file, ob, ob_mat):
         do_endpoints = (do_closed == 0) and nu.use_endpoint_u
 
         for pt in nu.points:
-            pt = ob_mat * pt.co.copy().resize3D()
+            pt = pt.co.copy().resize3D() * ob_mat
             file.write('v %.6f %.6f %.6f\n' % (pt[0], pt[1], pt[2]))
             pt_num += 1
         tot_verts += pt_num
@@ -435,7 +435,7 @@ def write_file(filepath, objects, scene,
                 # Cant use LC because some materials are None.
                 # materialNames = map(lambda mat: mat.name, materials) # Bug Blender, dosent account for null materials, still broken.
 
-            # Possible there null materials, will mess up indicies
+            # Possible there null materials, will mess up indices
             # but at least it will export, wait until Blender gets fixed.
             materialNames.extend((16-len(materialNames)) * [None])
             materialItems.extend((16-len(materialItems)) * [None])
@@ -659,7 +659,7 @@ def write_file(filepath, objects, scene,
                     if ed.is_loose:
                         file.write('f %d %d\n' % (ed.vertices[0] + totverts, ed.vertices[1] + totverts))
 
-            # Make the indicies global rather then per mesh
+            # Make the indices global rather then per mesh
             totverts += len(me_verts)
             if faceuv:
                 totuvco += uv_unique_count

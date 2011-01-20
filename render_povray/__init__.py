@@ -16,15 +16,15 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-bl_addon_info = {
-    "name": "PovRay 3.7",
+bl_info = {
+    "name": "POV-Ray 3.7",
     "author": "Campbell Barton, Silvio Falcinelli, Maurice Raybaud, Constantin Rahn",
     "version": (0, 0, 6),
     "blender": (2, 5, 6),
-    "api": 31667,
+    "api": 34318,
     "location": "Info Header (engine dropdown)",
-    "description": "Basic povray 3.7 integration for blender",
-    "warning": "both povray 3.7 and this script are beta",
+    "description": "Basic POV-Ray 3.7 integration for blender",
+    "warning": "both POV-Ray 3.7 and this script are beta",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
         "Scripts/Render/PovRay",
     "tracker_url": "https://projects.blender.org/tracker/index.php?"\
@@ -49,16 +49,16 @@ def register():
     # Not a real pov option, just to know if we should write
     Scene.pov_radio_enable = BoolProperty(
             name="Enable Radiosity",
-            description="Enable povrays radiosity calculation",
+            description="Enable POV-Rays radiosity calculation",
             default=False)
     Scene.pov_radio_display_advanced = BoolProperty(
             name="Advanced Options",
             description="Show advanced options",
             default=False)
     Scene.pov_media_enable = BoolProperty(
-        name="Enable Media",
-        description="Enable povrays atmospheric media",
-        default=False)
+            name="Enable Media",
+            description="Enable POV-Rays atmospheric media",
+            default=False)
     Scene.pov_media_samples = IntProperty(
             name="Samples", description="Number of samples taken from camera to first object encountered along ray path for media calculation",
             min=1, max=100, default=35)
@@ -67,7 +67,7 @@ def register():
             min=0.00, max=1.00, soft_min=0.01, soft_max=1.00, default=0.01)
     Scene.pov_baking_enable = BoolProperty(
             name="Enable Baking",
-            description="Enable povrays texture baking",
+            description="Enable POV-Rays texture baking",
             default=False)
     Scene.pov_indentation_character = EnumProperty(
             name="Indentation",
@@ -90,6 +90,25 @@ def register():
     Scene.pov_command_line_switches = StringProperty(name="Command Line Switches",
             description="Command line switches consist of a + (plus) or - (minus) sign, followed by one or more alphabetic characters and possibly a numeric value.",
             default="", maxlen=500)
+            
+    Scene.pov_antialias_enable = BoolProperty(
+            name="Anti-Alias", description="Enable Anti-Aliasing",
+            default=True)
+            
+    Scene.pov_antialias_method = EnumProperty(
+            name="Method",
+            description="AA-sampling method. Type 1 is an adaptive, non-recursive, super-sampling method. Type 2 is an adaptive and recursive super-sampling method.",
+            items=(("0", "non-recursive AA", "Type 1 Sampling in POV-Ray"),
+               ("1", "recursive AA", "Type 2 Sampling in POV-Ray")),
+            default="1")
+            
+    Scene.pov_antialias_depth = IntProperty(
+            name="Antialias Depth", description="Depth of pixel for sampling",
+            min=1, max=9, default=3)
+    
+    Scene.pov_antialias_threshold = FloatProperty(
+            name="Antialias Threshold", description="Tolerance for sub-pixels",
+            min=0.0, max=1.0, soft_min=0.05, soft_max=0.5, default=0.1)
     
     Scene.pov_max_trace_level = IntProperty(
             name="Max Trace Level", description="Number of reflections/refractions allowed on ray path",
@@ -277,10 +296,14 @@ def unregister():
     del Scene.pov_media_color # MR
     del Scene.pov_baking_enable # MR
     del Scene.pov_max_trace_level # MR
-    del Scene.pov_command_line_switches #CR
+    del Scene.pov_antialias_enable # CR
+    del Scene.pov_antialias_method # CR 
+    del Scene.pov_antialias_depth # CR
+    del Scene.pov_antialias_threshold # CR
+    del Scene.pov_command_line_switches # CR
     del Scene.pov_indentation_character # CR
-    del Scene.pov_indentation_spaces #CR
-    del Scene.pov_comments_enable #CR
+    del Scene.pov_indentation_spaces # CR
+    del Scene.pov_comments_enable # CR
     del Mat.pov_irid_enable # MR
     del Mat.pov_mirror_use_IOR # MR
     del Mat.pov_mirror_metallic # MR    
