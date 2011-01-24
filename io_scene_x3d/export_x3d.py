@@ -84,7 +84,7 @@ class x3d_class:
                 self.filepath = filepath[:-1]  # remove trailing z
 
         if self.file is None:
-            self.file = open(self.filepath, "w", encoding='utf8')
+            self.file = open(self.filepath, "w", encoding="utf8", newline="\n")
 
         self.bNav = 0
         self.nodeID = 0
@@ -191,10 +191,10 @@ class x3d_class:
         safeName = self.cleanStr(ob.name)
         if world:
             ambi = world.ambient_color
-            ambientIntensity = ((ambi[0] + ambi[1] + ambi[2]) / 3.0) / 2.5
+            amb_intensity = ((ambi[0] + ambi[1] + ambi[2]) / 3.0) / 2.5
             del ambi
         else:
-            ambientIntensity = 0.0
+            amb_intensity = 0.0
 
         # compute cutoff and beamwidth
         intensity = min(lamp.energy / 1.75, 1.0)
@@ -204,57 +204,58 @@ class x3d_class:
 
         dx, dy, dz = matrix_direction(mtx)
 
-        location = mtx.translation_part()
+        location = mtx.translation_part()[:]
 
         radius = lamp.distance * math.cos(beamWidth)
         # radius = lamp.dist*math.cos(beamWidth)
         self.file.write("<SpotLight DEF=\"%s\" " % safeName)
-        self.file.write("radius=\"%s\" " % (round(radius, self.cp)))
-        self.file.write("ambientIntensity=\"%s\" " % (round(ambientIntensity, self.cp)))
-        self.file.write("intensity=\"%s\" " % (round(intensity, self.cp)))
-        self.file.write("color=\"%s %s %s\" " % round_color(lamp.color, self.cp))
-        self.file.write("beamWidth=\"%s\" " % (round(beamWidth, self.cp)))
-        self.file.write("cutOffAngle=\"%s\" " % (round(cutOffAngle, self.cp)))
-        self.file.write("direction=\"%s %s %s\" " % (round(dx, 3), round(dy, 3), round(dz, 3)))
-        self.file.write("location=\"%s %s %s\" />\n\n" % (round(location[0], 3), round(location[1], 3), round(location[2], 3)))
+        self.file.write("radius=\"%.4f\" " % radius)
+        self.file.write("ambientIntensity=\"%.4f\" " % amb_intensity)
+        self.file.write("intensity=\"%.4f\" " % intensity)
+        self.file.write("color=\"%.4f %.4f %.4f\" " % round_color(lamp.color, 4))
+        self.file.write("beamWidth=\"%.4f\" " % beamWidth)
+        self.file.write("cutOffAngle=\"%.4f\" " % cutOffAngle)
+        self.file.write("direction=\"%.4f %.4f %.4f\" " % (dx, dy, dz))
+        self.file.write("location=\"%.4f %.4f %.4f\" />\n\n" % location)
 
     def writeDirectionalLight(self, ob, mtx, lamp, world):
         safeName = self.cleanStr(ob.name)
         if world:
             ambi = world.ambient_color
             # ambi = world.amb
-            ambientIntensity = ((float(ambi[0] + ambi[1] + ambi[2])) / 3.0) / 2.5
+            amb_intensity = ((float(ambi[0] + ambi[1] + ambi[2])) / 3.0) / 2.5
         else:
             ambi = 0
-            ambientIntensity = 0
+            amb_intensity = 0.0
 
         intensity = min(lamp.energy / 1.75, 1.0)
         dx, dy, dz = matrix_direction(mtx)
         self.file.write("<DirectionalLight DEF=\"%s\" " % safeName)
-        self.file.write("ambientIntensity=\"%s\" " % (round(ambientIntensity, self.cp)))
-        self.file.write("color=\"%s %s %s\" " % (round(lamp.color[0], self.cp), round(lamp.color[1], self.cp), round(lamp.color[2], self.cp)))
-        self.file.write("intensity=\"%s\" " % (round(intensity, self.cp)))
-        self.file.write("direction=\"%s %s %s\" />\n\n" % (round(dx, 4), round(dy, 4), round(dz, 4)))
+        self.file.write("ambientIntensity=\"%.4f\" " % amb_intensity)
+        self.file.write("color=\"%.4f %.4f %.4f\" " % round_color(lamp.color, 4))
+        self.file.write("intensity=\"%.4f\" " % intensity)
+        self.file.write("direction=\"%.4f %.4f %.4f\" />\n\n" % (dx, dy, dz))
 
     def writePointLight(self, ob, mtx, lamp, world):
         safeName = self.cleanStr(ob.name)
         if world:
             ambi = world.ambient_color
             # ambi = world.amb
-            ambientIntensity = ((float(ambi[0] + ambi[1] + ambi[2])) / 3) / 2.5
+            amb_intensity = ((float(ambi[0] + ambi[1] + ambi[2])) / 3) / 2.5
         else:
-            ambi = 0
-            ambientIntensity = 0
+            ambi = 0.0
+            amb_intensity = 0.0
 
-        location = mtx.translation_part()
+        intensity = min(lamp.energy / 1.75, 1.0)
+        location = mtx.translation_part()[:]
 
         self.file.write("<PointLight DEF=\"%s\" " % safeName)
-        self.file.write("ambientIntensity=\"%s\" " % (round(ambientIntensity, self.cp)))
-        self.file.write("color=\"%s %s %s\" " % (round(lamp.color[0], self.cp), round(lamp.color[1], self.cp), round(lamp.color[2], self.cp)))
+        self.file.write("ambientIntensity=\"%.4f\" " % amb_intensity)
+        self.file.write("color=\"%.4f %.4f %.4f\" " % round_color(lamp.color, 4))
 
-        self.file.write("intensity=\"%s\" " % (round(min(lamp.energy / 1.75, 1.0), self.cp)))
-        self.file.write("radius=\"%s\" " % lamp.distance)
-        self.file.write("location=\"%s %s %s\" />\n\n" % (round(location[0], 3), round(location[1], 3), round(location[2], 3)))
+        self.file.write("intensity=\"%.4f\" " % intensity)
+        self.file.write("radius=\"%.4f\" " % lamp.distance)
+        self.file.write("location=\"%.4f %.4f %.4f\" />\n\n" % location)
 
     def secureName(self, name):
         name = name + str(self.nodeID)
@@ -356,7 +357,7 @@ class x3d_class:
 
             mesh_faces = mesh.faces[:]
             mesh_faces_materials = [f.material_index for f in mesh_faces]
-            
+
             if is_uv and True in mesh_materials_use_face_texture:
                 mesh_faces_image = [(fuv.image if (mesh_materials_use_face_texture[mesh_faces_materials[i]] and fuv.use_image) else mesh_material_images[mesh_faces_materials[i]]) for i, fuv in enumerate(mesh.uv_textures.active.data)]
                 mesh_faces_image_unique = set(mesh_faces_image)
@@ -377,7 +378,11 @@ class x3d_class:
             for i, (material_index, image) in enumerate(zip(mesh_faces_materials, mesh_faces_image)):
                 face_groups[material_index, image].append(i)
 
-            for (material_index, image), face_group in face_groups.items():
+            # same as face_groups.items() but sorted so we can get predictable output.
+            face_groups_items = list(face_groups.items())
+            face_groups_items.sort(key=lambda m: (m[0][0], getattr(m[0][1], "name", "")))
+
+            for (material_index, image), face_group in face_groups_items:  # face_groups.items()
                 if face_group:
                     material = mesh_materials[material_index]
 
@@ -680,7 +685,8 @@ class x3d_class:
 ##########################################################
 
     def export(self, scene, world, alltextures,
-                EXPORT_APPLY_MODIFIERS=False,
+                use_apply_modifiers=False,
+                use_selection=True,
                 EXPORT_TRI=False,
                 ):
 
@@ -697,7 +703,12 @@ class x3d_class:
         self.writeFog(world)
         self.proto = 0
 
-        for ob_main in [o for o in scene.objects if o.is_visible(scene)]:
+        if use_selection:
+            objects = (o for o in scene.objects if o.is_visible(scene) and o.select)
+        else:
+            objects = (o for o in scene.objects if o.is_visible(scene))
+
+        for ob_main in objects:
 
             free, derived = create_derived_objects(scene, ob_main)
 
@@ -712,16 +723,20 @@ class x3d_class:
                 if objType == 'CAMERA':
                     self.writeViewpoint(ob, ob_mat, scene)
                 elif objType in ('MESH', 'CURVE', 'SURF', 'FONT'):
-                    if EXPORT_APPLY_MODIFIERS or objType != 'MESH':
-                        me = ob.create_mesh(scene, EXPORT_APPLY_MODIFIERS, 'PREVIEW')
+                    if use_apply_modifiers or objType != 'MESH':
+                        try:
+                            me = ob.create_mesh(scene, use_apply_modifiers, 'PREVIEW')
+                        except:
+                            me = None
                     else:
                         me = ob.data
 
-                    self.writeIndexedFaceSet(ob, me, ob_mat, world, EXPORT_TRI=EXPORT_TRI)
+                    if me is not None:
+                        self.writeIndexedFaceSet(ob, me, ob_mat, world, EXPORT_TRI=EXPORT_TRI)
 
-                    # free mesh created with create_mesh()
-                    if me != ob.data:
-                        bpy.data.meshes.remove(me)
+                        # free mesh created with create_mesh()
+                        if me != ob.data:
+                            bpy.data.meshes.remove(me)
 
                 elif objType == 'LAMP':
                     data = ob.data
@@ -743,7 +758,7 @@ class x3d_class:
 
         self.file.write("\n</Scene>\n</X3D>")
 
-        # if EXPORT_APPLY_MODIFIERS:
+        # if use_apply_modifiers:
         # 	if containerMesh:
         # 		containerMesh.vertices = None
 
@@ -827,6 +842,7 @@ class x3d_class:
 
 
 def save(operator, context, filepath="",
+          use_selection=True,
           use_apply_modifiers=False,
           use_triangulate=False,
           use_compress=False):
@@ -852,7 +868,8 @@ def save(operator, context, filepath="",
     wrlexport.export(scene,
                      world,
                      alltextures,
-                     EXPORT_APPLY_MODIFIERS=use_apply_modifiers,
+                     use_apply_modifiers=use_apply_modifiers,
+                     use_selection=use_selection,
                      EXPORT_TRI=use_triangulate,
                      )
 

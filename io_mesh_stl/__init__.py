@@ -71,6 +71,8 @@ class ImportSTL(bpy.types.Operator, ImportHelper):
     bl_label = "Import STL"
 
     filename_ext = ".stl"
+    
+    filter_glob = StringProperty(default="*.stl", options={'HIDDEN'})
 
     files = CollectionProperty(name="File Path",
                           description="File path used for importing "
@@ -80,7 +82,10 @@ class ImportSTL(bpy.types.Operator, ImportHelper):
     directory = StringProperty()
 
     def execute(self, context):
-        paths = (os.path.join(self.directory, name.name) for name in self.files)
+        paths = [os.path.join(self.directory, name.name) for name in self.files]
+
+        if not paths:
+            paths.append(self.filepath)
 
         for path in paths:
             objName = bpy.path.display_name(path.split("\\")[-1].split("/")[-1])

@@ -16,10 +16,12 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+# <pep8 compliant>
+
 bl_info = {
     "name": "POV-Ray 3.7",
     "author": "Campbell Barton, Silvio Falcinelli, Maurice Raybaud, Constantin Rahn",
-    "version": (0, 0, 6),
+    "version": (0, 0, 7),
     "blender": (2, 5, 6),
     "api": 34318,
     "location": "Info Header (engine dropdown)",
@@ -30,7 +32,6 @@ bl_info = {
     "tracker_url": "https://projects.blender.org/tracker/index.php?"\
         "func=detail&aid=23145",
     "category": "Render"}
-
 
 if "bpy" in locals():
     import imp
@@ -43,8 +44,32 @@ else:
     from render_povray import ui
     from render_povray import render
 
+
 def register():
     Scene = bpy.types.Scene
+
+    # File Options
+    Scene.pov_tempfiles_enable = BoolProperty(
+            name="Enable Tempfiles",
+            description="Enable the OS-Tempfiles. Otherwise set the path where to save the files.",
+            default=True)
+    Scene.pov_deletefiles_enable = BoolProperty(
+            name="Delete files",
+            description="Delete files after rendering. Doesn't work with the image.",
+            default=True)
+    Scene.pov_scene_name = StringProperty(
+            name="Scene Name",
+            description="Name of POV-Ray scene to create. Empty name will use the name of the blend file.",
+            default="", maxlen=1024)
+    Scene.pov_scene_path = StringProperty(
+            name="Export scene path",
+            # description="Path to directory where the exported scene (POV and INI) is created",  # Bug in POV-Ray RC3
+            description="Path to directory where the files are created",
+            default="", maxlen=1024, subtype="DIR_PATH")
+    Scene.pov_renderimage_path = StringProperty(
+            name="Rendered image path",
+            description="Full path to directory where the rendered image is saved.",
+            default="", maxlen=1024, subtype="DIR_PATH")
 
     # Not a real pov option, just to know if we should write
     Scene.pov_radio_enable = BoolProperty(
@@ -75,12 +100,12 @@ def register():
             items=(("0", "None", "No indentation"),
                ("1", "Tabs", "Indentation with tabs"),
                ("2", "Spaces", "Indentation with spaces")),
-            default="1")
+            default="2")
     Scene.pov_indentation_spaces = IntProperty(
             name="Quantity of spaces",
             description="The number of spaces for indentation",
-            min=1, max=10, default=3)
-    
+            min=1, max=10, default=4)
+
     Scene.pov_comments_enable = BoolProperty(
             name="Enable Comments",
             description="Add comments to pov file",
@@ -90,30 +115,42 @@ def register():
     Scene.pov_command_line_switches = StringProperty(name="Command Line Switches",
             description="Command line switches consist of a + (plus) or - (minus) sign, followed by one or more alphabetic characters and possibly a numeric value.",
             default="", maxlen=500)
-            
+
     Scene.pov_antialias_enable = BoolProperty(
             name="Anti-Alias", description="Enable Anti-Aliasing",
             default=True)
-            
+
     Scene.pov_antialias_method = EnumProperty(
             name="Method",
             description="AA-sampling method. Type 1 is an adaptive, non-recursive, super-sampling method. Type 2 is an adaptive and recursive super-sampling method.",
             items=(("0", "non-recursive AA", "Type 1 Sampling in POV-Ray"),
                ("1", "recursive AA", "Type 2 Sampling in POV-Ray")),
             default="1")
-            
+
     Scene.pov_antialias_depth = IntProperty(
             name="Antialias Depth", description="Depth of pixel for sampling",
             min=1, max=9, default=3)
-    
+
     Scene.pov_antialias_threshold = FloatProperty(
             name="Antialias Threshold", description="Tolerance for sub-pixels",
             min=0.0, max=1.0, soft_min=0.05, soft_max=0.5, default=0.1)
-    
+
+    Scene.pov_jitter_enable = BoolProperty(
+            name="Jitter", description="Enable Jittering. Adds noise into the sampling process (it should be avoided to use jitter in animation).",
+            default=True)
+
+    Scene.pov_jitter_amount = FloatProperty(
+            name="Jitter Amount", description="Amount of jittering.",
+            min=0.0, max=1.0, soft_min=0.01, soft_max=1.0, default=1.0)
+
+    Scene.pov_antialias_gamma = FloatProperty(
+            name="Antialias Gamma", description="POV-Ray compares gamma-adjusted values for super sampling. Antialias Gamma sets the Gamma before comparison.",
+            min=0.0, max=5.0, soft_min=0.01, soft_max=2.5, default=2.5)
+
     Scene.pov_max_trace_level = IntProperty(
             name="Max Trace Level", description="Number of reflections/refractions allowed on ray path",
             min=1, max=256, default=5)
-    
+
     Scene.pov_radio_adc_bailout = FloatProperty(
             name="ADC Bailout", description="The adc_bailout for radiosity rays. Use adc_bailout = 0.01 / brightest_ambient_object for good results",
             min=0.0, max=1000.0, soft_min=0.0, soft_max=1.0, default=0.01, precision=3)
@@ -177,7 +214,7 @@ def register():
     Mat.pov_irid_enable = BoolProperty(
             name="Enable Iridescence",
             description="Newton's thin film interference (like an oil slick on a puddle of water or the rainbow hues of a soap bubble.)",
-            default=False)            
+            default=False)
 
     Mat.pov_mirror_use_IOR = BoolProperty(
             name="Correct Reflection",
@@ -240,17 +277,17 @@ def register():
             default=False)
 
     Mat.pov_refraction_type = EnumProperty(
-            items=[("0","None","use only reflective caustics"),
-                   ("1","Fake Caustics","use fake caustics"),
-                   ("2","Photons Caustics","use photons for refractive caustics"),
+            items=[("0", "None", "use only reflective caustics"),
+                   ("1", "Fake Caustics", "use fake caustics"),
+                   ("2", "Photons Caustics", "use photons for refractive caustics"),
                    ],
             name="Refractive",
             description="use fake caustics (fast) or true photons for refractive Caustics",
-            default="1")#ui.py has to be loaded before render.py with this.
-    
+            default="1")  # ui.py has to be loaded before render.py with this.
+
     ########################################################################################
     #Custom texture gamma
-    Tex = bpy.types.Texture 
+    Tex = bpy.types.Texture
     Tex.pov_tex_gamma_enable = BoolProperty(
             name="Enable custom texture gamma",
             description="Notify some custom gamma for which texture has been precorrected without the file format carrying it and only if it differs from your OS expected standard (see pov doc)",
@@ -266,15 +303,21 @@ def register():
             name="Radiosity Importance",
             description="Priority value relative to other objects for sampling radiosity rays. Increase to get more radiosity rays at comparatively small yet bright objects",
             min=0.01, max=1.00, default=1.00)
-    
+
     ######################################EndMR#####################################
+
 
 def unregister():
     import bpy
     Scene = bpy.types.Scene
-    Mat = bpy.types.Material # MR
-    Tex = bpy.types.Texture # MR
-    Obj = bpy.types.Object # MR
+    Mat = bpy.types.Material  # MR
+    Tex = bpy.types.Texture  # MR
+    Obj = bpy.types.Object  # MR
+    del Scene.pov_tempfiles_enable  # CR
+    del Scene.pov_scene_name  # CR
+    del Scene.pov_deletefiles_enable  # CR
+    del Scene.pov_scene_path  # CR
+    del Scene.pov_renderimage_path  # CR
     del Scene.pov_radio_enable
     del Scene.pov_radio_display_advanced
     del Scene.pov_radio_adc_bailout
@@ -289,38 +332,41 @@ def unregister():
     del Scene.pov_radio_nearest_count
     del Scene.pov_radio_normal
     del Scene.pov_radio_recursion_limit
-    del Scene.pov_radio_pretrace_start # MR
-    del Scene.pov_radio_pretrace_end # MR
-    del Scene.pov_media_enable # MR
-    del Scene.pov_media_samples # MR
-    del Scene.pov_media_color # MR
-    del Scene.pov_baking_enable # MR
-    del Scene.pov_max_trace_level # MR
-    del Scene.pov_antialias_enable # CR
-    del Scene.pov_antialias_method # CR 
-    del Scene.pov_antialias_depth # CR
-    del Scene.pov_antialias_threshold # CR
-    del Scene.pov_command_line_switches # CR
-    del Scene.pov_indentation_character # CR
-    del Scene.pov_indentation_spaces # CR
-    del Scene.pov_comments_enable # CR
-    del Mat.pov_irid_enable # MR
-    del Mat.pov_mirror_use_IOR # MR
-    del Mat.pov_mirror_metallic # MR    
-    del Mat.pov_conserve_energy # MR
-    del Mat.pov_irid_amount # MR
-    del Mat.pov_irid_thickness # MR  
-    del Mat.pov_irid_turbulence # MR
-    del Mat.pov_caustics_enable # MR
-    del Mat.pov_fake_caustics # MR    
-    del Mat.pov_fake_caustics_power # MR
-    del Mat.pov_photons_refraction # MR
-    del Mat.pov_photons_dispersion # MR  
-    del Mat.pov_photons_reflection # MR 
-    del Mat.pov_refraction_type # MR
-    del Tex.pov_tex_gamma_enable # MR
-    del Tex.pov_tex_gamma_value # MR
-    del Obj.pov_importance_value # MR
+    del Scene.pov_radio_pretrace_start  # MR
+    del Scene.pov_radio_pretrace_end  # MR
+    del Scene.pov_media_enable  # MR
+    del Scene.pov_media_samples  # MR
+    del Scene.pov_media_color  # MR
+    del Scene.pov_baking_enable  # MR
+    del Scene.pov_max_trace_level  # MR
+    del Scene.pov_antialias_enable  # CR
+    del Scene.pov_antialias_method  # CR
+    del Scene.pov_antialias_depth  # CR
+    del Scene.pov_antialias_threshold  # CR
+    del Scene.pov_antialias_gamma  # CR
+    del Scene.pov_jitter_enable  # CR
+    del Scene.pov_jitter_amount  # CR
+    del Scene.pov_command_line_switches  # CR
+    del Scene.pov_indentation_character  # CR
+    del Scene.pov_indentation_spaces  # CR
+    del Scene.pov_comments_enable  # CR
+    del Mat.pov_irid_enable  # MR
+    del Mat.pov_mirror_use_IOR  # MR
+    del Mat.pov_mirror_metallic  # MR
+    del Mat.pov_conserve_energy  # MR
+    del Mat.pov_irid_amount  # MR
+    del Mat.pov_irid_thickness  # MR
+    del Mat.pov_irid_turbulence  # MR
+    del Mat.pov_caustics_enable  # MR
+    del Mat.pov_fake_caustics  # MR
+    del Mat.pov_fake_caustics_power  # MR
+    del Mat.pov_photons_refraction  # MR
+    del Mat.pov_photons_dispersion  # MR
+    del Mat.pov_photons_reflection  # MR
+    del Mat.pov_refraction_type  # MR
+    del Tex.pov_tex_gamma_enable  # MR
+    del Tex.pov_tex_gamma_value  # MR
+    del Obj.pov_importance_value  # MR
 
 if __name__ == "__main__":
     register()

@@ -89,23 +89,24 @@ import struct
 
 # So 3ds max can open files, limit names to 12 in length
 # this is verry annoying for filenames!
-name_unique = []
-name_mapping = {}
+name_unique = []  # stores str, ascii only
+name_mapping = {}  # stores {orig: byte} mapping
 def sane_name(name):
     name_fixed = name_mapping.get(name)
     if name_fixed is not None:
         return name_fixed
 
-    new_name = name[:12]
-
+    # strip non ascii chars
+    new_name_clean = new_name = name.encode("ASCII", "replace").decode("ASCII")[:12]
     i = 0
 
     while new_name in name_unique:
-        new_name = new_name[:-4] + '.%.3d' % i
+        new_name = new_name_clean + ".%.3d" % i
         i+=1
 
+    # note, appending the 'str' version.
     name_unique.append(new_name)
-    name_mapping[name] = new_name
+    name_mapping[name] = new_name = new_name.encode("ASCII", "replace")
     return new_name
 
 def uv_key(uv):
@@ -167,7 +168,8 @@ class _3ds_string(object):
     '''Class representing a zero-terminated string for a 3ds file.'''
     __slots__ = ('value', )
     def __init__(self, val):
-        self.value=val
+        assert(type(val) == bytes)
+        self.value = val
 
     def get_size(self):
         return (len(self.value)+1)
@@ -859,13 +861,16 @@ def make_kf_obj_node(obj, name_to_id):
 """
 
 
-def save(operator, context, filepath=""):
+def save(operator, context, filepath="",
+          use_selection=True,
+          ):
+
     import bpy
     import time
     from io_utils import create_derived_objects, free_derived_objects
-    
+
     '''Save the Blender scene to a 3ds file.'''
-    
+
     # Time the export
     time1 = time.clock()
 #	Blender.Window.WaitCursor(1)
@@ -900,9 +905,14 @@ def save(operator, context, filepath=""):
     materialDict = {}
     mesh_objects = []
     scene = context.scene
-    for ob in [ob for ob in scene.objects if ob.is_visible(scene)]:
-# 	for ob in sce.objects.context:
 
+
+    if use_selection:
+        objects = (ob for ob in scene.objects if ob.is_visible(scene) and ob.select)
+    else:
+        objects = (ob for ob in scene.objects if ob.is_visible(scene))
+
+    for ob in objects:
         # get derived objects
         free, derived = create_derived_objects(scene, ob)
 
@@ -915,8 +925,11 @@ def save(operator, context, filepath=""):
             if ob.type not in ('MESH', 'CURVE', 'SURFACE', 'FONT', 'META'):
                 continue
 
-            data = ob_derived.create_mesh(scene, True, 'PREVIEW')
-# 			data = getMeshFromObject(ob_derived, None, True, False, sce)
+            try:
+                data = ob_derived.create_mesh(scene, True, 'PREVIEW')
+            except:
+                data = None
+
             if data:
                 data.transform(mat)
 # 				data.transform(mat, recalc_normals=False)
@@ -1040,5 +1053,5 @@ def save(operator, context, filepath=""):
 
     # Debugging only: dump the chunk hierarchy:
     #primary.dump()
-    
+
     return {'FINISHED'}

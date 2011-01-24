@@ -39,22 +39,38 @@ if "bpy" in locals():
         imp.reload(import_ply)
 
 
+import os
 import bpy
 from bpy.props import *
 from io_utils import ImportHelper, ExportHelper
 
 
 class ImportPLY(bpy.types.Operator, ImportHelper):
-    '''Load a BVH motion capture file'''
+    '''Load a PLY geometry file'''
     bl_idname = "import_mesh.ply"
     bl_label = "Import PLY"
+    
+    files = CollectionProperty(name="File Path",
+                          description="File path used for importing "
+                                      "the PLY file",
+                          type=bpy.types.OperatorFileListElement)
+
+    directory = StringProperty()
 
     filename_ext = ".ply"
     filter_glob = StringProperty(default="*.ply", options={'HIDDEN'})
 
     def execute(self, context):
+        paths = [os.path.join(self.directory, name.name) for name in self.files]
+        if not paths:
+            paths.append(self.filepath)
+
         from . import import_ply
-        return import_ply.load(self, context, **self.as_keywords(ignore=("filter_glob",)))
+
+        for path in paths:
+            import_ply.load(self, context, path)
+
+        return {'FINISHED'}
 
 
 class ExportPLY(bpy.types.Operator, ExportHelper):

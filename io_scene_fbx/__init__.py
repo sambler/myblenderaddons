@@ -18,6 +18,18 @@
 
 # <pep8 compliant>
 
+bl_info = {
+    "name": "Autodesk FBX format",
+    "author": "Campbell Barton",
+    "location": "File > Import-Export",
+    "description": "Import-Export FBX meshes, UV's, vertex colors, materials, textures, cameras and lamps",
+    "warning": "",
+    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
+        "Scripts/Import-Export/Autodesk_FBX",
+    "tracker_url": "",
+    "support": 'OFFICIAL',
+    "category": "Import-Export"}
+
 # To support reload properly, try to access a package var, if it's there, reload everything
 if "bpy" in locals():
     import imp
@@ -42,7 +54,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
 
-    EXP_OBS_SELECTED = BoolProperty(name="Selected Objects", description="Export selected objects on visible layers", default=True)
+    use_selection = BoolProperty(name="Selected Objects", description="Export selected objects on visible layers", default=True)
 # 	EXP_OBS_SCENE = BoolProperty(name="Scene Objects", description="Export all objects in this scene", default=True)
     TX_SCALE = FloatProperty(name="Scale", description="Scale all data, (Note! some imports dont support scaled armatures)", min=0.01, max=1000.0, soft_min=0.01, soft_max=1000.0, default=1.0)
     TX_XROT90 = BoolProperty(name="Rot X90", description="Rotate all objects 90 degrees about the X axis", default=True)
@@ -67,6 +79,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
     BATCH_GROUP = BoolProperty(name="Group > File", description="Export each group as an FBX file, if false, export each scene as an FBX file", default=False)
     BATCH_OWN_DIR = BoolProperty(name="Own Dir", description="Create a dir for each exported file", default=True)
     BATCH_FILE_PREFIX = StringProperty(name="Prefix", description="Prefix each file with this name", maxlen=1024, default="")
+    use_metadata = BoolProperty(name="Use Metadata", default=True, options={'HIDDEN'})
 
     def execute(self, context):
         import math
