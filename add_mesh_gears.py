@@ -22,8 +22,8 @@
 bl_info = {
     "name": "Gears",
     "author": "Michel J. Anders (varkenvarken)",
-    "version": (2,4,1),
-    "blender": (2, 5, 3),
+    "version": (2, 4, 2),
+    "blender": (2, 5, 6),
     "api": 32411,
     "location": "View3D > Add > Mesh > Gears ",
     "description": "Adds a mesh Gear to the Add Mesh menu",
@@ -44,7 +44,7 @@ Also, the vertex group API is changed a little bit but the concepts
 are the same:
 =========
 vertexgroup = ob.vertex_groups.new('NAME_OF_VERTEXGROUP')
-ob.vertex_groups.assign(vertexgroup_vertex_indices, vertexgroup, weight, 'ADD')
+vertexgroup.add(vertexgroup_vertex_indices, weight, 'ADD')
 =========
 
 Now for some reason the name does not 'stick' and we have to set it this way:
@@ -69,32 +69,13 @@ import mathutils
 from math import *
 from bpy.props import *
 
-# calculates the matrix for the new object
-# depending on user pref
-def align_matrix(context):
-    loc = mathutils.Matrix.Translation(context.scene.cursor_location)
-    obj_align = context.user_preferences.edit.object_align
-    if (context.space_data.type == 'VIEW_3D'
-        and obj_align == 'VIEW'):
-        rot = context.space_data.region_3d.view_matrix.rotation_part().invert().resize4x4()
-    else:
-        rot = mathutils.Matrix()
-    align_matrix = loc * rot
-    return align_matrix
-
 # Create a new mesh (object) from verts/edges/faces.
 # verts/edges/faces ... List of vertices/edges/faces for the
 #                       new mesh (as used in from_pydata).
 # name ... Name of the new mesh (& object).
-# edit ... Replace existing mesh data.
-# Note: Using "edit" will destroy/delete existing mesh data.
-def create_mesh_object(context, verts, edges, faces, name, edit, align_matrix):
+def create_mesh_object(context, verts, edges, faces, name):
     scene = context.scene
     obj_act = scene.objects.active
-
-    # Can't edit anything, unless we have an active obj.
-    if edit and not obj_act:
-        return None
 
     # Create new mesh
     mesh = bpy.data.meshes.new(name)
@@ -105,71 +86,8 @@ def create_mesh_object(context, verts, edges, faces, name, edit, align_matrix):
     # Update mesh geometry after adding stuff.
     mesh.update()
 
-    # Deselect all objects.
-    bpy.ops.object.select_all(action='DESELECT')
-
-    if edit:
-        # Replace geometry of existing object
-
-        # Use the active obj and select it.
-        ob_new = obj_act
-        ob_new.select = True
-
-        if obj_act.mode == 'OBJECT':
-            # Get existing mesh datablock.
-            old_mesh = ob_new.data
-
-            # Set object data to nothing
-            ob_new.data = None
-
-            # Clear users of existing mesh datablock.
-            old_mesh.user_clear()
-
-            # Remove old mesh datablock if no users are left.
-            if (old_mesh.users == 0):
-                bpy.data.meshes.remove(old_mesh)
-
-            # Assign new mesh datablock.
-            ob_new.data = mesh
-
-    else:
-        # Create new object
-        ob_new = bpy.data.objects.new(name, mesh)
-
-        # Link new object to the given scene and select it.
-        scene.objects.link(ob_new)
-        ob_new.select = True
-
-        # Place the object at the 3D cursor location.
-        # apply viewRotaion
-        ob_new.matrix_world = align_matrix
-
-
-    if obj_act and obj_act.mode == 'EDIT':
-        if not edit:
-            # We are in EditMode, switch to ObjectMode.
-            bpy.ops.object.mode_set(mode='OBJECT')
-
-            # Select the active object as well.
-            obj_act.select = True
-
-            # Apply location of new object.
-            scene.update()
-
-            # Join new object into the active.
-            bpy.ops.object.join()
-
-            # Switching back to EditMode.
-            bpy.ops.object.mode_set(mode='EDIT')
-
-            ob_new = obj_act
-
-    else:
-        # We are in ObjectMode.
-        # Make the new object the active one.
-        scene.objects.active = ob_new
-
-    return ob_new
+    import add_object_utils
+    return add_object_utils.object_data_add(context, mesh, operator=None)
 
 
 # A very simple "bridge" tool.
@@ -691,11 +609,6 @@ class AddGear(bpy.types.Operator):
     bl_label = "Add Gear"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # edit - Whether to add or update.
-    edit = BoolProperty(name="",
-        description="",
-        default=False,
-        options={'HIDDEN'})
     number_of_teeth = IntProperty(name="Number of Teeth",
         description="Number of teeth on the gear",
         min=2,
@@ -746,7 +659,6 @@ class AddGear(bpy.types.Operator):
         min=0.0,
         max=100.0,
         default=0.0)
-    align_matrix = mathutils.Matrix()
 
     def draw(self, context):
         layout = self.layout
@@ -781,21 +693,18 @@ class AddGear(bpy.types.Operator):
             crown=self.crown)
 
         # Actually create the mesh object from this geometry data.
-        obj = create_mesh_object(context, verts, [], faces, "Gear", self.edit, self.align_matrix)
+        base = create_mesh_object(context, verts, [], faces, "Gear")
+        obj = base.object
 
         # Create vertex groups from stored vertices.
         tipGroup = obj.vertex_groups.new('Tips')
-        obj.vertex_groups.assign(verts_tip, tipGroup, 1.0, 'ADD')
+        tipGroup.add(verts_tip, 1.0, 'ADD')
 
         valleyGroup = obj.vertex_groups.new('Valleys')
-        obj.vertex_groups.assign(verts_valley, valleyGroup, 1.0, 'ADD')
+        valleyGroup.add(verts_valley, 1.0, 'ADD')
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
-        self.align_matrix = align_matrix(context)
-        self.execute(context)
-        return {'FINISHED'}
 
 class AddWormGear(bpy.types.Operator):
     '''Add a worm gear mesh.'''
@@ -803,11 +712,6 @@ class AddWormGear(bpy.types.Operator):
     bl_label = "Add Worm Gear"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # edit - Whether to add or update.
-    edit = BoolProperty(name="",
-        description="",
-        default=False,
-        options={'HIDDEN'})
     number_of_teeth = IntProperty(name="Number of Teeth",
         description="Number of teeth on the gear",
         min=2,
@@ -853,7 +757,6 @@ class AddWormGear(bpy.types.Operator):
         min=0.0,
         max=100.0,
         default=0.0)
-    align_matrix = mathutils.Matrix()
 
     def draw(self, context):
         layout = self.layout
@@ -884,22 +787,18 @@ class AddWormGear(bpy.types.Operator):
             crown=self.crown)
 
         # Actually create the mesh object from this geometry data.
-        obj = create_mesh_object(context, verts, [], faces, "Worm Gear",
-            self.edit, self.align_matrix)
+        base = create_mesh_object(context, verts, [], faces, "Worm Gear")
+        obj = base.object
 
         # Create vertex groups from stored vertices.
         tipGroup = obj.vertex_groups.new('Tips')
-        obj.vertex_groups.assign(verts_tip, tipGroup, 1.0, 'ADD')
+        tipGroup.add(verts_tip, 1.0, 'ADD')
 
         valleyGroup = obj.vertex_groups.new('Valleys')
-        obj.vertex_groups.assign(verts_valley, valleyGroup, 1.0, 'ADD')
+        valleyGroup.add(verts_valley, 1.0, 'ADD')
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
-        self.align_matrix = align_matrix(context)
-        self.execute(context)
-        return {'FINISHED'}
 
 class INFO_MT_mesh_gears_add(bpy.types.Menu):
     # Define the "Gears" menu

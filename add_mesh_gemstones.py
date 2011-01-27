@@ -19,8 +19,8 @@
 bl_info = {
     "name": "Gemstones",
     "author": "Pontiac, Fourmadmen, Dreampainter",
-    "version": (0,3),
-    "blender": (2, 5, 3),
+    "version": (0, 4),
+    "blender": (2, 5, 6),
     "api": 32411,
     "location": "View3D > Add > Mesh > Gemstones",
     "description": "Adds various gemstone (Diamond & Gem) meshes.",
@@ -36,32 +36,13 @@ from mathutils import *
 from math import *
 from bpy.props import *
 
-# calculates the matrix for the new object
-# depending on user pref
-def align_matrix(context):
-    loc = Matrix.Translation(context.scene.cursor_location)
-    obj_align = context.user_preferences.edit.object_align
-    if (context.space_data.type == 'VIEW_3D'
-        and obj_align == 'VIEW'):
-        rot = context.space_data.region_3d.view_matrix.rotation_part().invert().resize4x4()
-    else:
-        rot = Matrix()
-    align_matrix = loc * rot
-    return align_matrix
-
 # Create a new mesh (object) from verts/edges/faces.
 # verts/edges/faces ... List of vertices/edges/faces for the
 #                       new mesh (as used in from_pydata).
 # name ... Name of the new mesh (& object).
-# edit ... Replace existing mesh data.
-# Note: Using "edit" will destroy/delete existing mesh data.
-def create_mesh_object(context, verts, edges, faces, name, edit, align_matrix):
+def create_mesh_object(context, verts, edges, faces, name):
     scene = context.scene
     obj_act = scene.objects.active
-
-    # Can't edit anything, unless we have an active obj.
-    if edit and not obj_act:
-        return None
 
     # Create new mesh
     mesh = bpy.data.meshes.new(name)
@@ -72,70 +53,8 @@ def create_mesh_object(context, verts, edges, faces, name, edit, align_matrix):
     # Update mesh geometry after adding stuff.
     mesh.update()
 
-    # Deselect all objects.
-    bpy.ops.object.select_all(action='DESELECT')
-
-    if edit:
-        # Replace geometry of existing object
-
-        # Use the active obj and select it.
-        ob_new = obj_act
-        ob_new.select = True
-
-        if obj_act.mode == 'OBJECT':
-            # Get existing mesh datablock.
-            old_mesh = ob_new.data
-
-            # Set object data to nothing
-            ob_new.data = None
-
-            # Clear users of existing mesh datablock.
-            old_mesh.user_clear()
-
-            # Remove old mesh datablock if no users are left.
-            if (old_mesh.users == 0):
-                bpy.data.meshes.remove(old_mesh)
-
-            # Assign new mesh datablock.
-            ob_new.data = mesh
-
-    else:
-        # Create new object
-        ob_new = bpy.data.objects.new(name, mesh)
-
-        # Link new object to the given scene and select it.
-        scene.objects.link(ob_new)
-        ob_new.select = True
-
-        # Place the object at the 3D cursor location.
-        # apply viewRotaion
-        ob_new.matrix_world = align_matrix
-
-    if obj_act and obj_act.mode == 'EDIT':
-        if not edit:
-            # We are in EditMode, switch to ObjectMode.
-            bpy.ops.object.mode_set(mode='OBJECT')
-
-            # Select the active object as well.
-            obj_act.select = True
-
-            # Apply location of new object.
-            scene.update()
-
-            # Join new object into the active.
-            bpy.ops.object.join()
-
-            # Switching back to EditMode.
-            bpy.ops.object.mode_set(mode='EDIT')
-
-            ob_new = obj_act
-
-    else:
-        # We are in ObjectMode.
-        # Make the new object the active one.
-        scene.objects.active = ob_new
-
-    return ob_new
+    import add_object_utils
+    return add_object_utils.object_data_add(context, mesh, operator=None)
 
 
 # A very simple "bridge" tool.
@@ -327,11 +246,6 @@ class AddDiamond(bpy.types.Operator):
     bl_label = "Add Diamond"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # edit - Whether to add or update.
-    edit = BoolProperty(name="",
-        description="",
-        default=False,
-        options={'HIDDEN'})
     segments = IntProperty(name="Segments",
         description="Number of segments for the diamond",
         min=3,
@@ -357,7 +271,6 @@ class AddDiamond(bpy.types.Operator):
         min=0.01,
         max=9999.0,
         default=0.8)
-    align_matrix = Matrix()
 
     def execute(self, context):
         verts, faces = add_diamond(self.segments,
@@ -366,15 +279,10 @@ class AddDiamond(bpy.types.Operator):
             self.crown_height,
             self.pavilion_height)
 
-        obj = create_mesh_object(context, verts, [], faces,
-            "Diamond", self.edit, self.align_matrix)
+        obj = create_mesh_object(context, verts, [], faces, "Diamond")
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
-        self.align_matrix = align_matrix(context)
-        self.execute(context)
-        return {'FINISHED'}
 
 class AddGem(bpy.types.Operator):
     """Add a diamond gem"""
@@ -383,11 +291,6 @@ class AddGem(bpy.types.Operator):
     bl_description = "Create an offset faceted gem."
     bl_options = {'REGISTER', 'UNDO'}
 
-    # edit - Whether to add or update.
-    edit = BoolProperty(name="",
-        description="",
-        default=False,
-        options={'HIDDEN'})
     segments = IntProperty(name="Segments",
         description="Longitudial segmentation",
         min=3,
@@ -413,7 +316,6 @@ class AddGem(bpy.types.Operator):
        min=0.01,
        max=9999.0,
        default=0.8)
-    align_matrix = Matrix()
 
     def execute(self, context):
 
@@ -425,14 +327,10 @@ class AddGem(bpy.types.Operator):
             self.pavilion_height,
             self.crown_height)
 
-        obj = create_mesh_object(context, verts, [], faces, "Gem", self.edit, self.align_matrix)
+        obj = create_mesh_object(context, verts, [], faces, "Gem")
 
         return {'FINISHED'}
 
-    def invoke(self, context, event):
-        self.align_matrix = align_matrix(context)
-        self.execute(context)
-        return {'FINISHED'}
 
 class INFO_MT_mesh_gemstones_add(bpy.types.Menu):
     # Define the "Gemstones" menu
