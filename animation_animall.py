@@ -19,12 +19,12 @@
 bl_info = {
     'name': 'AnimAll',
     'author': 'Daniel Salazar <zanqdo@gmail.com>',
-    'version': (0, 3),
+    'version': (0, 4),
     'blender': (2, 5, 5),
-    'api': 33625,
+    'api': 34513,
     'location': 'Select a Mesh: Toolbar > AnimAll panel',
     'description': 'Allows animation of mesh and lattice data (Shape Keys, VCols, VGroups, UVs)',
-    'warning': 'Blender API has some bugs around this still',
+    'warning': '',
     'wiki_url': 'http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/Animation/AnimAll',
     'tracker_url': 'http://projects.blender.org/tracker/index.php?'\
         'func=detail&aid=24874',
@@ -88,6 +88,9 @@ class VIEW3D_PT_animall(bpy.types.Panel):
     
     # draw the gui
     def draw(self, context):
+        
+        Obj = context.active_object
+        
         layout = self.layout
         
         col = layout.column(align=True)
@@ -106,6 +109,20 @@ class VIEW3D_PT_animall(bpy.types.Panel):
         row.operator('anim.delete_keyframe_animall', icon='KEY_DEHLT')
         row = layout.row()
         row.operator('anim.clear_animation_animall', icon='X')
+        
+        if context.window_manager.key_shape:
+            
+            ShapeKey = Obj.active_shape_key
+            
+            split = layout.split()
+            row = split.row()
+            
+            if ShapeKey:
+                row.label(ShapeKey.name, icon='SHAPEKEY_DATA')
+                row.prop(ShapeKey, "value", text="")
+                row.prop(Obj, "show_only_shape_key", text="")
+            else:
+                row.label('No active ShapeKey', icon='INFO')
 
 
 class ANIM_OT_insert_keyframe_animall(bpy.types.Operator):
