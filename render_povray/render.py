@@ -535,10 +535,11 @@ def write_pov(filename, scene=None, info_callback=None):
 
             tabWrite("rotate  <%.6f, %.6f, %.6f>\n" % tuple([degrees(e) for e in matrix.rotation_part().to_euler()]))
             tabWrite("translate <%.6f, %.6f, %.6f>\n" % (matrix[3][0], matrix[3][1], matrix[3][2]))
-            if focal_point != 0:
-                tabWrite("aperture 0.25\n")  # fixed blur amount for now to do, add slider a button?
-                tabWrite("blur_samples 96 128\n")
-                tabWrite("variance 1/10000\n")
+            if camera.data.pov_dof_enable and focal_point != 0:
+                tabWrite("aperture %.3g\n" % camera.data.pov_dof_aperture) 
+                tabWrite("blur_samples %d %d\n" % (camera.data.pov_dof_samples_min, camera.data.pov_dof_samples_max))
+                tabWrite("variance 1/%d\n" % camera.data.pov_dof_variance)
+                tabWrite("confidence %.3g\n" % camera.data.pov_dof_confidence)
                 tabWrite("focal_point <0, 0, %f>\n" % focal_point)
         tabWrite("}\n")
 
@@ -592,10 +593,8 @@ def write_pov(filename, scene=None, info_callback=None):
                     tabWrite("adaptive 1\n")
                     tabWrite("jitter\n")
 
-            if lamp.type == 'HEMI':  # HEMI never has any shadow attribute
+            if not scene.render.use_shadows or lamp.type == 'HEMI' or (lamp.type != 'HEMI' and lamp.shadow_method == 'NOSHADOW'): # HEMI never has any shadow_method attribute
                 tabWrite("shadowless\n")
-            elif lamp.shadow_method == 'NOSHADOW':
-                    tabWrite("shadowless\n")
 
             if lamp.type not in ('SUN', 'AREA', 'HEMI'):  # Sun shouldn't be attenuated. Hemi and area lights have no falloff attribute so they are put to type 2 attenuation a little higher above.
                 tabWrite("fade_distance %.6f\n" % (lamp.distance / 5.0))
@@ -692,7 +691,7 @@ def write_pov(filename, scene=None, info_callback=None):
 
                 if material:
                     diffuse_color = material.diffuse_color
-                    trans= 1.0 - material.alpha
+                    trans = 1.0 - material.alpha
                     if material.use_transparency and material.transparency_method == 'RAYTRACE':
                         povFilter = material.raytrace_transparency.filter * (1.0 - material.alpha)
                         trans = (1.0 - material.alpha) - povFilter
@@ -706,7 +705,7 @@ def write_pov(filename, scene=None, info_callback=None):
 
                 else:
                     tabWrite("pigment {rgb<1 1 1>} \n")
-                    tabWrite("finish {%s}\n" % (safety(DEF_MAT_NAME, Level=1)))		# Write the finish last.
+                    tabWrite("finish {%s}\n" % (safety(DEF_MAT_NAME, Level=2)))		# Write the finish last.
 
                 writeObjectMaterial(material, ob)
 
@@ -1705,6 +1704,8 @@ class PovrayRender(bpy.types.RenderEngine):
         povSceneName = ""
         povPath = ""
         renderImagePath = ""
+
+        scene.frame_set(scene.frame_current)  # has to be called to update the frame on exporting animations
 
         if not scene.pov_tempfiles_enable:
 

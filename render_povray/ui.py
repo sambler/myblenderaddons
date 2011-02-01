@@ -135,6 +135,19 @@ class ObjectButtonsPanel():
         return obj and (rd.use_game_engine == False) and (rd.engine in cls.COMPAT_ENGINES)
 
 
+class CameraDataButtonsPanel():
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "data"
+    # COMPAT_ENGINES must be defined in each subclass, external engines can add themselves here
+
+    @classmethod
+    def poll(cls, context):
+        cam = context.camera
+        rd = context.scene.render
+        return cam and (rd.use_game_engine == False) and (rd.engine in cls.COMPAT_ENGINES)
+
+
 class RENDER_PT_povray_export_settings(RenderButtonsPanel, bpy.types.Panel):
     bl_label = "Export Settings"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
@@ -196,19 +209,25 @@ class RENDER_PT_povray_render_settings(RenderButtonsPanel, bpy.types.Panel):
         rd = scene.render
 
         layout.active = scene.pov_max_trace_level
+
         split = layout.split()
-        
         col = split.column()
+        
         col.label(text="Global Settings")
         col.prop(scene, "pov_max_trace_level", text="Ray Depth")
-        row = col.row()
+
         col.label(text="Global Photons")
         col.prop(scene, "pov_photon_max_trace_level", text="Photon Depth")
-        row = col.row()
+
+        split = layout.split()
+        col = split.column()
         col.prop(scene, "pov_photon_spacing", text="Spacing")
+        col.prop(scene, "pov_photon_gather_min")
+
+        col = split.column()
+
         col.prop(scene, "pov_photon_adc_bailout", text="Photon ADC")
-        col.prop(scene, "pov_photon_gather_min", text="Photons gathered min")
-        col.prop(scene, "pov_photon_gather_max", text="Photons gathered max")
+        col.prop(scene, "pov_photon_gather_max")      
 
 
 class RENDER_PT_povray_antialias(RenderButtonsPanel, bpy.types.Panel):
@@ -324,7 +343,8 @@ class RENDER_PT_povray_media(RenderButtonsPanel, bpy.types.Panel):
 
         col = split.column()
         col.prop(scene, "pov_media_samples", text="Samples")
-        col.prop(scene, "pov_media_color", text="Color")
+        col = split.column()
+        col.prop(scene, "pov_media_color", text="")
 
 ##class RENDER_PT_povray_baking(RenderButtonsPanel, bpy.types.Panel):
 ##    bl_label = "Baking"
@@ -385,6 +405,7 @@ class MATERIAL_PT_povray_metallic(MaterialButtonsPanel, bpy.types.Panel):
         mat = context.material
         layout.active = mat.pov_mirror_metallic
 
+
 class MATERIAL_PT_povray_fade_color(MaterialButtonsPanel, bpy.types.Panel):
     bl_label = "Interior Fade Color"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
@@ -399,6 +420,7 @@ class MATERIAL_PT_povray_fade_color(MaterialButtonsPanel, bpy.types.Panel):
 
         mat = context.material
         layout.active = mat.pov_interior_fade_color
+
 
 class MATERIAL_PT_povray_conserve_energy(MaterialButtonsPanel, bpy.types.Panel):
     bl_label = "conserve energy"
@@ -468,7 +490,7 @@ class MATERIAL_PT_povray_caustics(MaterialButtonsPanel, bpy.types.Panel):
                 col.prop(mat, "pov_photons_dispersion", slider=True)
             col.prop(mat, "pov_photons_reflection")
             
-            if mat.pov_refraction_type=="0" and not mat.pov_photons_reflection:
+            if mat.pov_refraction_type == "0" and not mat.pov_photons_reflection:
                 split = layout.split()
                 col = split.column()
                 row = col.row()
@@ -477,7 +499,6 @@ class MATERIAL_PT_povray_caustics(MaterialButtonsPanel, bpy.types.Panel):
                 row = col.row()
                 row.alignment = 'CENTER'
                 row.label(text="but you didn't chose any !")
-
 
 
 class TEXTURE_PT_povray_tex_gamma(TextureButtonsPanel, bpy.types.Panel):
@@ -519,3 +540,35 @@ class OBJECT_PT_povray_obj_importance(ObjectButtonsPanel, bpy.types.Panel):
         row = col.row()
         col.label(text="Photons")
         col.prop(obj, "pov_collect_photons", text="Receive Photon Caustics")
+
+
+class Camera_PT_povray_cam_dof(CameraDataButtonsPanel, bpy.types.Panel):
+    bl_label = "POV-Ray Depth Of Field"
+    COMPAT_ENGINES = {'POVRAY_RENDER'}
+
+    def draw_header(self, context):
+        cam = context.camera
+
+        self.layout.prop(cam, "pov_dof_enable", text="")
+        
+    def draw(self, context):
+        layout = self.layout
+
+        cam = context.camera
+
+        layout.active = cam.pov_dof_enable
+        
+        split = layout.split()
+        row = split.row()
+        row.prop(cam, "pov_dof_aperture")
+        
+        split = layout.split()
+        col = split.column()
+
+        col.prop(cam, "pov_dof_samples_min")
+        col.prop(cam, "pov_dof_variance")
+        
+        col = split.column()
+
+        col.prop(cam, "pov_dof_samples_max")
+        col.prop(cam, "pov_dof_confidence")

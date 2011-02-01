@@ -22,7 +22,7 @@ bl_info = {
     "version": (1, 70),
     "blender": (2, 5, 6),
     "api": 34481,
-    "location": "Scene -> 3D-Coat Applink",
+    "location": "Scene > 3D-Coat Applink",
     "description": "Transfer data between 3D-Coat/Blender",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/" \
@@ -80,6 +80,12 @@ def register():
     coat3D.texturefolder = StringProperty(
         name="Texture folder:",
         subtype="DIR_PATH",
+        default= ""
+    )
+
+    coat3D.path3b = StringProperty(
+        name="3B Path",
+        subtype="FILE_PATH",
         default= ""
     )
 
