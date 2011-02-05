@@ -47,7 +47,7 @@ def round_color(col, cp):
 
 
 def matrix_direction(mtx):
-    return (mathutils.Vector((0.0, 0.0, -1.0)) * mtx.rotation_part()).normalize()[:]
+    return (mathutils.Vector((0.0, 0.0, -1.0)) * mtx.to_3x3()).normalize()[:]
 
 
 ##########################################################
@@ -204,7 +204,7 @@ class x3d_class:
 
         dx, dy, dz = matrix_direction(mtx)
 
-        location = mtx.translation_part()[:]
+        location = mtx.to_translation()[:]
 
         radius = lamp.distance * math.cos(beamWidth)
         # radius = lamp.dist*math.cos(beamWidth)
@@ -247,7 +247,7 @@ class x3d_class:
             amb_intensity = 0.0
 
         intensity = min(lamp.energy / 1.75, 1.0)
-        location = mtx.translation_part()[:]
+        location = mtx.to_translation()[:]
 
         self.file.write("<PointLight DEF=\"%s\" " % safeName)
         self.file.write("ambientIntensity=\"%.4f\" " % amb_intensity)
@@ -591,18 +591,19 @@ class x3d_class:
 
             self.write_indented("<ImageTexture DEF=\"%s\" " % self.cleanStr(name), 1)
             filepath = image.filepath
+            relpath = os.path.dirname(self.filepath)  # could cache
             filepath_full = bpy.path.abspath(filepath)
             # collect image paths, can load multiple
-            # [relative, absolute, name-only]
+            # [relative, name-only, absolute]
             images = []
 
-            if bpy.path.is_subdir(filepath_full, self.filepath):
-                images.append(os.path.relpath(filepath_full, self.filepath))
+            if bpy.path.is_subdir(filepath_full, relpath):
+                images.append(os.path.relpath(filepath_full, relpath))
 
-            images.append(filepath_full)
             images.append(os.path.basename(filepath_full))
+            images.append(filepath_full)
 
-            self.file.write("url='%s' />" % " ".join(["\"%s\"" % f for f in images]))
+            self.file.write("url='%s' />" % " ".join(["\"%s\"" % f.replace("\\", "/") for f in images]))
             self.write_indented("\n", -1)
 
     def writeBackground(self, world, alltextures):
