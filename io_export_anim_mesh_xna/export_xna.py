@@ -252,7 +252,7 @@ def export_fbx(operator, context, filepath="",
 # 			self.restMatrix =		blenBone.matrix['ARMATURESPACE']
 
             # not used yet
-            #self.restMatrixInv =	self.restMatrix.copy().invert()
+            #self.restMatrixInv =	self.restMatrix.inverted()
             #self.restMatrixLocal =	None # set later, need parent matrix
 
             self.parent =			None
@@ -309,7 +309,7 @@ def export_fbx(operator, context, filepath="",
 
         def parRelMatrix(self):
             if self.fbxParent:
-                return self.fbxParent.matrixWorld.copy().invert() * self.matrixWorld
+                return self.fbxParent.matrixWorld.inverted() * self.matrixWorld
             else:
                 return self.matrixWorld
 
@@ -325,9 +325,9 @@ def export_fbx(operator, context, filepath="",
         def getAnimParRelMatrixRot(self, frame):
             obj_type = self.blenObject.type
             if self.fbxParent:
-                matrix_rot = ((GLOBAL_MATRIX * self.fbxParent.__anim_poselist[frame]).invert() * (GLOBAL_MATRIX * self.__anim_poselist[frame])).rotation_part()
+                matrix_rot = ((GLOBAL_MATRIX * self.fbxParent.__anim_poselist[frame]).invert() * (GLOBAL_MATRIX * self.__anim_poselist[frame])).to_3x3()
             else:
-                matrix_rot = (GLOBAL_MATRIX * self.__anim_poselist[frame]).rotation_part()
+                matrix_rot = (GLOBAL_MATRIX * self.__anim_poselist[frame]).to_3x3()
 
             # Lamps need to be rotated
             if obj_type =='LAMP':
@@ -402,12 +402,12 @@ def export_fbx(operator, context, filepath="",
             if parent:
                 # XNA
                 par_matrix = parent.matrix_local
-                matrix = par_matrix.copy().invert() * matrix
+                matrix = par_matrix.inverted() * matrix
 
-            matrix_rot =	matrix.rotation_part()
+            matrix_rot =	matrix.to_3x3()
 
-            loc =			tuple(matrix.translation_part())
-            scale =			tuple(matrix.scale_part())
+            loc =			tuple(matrix.to_translation())
+            scale =			tuple(matrix.to_scale())
             rot =			tuple(matrix_rot.to_euler())
             
             # XNA return the original matrix (JCB)
@@ -421,10 +421,10 @@ def export_fbx(operator, context, filepath="",
             matrix_rot = matrix
 
             if matrix:
-                loc = tuple(matrix.translation_part())
-                scale = tuple(matrix.scale_part())
+                loc = matrix.to_translation()[:]
+                scale = matrix.to_scale()[:]
 
-                matrix_rot = matrix.rotation_part()
+                matrix_rot = matrix.to_3x3()
                 # Lamps need to be rotated
                 if ob and ob.type =='LAMP':
                     matrix_rot = matrix_rot * mtx_x90
@@ -873,7 +873,7 @@ def export_fbx(operator, context, filepath="",
         else:
             do_light = 1
 
-        scale = abs(GLOBAL_MATRIX.scale_part()[0]) # scale is always uniform in this case
+        scale = abs(GLOBAL_MATRIX.to_scale()[0]) # scale is always uniform in this case
 
         file.write('\n\t\t\tProperty: "LightType", "enum", "",%i' % light_type)
         file.write('\n\t\t\tProperty: "CastLightOnObject", "bool", "",1')
@@ -1220,11 +1220,11 @@ def export_fbx(operator, context, filepath="",
         if my_mesh.fbxParent:
             # TODO FIXME, this case is broken in some cases. skinned meshes just shouldnt have parents where possible!
             # Removed rotation for XNA (JCB)
-            m = (my_mesh.matrixWorld.copy().invert() * my_bone.fbxArm.matrixWorld.copy() * my_bone.restMatrix)
+            m = (my_mesh.matrixWorld.inverted() * my_bone.fbxArm.matrixWorld.copy() * my_bone.restMatrix)
         else:
             # Yes! this is it...  - but dosnt work when the mesh is a.
             # Removed rotation for XNA (JCB)
-            m = (my_mesh.matrixWorld.copy().invert() * my_bone.fbxArm.matrixWorld.copy() * my_bone.restMatrix)
+            m = (my_mesh.matrixWorld.inverted() * my_bone.fbxArm.matrixWorld.copy() * my_bone.restMatrix)
 
         matstr = mat4x4str(m)
         matstr_i = mat4x4str(m.invert())
@@ -2562,8 +2562,8 @@ Takes:  {''')
                         # ----------------
                         for TX_LAYER, TX_CHAN in enumerate('TRS'): # transform, rotate, scale
 
-                            if		TX_CHAN=='T':	context_bone_anim_vecs = [mtx[0].translation_part()	for mtx in context_bone_anim_mats]
-                            elif	TX_CHAN=='S':	context_bone_anim_vecs = [mtx[0].scale_part()		for mtx in context_bone_anim_mats]
+                            if		TX_CHAN=='T':	context_bone_anim_vecs = [mtx[0].to_translation()	for mtx in context_bone_anim_mats]
+                            elif	TX_CHAN=='S':	context_bone_anim_vecs = [mtx[0].to_scale()		for mtx in context_bone_anim_mats]
                             elif	TX_CHAN=='R':
                                 context_bone_anim_vecs = []
                                 prev_eul = None
@@ -2940,7 +2940,7 @@ class ExportFBXanimated(bpy.types.Operator, ExportHelper):
 # - Be specific about the properties of objects used is:
 #       my_object_generic
 # - Reverse the rotation of the CAMERA in various places
-# - Use matrix.decompose() rather that matrix.translation_part() in various places
+# - Use matrix.decompose() rather that matrix.to_translation() in various places
 # On hold - Remove Optimise Keyframes it unnecessarily complicates the script
 
 # ** Ideas for others ** (JCB)
