@@ -1509,7 +1509,7 @@ def translateTexTransform(node, ancestry):
 
     if cent:
         # cent is at a corner by default
-        cent_mat = Matrix.Translation(Vector(cent).resize_3d())
+        cent_mat = Matrix.Translation(Vector(cent).to_3d())
         cent_imat = cent_mat.inverted()
     else:
         cent_mat = cent_imat = None
@@ -1525,7 +1525,7 @@ def translateTexTransform(node, ancestry):
         sca_mat = None
 
     if tx:
-        tx_mat = Matrix.Translation(Vector(tx).resize_3d())
+        tx_mat = Matrix.Translation(Vector(tx).to_3d())
     else:
         tx_mat = None
 
@@ -1700,7 +1700,7 @@ def importMesh_IndexedFaceSet(geom, bpyima, ancestry):
         #   bpymesh.faces.extend(faces, smooth=True)
 
     # bpymesh.calcNormals()
-    bpymesh.update()
+    bpymesh.update_tag()
 
     if len(bpymesh.faces) != len(faces):
         print('\tWarning: adding faces did not work! file is invalid, not adding UVs or vcolors')
@@ -1917,7 +1917,7 @@ def importMesh_PointSet(geom, ancestry):
     bpymesh.vertices.foreach_set("co", [a for v in points for a in v])
 
     # bpymesh.calcNormals()  # will just be dummy normals
-    bpymesh.update()
+    bpymesh.update_tag()
     return bpymesh
 
 GLOBALS['CIRCLE_DETAIL'] = 12
