@@ -2499,7 +2499,7 @@ def Create_New_Mesh(context):
     for ob in scene.objects:
         ob.select = False
 
-    mesh.update_tag()
+    mesh.update()
     ob_new = bpy.data.objects.new(sObjName, mesh)
     scene.objects.link(ob_new)
     ob_new.select = True
