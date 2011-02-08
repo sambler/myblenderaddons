@@ -284,8 +284,8 @@ def export_fbx(operator, context, filepath="",
                 # XNA
                 return self.getPoseMatrix(frame)
             else:
-                # XNA
-                return (self.parent.getPoseMatrix(frame)).invert() * ((self.getPoseMatrix(frame)))
+                # XNA (changed for api34647)
+                return (self.parent.getPoseMatrix(frame)).inverted() * ((self.getPoseMatrix(frame)))
             
 
         # we need these because cameras and lights modified rotations
@@ -318,14 +318,14 @@ def export_fbx(operator, context, filepath="",
 
         def getAnimParRelMatrix(self, frame):
             if self.fbxParent:
-                return (GLOBAL_MATRIX * self.fbxParent.__anim_poselist[frame]).invert() * (GLOBAL_MATRIX * self.__anim_poselist[frame])
+                return (GLOBAL_MATRIX * self.fbxParent.__anim_poselist[frame]).inverted() * (GLOBAL_MATRIX * self.__anim_poselist[frame])
             else:
                 return GLOBAL_MATRIX * self.__anim_poselist[frame]
 
         def getAnimParRelMatrixRot(self, frame):
             obj_type = self.blenObject.type
             if self.fbxParent:
-                matrix_rot = ((GLOBAL_MATRIX * self.fbxParent.__anim_poselist[frame]).invert() * (GLOBAL_MATRIX * self.__anim_poselist[frame])).to_3x3()
+                matrix_rot = ((GLOBAL_MATRIX * self.fbxParent.__anim_poselist[frame]).inverted() * (GLOBAL_MATRIX * self.__anim_poselist[frame])).to_3x3()
             else:
                 matrix_rot = (GLOBAL_MATRIX * self.__anim_poselist[frame]).to_3x3()
 
@@ -1227,7 +1227,7 @@ def export_fbx(operator, context, filepath="",
             m = (my_mesh.matrixWorld.inverted() * my_bone.fbxArm.matrixWorld.copy() * my_bone.restMatrix)
 
         matstr = mat4x4str(m)
-        matstr_i = mat4x4str(m.invert())
+        matstr_i = mat4x4str(m.inverted())
 
 		# TODO: this is one possible place that could affect the whole model in XNA (JCB)
         file.write('\n\t\tTransform: %s' % matstr_i) # THIS IS __NOT__ THE GLOBAL MATRIX AS DOCUMENTED :/
