@@ -19,7 +19,7 @@ bl_info = {
     "author": "John C Brown, JCBDigger (@MistyManor)",
     "version": (1, 2),
     "blender": (2, 5, 6),
-    "api": 34076,
+    "api": 34647,
     "location": "File > Export > XNA FBX Animated Model",
     "description": "Export the model and animations for use in XNA",
     "warning": "",

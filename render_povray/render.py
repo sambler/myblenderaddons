@@ -1050,7 +1050,7 @@ def write_pov(filename, scene=None, info_callback=None):
                         if texturesAlpha != "":
                             # POV-Ray "scale" is not a number of repetitions factor, but its inverse, a standard scale factor.
                             # Offset seems needed relatively to scale so probably center of the scale is not the same in blender and POV
-                            mappingAlpha = " translate <%.4g,%.4g,%.4g> scale <%.4g,%.4g,%.4g>" % (t_alpha.offset.x, -t_alpha.offset.y, t_alpha.offset.z, 1.0 / t_alpha.scale.x, 1.0 / t_alpha.scale.y, 1.0 / t_alpha.scale.z)
+                            mappingAlpha = " translate <%.4g,%.4g,%.4g> scale <%.4g,%.4g,%.4g>" % (-t_alpha.offset.x, -t_alpha.offset.y, t_alpha.offset.z, 1.0 / t_alpha.scale.x, 1.0 / t_alpha.scale.y, 1.0 / t_alpha.scale.z)
                             tabWrite("pigment {\n")
                             tabWrite("pigment_pattern {\n")
                             tabWrite("uv_mapping image_map{%s \"%s\" %s}%s}\n" % (imageFormat(texturesAlpha), texturesAlpha, imgMap(t_alpha), mappingAlpha))
@@ -1721,13 +1721,19 @@ class PovrayRender(bpy.types.RenderEngine):
                     povPath = bpy.path.abspath("//")
                 else:
                     povPath = bpy.path.abspath(scene.pov_scene_path)
+
             if not os.path.exists(povPath):
-                print("POV-Ray 3.7: Cannot find scenes directory")
-                self.update_stats("", "POV-Ray 3.7: Cannot find scenes directory")
-                print("Path: " + povPath)
-                time.sleep(2.0)
-                return
-            
+                try:
+                    os.makedirs(povPath)
+                except:
+                    import traceback
+                    traceback.print_exc()
+
+                    print("POV-Ray 3.7: Cannot create scenes directory: %r" % povPath)
+                    self.update_stats("", "POV-Ray 3.7: Cannot create scenes directory %r" % povPath)
+                    time.sleep(2.0)
+                    return
+
             '''
             # Bug in POV-Ray RC3
             renderImagePath = bpy.path.abspath(scene.pov_renderimage_path).replace('\\','/')
@@ -1769,7 +1775,7 @@ class PovrayRender(bpy.types.RenderEngine):
 
             print("Scene name: " + povSceneName)
             print("Export path: " + povPath)
-            povPath = povPath + "\\" + povSceneName
+            povPath = os.path.join(povPath, povSceneName)
             povPath = os.path.realpath(povPath)
 
             # renderImagePath = renderImagePath + "\\" + povSceneName  # for now this has to be the same like the pov output. Bug in POV-Ray RC3.
@@ -1819,12 +1825,19 @@ class PovrayRender(bpy.types.RenderEngine):
             prev_size = -1
 
             def update_image():
+                xmin = int(r.border_min_x * x)
+                ymin = int(r.border_min_y * y)
+                xmax = int(r.border_max_x * x)
+                ymax = int(r.border_max_y * y)
+
                 # print("***POV UPDATING IMAGE***")
                 result = self.begin_result(0, 0, x, y)
+                #result = self.begin_result(xmin, ymin, xmax - xmin, ymax - ymin)  # XXX, test for border render.
                 lay = result.layers[0]
                 # possible the image wont load early on.
                 try:
                     lay.load_from_file(self._temp_file_out)
+                    #lay.load_from_file(self._temp_file_out, xmin, ymin)  # XXX, test for border render.
                 except SystemError:
                     pass
                 self.end_result(result)
