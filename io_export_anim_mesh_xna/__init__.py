@@ -54,10 +54,7 @@ def menu_export_fbx_model(self, context):
     self.layout.operator(export_xna.ExportFBXmodel.bl_idname, text="XNA FBX Model only (.fbx)").filepath = default_path
 
 def menu_export_fbx_takes(self, context):
-    from . import export_xna
     import os
-    if not export_xna.ExportFBXtakes.is_registered():
-        bpy.utils.register_module(__name__)
 
     # get the current action name
     currentAction = ""
@@ -71,10 +68,7 @@ def menu_export_fbx_takes(self, context):
     self.layout.operator(export_xna.ExportFBXtakes.bl_idname, text="XNA FBX Animations only (.fbx)").filepath = default_path
     
 def menu_export_fbx_animated(self, context):
-    from . import export_xna
     import os
-    if not export_xna.ExportFBXanimated.is_registered():
-        bpy.utils.register_module(__name__)
 
     default_path = os.path.splitext(bpy.data.filepath)[0] + ".fbx"
     self.layout.operator(export_xna.ExportFBXanimated.bl_idname, text="XNA FBX Animated Model (.fbx)").filepath = default_path
@@ -82,6 +76,9 @@ def menu_export_fbx_animated(self, context):
 
 # Add references to all scripts invoked by this class
 def register():
+    from . import export_xna
+    bpy.utils.register_module(__name__)
+
     bpy.types.INFO_MT_file_export.append(menu_export_fbx_animated)
     bpy.types.INFO_MT_file_export.append(menu_export_fbx_model)
     bpy.types.INFO_MT_file_export.append(menu_export_fbx_takes)
