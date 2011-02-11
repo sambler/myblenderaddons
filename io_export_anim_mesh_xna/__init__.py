@@ -76,12 +76,16 @@ def menu_export_fbx_animated(self, context):
 
 # Add references to all scripts invoked by this class
 def register():
+    bpy.utils.register_module(__name__)
+
     bpy.types.INFO_MT_file_export.append(menu_export_fbx_animated)
     bpy.types.INFO_MT_file_export.append(menu_export_fbx_model)
     bpy.types.INFO_MT_file_export.append(menu_export_fbx_takes)
 
 # Add references to all scripts invoked by this class
 def unregister():
+    bpy.utils.unregister_module(__name__)
+
     bpy.types.INFO_MT_file_export.remove(menu_export_fbx_animated)
     bpy.types.INFO_MT_file_export.remove(menu_export_fbx_model)
     bpy.types.INFO_MT_file_export.remove(menu_export_fbx_takes)
