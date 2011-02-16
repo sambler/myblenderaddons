@@ -46,11 +46,13 @@ menu_func = (lambda self, context: self.layout.operator(AddHuman.bl_idname,
 
 
 def register():
-    #bpy.types.register(AddHuman)
+    bpy.utils.register_class(AddHuman)
+
     bpy.types.INFO_MT_armature_add.append(menu_func)
 
 
 def unregister():
-    #bpy.types.unregister(AddHuman)
+    bpy.utils.unregister_class(AddHuman)
+
     bpy.types.INFO_MT_armature_add.remove(menu_func)
 

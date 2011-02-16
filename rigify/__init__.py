@@ -74,7 +74,7 @@ def get_rig_list(path):
                     # Check if it's a rig itself
                     if not hasattr(rig, "Rig"):
                         # Check for sub-rigs
-                        ls = get_rig_list(os.path.join(path, f, "")) # "" adds a final slash
+                        ls = get_rig_list(os.path.join(path, f, ""))  # "" adds a final slash
                         rigs.extend(["%s.%s" % (f, l) for l in ls])
                     else:
                         rigs += [f]
@@ -108,11 +108,11 @@ for c in collection_list:
     col_enum_list += [(c, c, "")]
 
 
-class RigifyName(bpy.types.IDPropertyGroup):
+class RigifyName(bpy.types.PropertyGroup):
     name = bpy.props.StringProperty()
 
 
-class RigifyParameters(bpy.types.IDPropertyGroup):
+class RigifyParameters(bpy.types.PropertyGroup):
     name = bpy.props.StringProperty()
 
 
@@ -127,6 +127,12 @@ for rig in rig_list:
 ##### REGISTER #####
 
 def register():
+    ui.register()
+    metarig_menu.register()
+
+    bpy.utils.register_class(RigifyName)
+    bpy.utils.register_class(RigifyParameters)
+
     bpy.types.PoseBone.rigify_type = bpy.props.StringProperty(name="Rigify Type", description="Rig type for this bone.")
     bpy.types.PoseBone.rigify_parameters = bpy.props.CollectionProperty(type=RigifyParameters)
 
@@ -134,8 +140,6 @@ def register():
     IDStore.rigify_collection = bpy.props.EnumProperty(items=col_enum_list, default="All", name="Rigify Active Collection", description="The selected rig collection")
     IDStore.rigify_types = bpy.props.CollectionProperty(type=RigifyName)
     IDStore.rigify_active_type = bpy.props.IntProperty(name="Rigify Active Type", description="The selected rig type.")
-
-    metarig_menu.register()
 
 
 def unregister():
@@ -147,5 +151,8 @@ def unregister():
     del IDStore.rigify_types
     del IDStore.rigify_active_type
 
-    metarig_menu.unregister()
+    bpy.utils.unregister_class(RigifyName)
+    bpy.utils.unregister_class(RigifyParameters)
 
+    metarig_menu.unregister()
+    ui.unregister()

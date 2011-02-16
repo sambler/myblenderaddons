@@ -47,7 +47,7 @@ def round_color(col, cp):
 
 
 def matrix_direction(mtx):
-    return (mathutils.Vector((0.0, 0.0, -1.0)) * mtx.to_3x3()).normalize()[:]
+    return (mathutils.Vector((0.0, 0.0, -1.0)) * mtx.to_3x3()).normalized()[:]
 
 
 ##########################################################
@@ -420,7 +420,7 @@ class x3d_class:
                             else:
                                 rot = 0.0
 
-                            self.write_indented("<TextureTransform ", 1)
+                            self.write_indented("<TextureTransform ", 0)
                             # fw("center=\"%.6f %.6f\" " % (0.0, 0.0))
                             fw("translation=\"%.6f %.6f\" " % loc)
                             fw("scale=\"%.6f %.6f\" " % (sca_x, sca_y))

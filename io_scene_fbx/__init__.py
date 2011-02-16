@@ -21,6 +21,8 @@
 bl_info = {
     "name": "Autodesk FBX format",
     "author": "Campbell Barton",
+    "blender": (2, 5, 6),
+    "api": 34647,
     "location": "File > Import-Export",
     "description": "Import-Export FBX meshes, UV's, vertex colors, materials, textures, cameras and lamps",
     "warning": "",
@@ -112,10 +114,14 @@ def menu_func(self, context):
 
 
 def register():
+    bpy.utils.register_module(__name__)
+
     bpy.types.INFO_MT_file_export.append(menu_func)
 
 
 def unregister():
+    bpy.utils.unregister_module(__name__)
+
     bpy.types.INFO_MT_file_export.remove(menu_func)
 
 if __name__ == "__main__":

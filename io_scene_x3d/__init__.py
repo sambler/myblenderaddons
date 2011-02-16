@@ -22,7 +22,7 @@ bl_info = {
     "name": "Web3D X3D/VRML format",
     "author": "Campbell Barton, Bart",
     "blender": (2, 5, 6),
-    "api": 34386,
+    "api": 34647,
     "location": "File > Import-Export",
     "description": "Import-Export X3D, Import VRML",
     "warning": "",
@@ -84,11 +84,15 @@ def menu_func_export(self, context):
 
 
 def register():
+    bpy.utils.register_module(__name__)
+
     bpy.types.INFO_MT_file_import.append(menu_func_import)
     bpy.types.INFO_MT_file_export.append(menu_func_export)
 
 
 def unregister():
+    bpy.utils.unregister_module(__name__)
+
     bpy.types.INFO_MT_file_import.remove(menu_func_import)
     bpy.types.INFO_MT_file_export.remove(menu_func_export)
 

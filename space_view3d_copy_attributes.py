@@ -32,11 +32,6 @@ bl_info = {
         'func=detail&aid=22588',
     'category': '3D View'}
 
-__bpydoc__ = """
-Copy Menu
-
-
-"""
 import bpy
 import mathutils
 from mathutils import *
@@ -729,6 +724,8 @@ def _add_tface_buttons(self, context):
 
 
 def register():
+    bpy.utils.register_module(__name__)
+
     ''' mostly to get the keymap working '''
     kc = bpy.context.window_manager.keyconfigs['Blender']
     km = kc.keymaps.get("Object Mode")
@@ -747,7 +744,7 @@ def register():
         kmi = km.items.new('wm.call_menu', 'C', 'PRESS', ctrl=True)
     kmi.properties.name = 'VIEW3D_MT_posecopypopup'
     for menu in _layer_menus:
-        bpy.types.register(menu)
+        bpy.utils.register_class(menu)
     bpy.types.DATA_PT_texface.append(_add_tface_buttons)
     km = kc.keymaps.get("Mesh")
     if km is None:
@@ -758,6 +755,8 @@ def register():
 
 
 def unregister():
+    bpy.utils.unregister_module(__name__)
+
     ''' mostly to remove the keymap '''
     kms = bpy.context.window_manager.keyconfigs['Blender'].keymaps['Pose']
     for item in kms.items:
@@ -766,7 +765,7 @@ def unregister():
             item.idname = 'pose.copy'
             break
     for menu in _layer_menus:
-        bpy.types.unregister(menu)
+        bpy.utils.unregister_class(menu)
     bpy.types.DATA_PT_texface.remove(_add_tface_buttons)
     km = bpy.context.window_manager.keyconfigs.active.keymaps['Mesh']
     for kmi in km.items:

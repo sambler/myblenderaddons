@@ -2600,9 +2600,13 @@ class CUSTOM_OT_Create_Button(bpy.types.Operator):
 
 
 def register():
+    bpy.utils.register_module(__name__)
+
     pass
     
 def unregister():
+    bpy.utils.unregister_module(__name__)
+
     pass
 
  

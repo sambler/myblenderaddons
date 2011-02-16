@@ -25,11 +25,11 @@
 bl_info = {
     "name": "Dynamic Spacebar Menu",
     "author": "JayDez, sim88, meta-androcto, sam",
-    "version": (1, 6, 1),
+    "version": (1, 7, 2),
     "blender": (2, 5, 6),
-    "api": 34036,
+    "api": 34860,
     "location": "View3D > Spacebar Key",
-    "description": "Context sensitive spacebar menu",
+    "description": "Context Sensitive Spacebar Menu",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
         "Scripts/3D_interaction/Dynamic_Spacebar_Menu",
@@ -43,12 +43,16 @@ This adds a the Dynamic Spacebar Menu in the View3D.
 
 Usage:
 *  This script gives a basic menu with common simple tools for easy access.
-* Very similar to the Spacebar menu in 2.49
-* Context sensitive for Object. Edit, Sculpt, Pose, Weight/Texture/Vertex
-     Paint.
+*  Very similar to the Spacebar menu in 2.49
+*  Context sensitive for Object, Edit, Sculpt, Pose, Weight/Texture/Vertex
+       Paint modes.
 * Object sensitive based on object selected in edit mode.
 
 Version history:
+v1.7.3 - (JayDez) - Wrong operator names for deleting in editmode
+v1.7.2 - (JayDez) - Adding proportional editing menu to where it was missing
+v1.7.1 - (JayDez) - Fixing up lattice menu and a wrong operator in curve menu
+v1.7 - (JayDez) - Fixing up animation menu and Metaball Add Menu
 v1.6.1 - (JayDez) - Added Add Menu to Curve and Surface (respectively)
 v1.6 - (JayDez) - Fixed a couple wrong names. (Thanks Bao2 and Dennis)
 v1.5.1 - (JayDez) - Changing formatting to be more uniform.
@@ -129,6 +133,9 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.operator("view3d.properties", icon='MENU_PANEL')
             layout.separator()
 
+            #TODO: Add if statement to test whether editmode switch needs to
+            #be added to the menu, since certain object can't enter edit mode
+            #In which case we don't need the toggle
             # Toggle Editmode
             layout.operator("object.editmode_toggle", text="Enter Edit Mode",
                 icon='EDITMODE_HLT')
@@ -160,6 +167,13 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.menu("VIEW3D_MT_EditCursorMenu", icon='CURSOR')
             layout.separator()
 
+            # Proportional block
+            layout.prop_menu_enum(settings, "proportional_edit",
+                icon="PROP_CON")
+            layout.prop_menu_enum(settings, "proportional_edit_falloff",
+                icon="SMOOTHCURVE")
+            layout.separator()
+
             # Edit block
             layout.menu("VIEW3D_MT_edit_TK", icon='OUTLINER_OB_MESH')
             layout.separator()
@@ -179,6 +193,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             # Select block
             layout.menu("VIEW3D_MT_SelectEditMenu",
                 icon='RESTRICT_SELECT_OFF')
+            layout.separator()
 
             # Toolshelf block
             layout.operator("view3d.toolshelf", icon='MENU_PANEL')
@@ -235,6 +250,9 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.separator()
 
             # Select Curve Block
+            #Could use: VIEW3D_MT_select_edit_curve
+            #Which is the default, instead of a hand written one, left it alone
+            #for now though.
             layout.menu("VIEW3D_MT_SelectCurveMenu",
                 icon='RESTRICT_SELECT_OFF')
 
@@ -251,7 +269,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
                 icon='OBJECT_DATA')
 
             # Delete block
-            layout.operator("object.delete", text="Delete Object",
+            layout.operator("curve.delete", text="Delete Object",
                 icon='CANCEL')
 
         if ob.mode == 'EDIT_SURFACE':
@@ -304,7 +322,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
                 icon='OBJECT_DATA')
 
             # Delete block
-            layout.operator("object.delete", text="Delete Object",
+            layout.operator("curve.delete", text="Delete Object",
                 icon='CANCEL')
 
         if ob.mode == 'EDIT_METABALL':
@@ -315,11 +333,11 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.separator()
 
             # Add block
-            #No INFO_MT_metaball_add find out why.. and how to use,
-            #for some reason also there is no add menu when editing mballs...
             #layout.menu("INFO_MT_metaball_add", text="Add Metaball",
             #    icon='OUTLINER_OB_META')
-            #layout.separator()
+            layout.operator_menu_enum("object.metaball_add", "type",
+                text="Add Metaball", icon='OUTLINER_OB_META')
+            layout.separator()
 
             # Transform block
             layout.menu("VIEW3D_MT_TransformMenu", icon='MANIPUL')
@@ -354,7 +372,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
                 icon='OBJECT_DATA') 
 
             # Delete block
-            layout.operator("object.delete", text="Delete Object",
+            layout.operator("mball.delete_metaelems", text="Delete Object",
                 icon='CANCEL')
 
         elif ob.mode == 'EDIT_LATTICE':
@@ -362,6 +380,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
 
             #Search Menu
             layout.operator("wm.search_menu", text="Search", icon='VIEWZOOM')
+            layout.separator()
 
             # Transform block
             layout.menu("VIEW3D_MT_TransformMenu", icon='MANIPUL')
@@ -399,9 +418,9 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.operator("object.editmode_toggle", text="Enter Object Mode",
                 icon='OBJECT_DATA')
 
-            # Delete block
-            layout.operator("object.delete", text="Delete Object",
-                icon='CANCEL')				
+            # Delete block - Can't delete any lattice stuff so not needed
+            #layout.operator("object.delete", text="Delete Object",
+            #    icon='CANCEL')				
 
         if  context.mode == 'PARTICLE':
             # Particle menu
@@ -603,6 +622,13 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.menu("VIEW3D_MT_CursorMenu", icon='CURSOR')
             layout.separator()
 
+            # Proportional block
+            layout.prop_menu_enum(settings, "proportional_edit",
+                icon="PROP_CON")
+            layout.prop_menu_enum(settings, "proportional_edit_falloff",
+                icon="SMOOTHCURVE")
+            layout.separator()
+
             # Edit Armature roll
             layout.menu("VIEW3D_MT_edit_armature_roll",
                 icon='BONE_DATA')
@@ -625,25 +651,32 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.operator_menu_enum("armature.flags_set", "mode",
                 text="Bone Settings")
 
-            # Edit Armature Select
-            layout.menu("VIEW3D_MT_SelectArmatureMenu",
-                icon='RESTRICT_SELECT_OFF')
-            layout.separator()
-
             # Edit Armature Specials
             layout.menu("VIEW3D_MT_armature_specials", icon='MODIFIER')
             layout.separator()
 
+            # Edit Armature Select
+            layout.menu("VIEW3D_MT_SelectArmatureMenu",
+                icon='RESTRICT_SELECT_OFF')
+
+            # Toolshelf block
+            layout.operator("view3d.toolshelf", icon='MENU_PANEL')
+            layout.separator()
+
+            # Properties block
+            layout.operator("view3d.properties", icon='MENU_PANEL')
+            layout.separator()
+
             # Toggle Posemode
             layout.operator("object.posemode_toggle", text="Enter Pose Mode",
-                icon='EDITMODE_HLT')
+                icon='POSE_HLT')
 
             # Toggle Posemode
             layout.operator("object.editmode_toggle", text="Enter Object Mode",
                 icon='OBJECT_DATA')
 
             # Delete block
-            layout.operator("object.delete", text="Delete Object",
+            layout.operator("armature.delete", text="Delete Object",
                 icon='CANCEL')
 
 
@@ -663,10 +696,6 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
 
 			# Cursor Menu
             layout.menu("VIEW3D_MT_CursorMenu", icon='CURSOR')
-            layout.separator()
-
-			# Select Pose Block
-            layout.menu("VIEW3D_MT_SelectPoseMenu", icon='RESTRICT_SELECT_OFF')
             layout.separator()
 
 			# Pose Copy Block
@@ -711,10 +740,25 @@ class VIEW3D_MT_Space_Dynamic_Menu(bpy.types.Menu):
             layout.menu("VIEW3D_MT_pose_showhide")
             layout.operator_menu_enum("pose.flags_set", 'mode',
                 text="Bone Settings")
+            layout.separator()
+
+			# Select Pose Block
+            layout.menu("VIEW3D_MT_SelectPoseMenu", icon='RESTRICT_SELECT_OFF')
+
+            # Toolshelf block
+            layout.operator("view3d.toolshelf", icon='MENU_PANEL')
+            layout.separator()
+
+            # Properties block
+            layout.operator("view3d.properties", icon='MENU_PANEL')
+            layout.separator()
 
             # Toggle Editmode
             layout.operator("object.editmode_toggle", text="Enter Edit Mode",
                 icon='EDITMODE_HLT')
+
+            layout.operator("object.mode_set", text="Enter Object Mode",
+                icon='OBJECT_DATA').mode='OBJECT'
 
 
 class VIEW3D_MT_AddMenu(bpy.types.Menu):
@@ -963,7 +1007,7 @@ class VIEW3D_MT_SelectCurveMenu(bpy.types.Menu):
         layout.operator("curve.select_all", text="Select/Deselect All")
         layout.operator("curve.select_inverse")
         layout.operator("curve.select_random")
-        layout.operator("curve.select_every_nth")
+        layout.operator("curve.select_nth")
         layout.separator()
 
         layout.operator("curve.de_select_first")
@@ -1499,12 +1543,16 @@ class VIEW3D_MT_undoS(bpy.types.Menu):
         layout.operator("ed.redo", icon='TRIA_RIGHT')
 
 def register():
+    bpy.utils.register_module(__name__)
+
     km = bpy.context.window_manager.keyconfigs.default.keymaps['3D View']
     kmi = km.items.new('wm.call_menu', 'SPACE', 'PRESS')
     kmi.properties.name = "VIEW3D_MT_Space_Dynamic_Menu"
 
 
 def unregister():
+    bpy.utils.unregister_module(__name__)
+
     km = bpy.context.window_manager.keyconfigs.default.keymaps['3D View']
     for kmi in km.items:
         if kmi.idname == 'wm.call_menu':

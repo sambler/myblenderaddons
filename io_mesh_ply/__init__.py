@@ -49,7 +49,7 @@ class ImportPLY(bpy.types.Operator, ImportHelper):
     '''Load a PLY geometry file'''
     bl_idname = "import_mesh.ply"
     bl_label = "Import PLY"
-    
+
     files = CollectionProperty(name="File Path",
                           description="File path used for importing "
                                       "the PLY file",
@@ -116,11 +116,15 @@ def menu_func_export(self, context):
 
 
 def register():
+    bpy.utils.register_module(__name__)
+
     bpy.types.INFO_MT_file_import.append(menu_func_import)
     bpy.types.INFO_MT_file_export.append(menu_func_export)
 
 
 def unregister():
+    bpy.utils.unregister_module(__name__)
+
     bpy.types.INFO_MT_file_import.remove(menu_func_import)
     bpy.types.INFO_MT_file_export.remove(menu_func_export)
 
