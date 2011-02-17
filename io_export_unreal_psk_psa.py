@@ -18,7 +18,7 @@
 bl_info = {
     "name": "Export Skeleletal Mesh/Animation Data",
     "author": "Darknet/Optimus_P-Fat/Active_Trash/Sinsoft/VendorX",
-    "version": (2, 0),
+    "version": (2, 2),
     "blender": (2, 5, 6),
     "api": 31847,
     "location": "File > Export > Skeletal Mesh/Animation Data (.psk/.psa)",
@@ -109,6 +109,7 @@ SIZE_VQUATANIMKEY = 32
 SIZE_VVERTEX = 16
 SIZE_VPOINT = 12
 SIZE_VTRIANGLE = 12
+MaterialName = []
 
 ########################################################################
 # Generic Object->Integer mapping
@@ -452,7 +453,8 @@ class PSKFile:
             return self.Materials.Data[mat_index]
         else:
             m = VMaterial()
-            m.MaterialName = "Mat%i" % mat_index
+            # modified by VendorX
+            m.MaterialName = MaterialName[mat_index]
             self.AddMaterial(m)
             return m
         
@@ -606,9 +608,10 @@ def is_1d_face(blender_face,mesh):
 
 ##################################################
 # http://en.wikibooks.org/wiki/Blender_3D:_Blending_Into_Python/Cookbook#Triangulate_NMesh
-
+bDeleteMergeMesh = False
 #blender 2.50 format using the Operators/command convert the mesh to tri mesh
 def triangulateNMesh(object):
+    global bDeleteMergeMesh
     bneedtri = False
     scene = bpy.context.scene
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -640,6 +643,10 @@ def triangulateNMesh(object):
         bpy.ops.object.mode_set(mode='OBJECT') # set it in object
         bpy.context.scene.unrealtriangulatebool = True
         print("Triangulate Mesh Done!")
+        if bDeleteMergeMesh == True:
+            print("Remove Merge tmp Mesh [ " ,object.name, " ] from scene!" )
+            bpy.ops.object.mode_set(mode='OBJECT') # set it in object
+            bpy.context.scene.objects.unlink(object)
     else:
         bpy.context.scene.unrealtriangulatebool = False
         print("No need to convert tri mesh.")
@@ -680,10 +687,11 @@ def BoneIndexArmature(blender_armature):
             #BBCount += 1
             break
     
+
 # Actual object parsing functions
 def parse_meshes(blender_meshes, psk_file):
     #this is use to call the bone name and the index array for group index matches
-    global bonedata
+    global bonedata,bDeleteMergeMesh
     #print("BONE DATA",len(bonedata))
     print ("----- parsing meshes -----")
     print("Number of Object Meshes:",len(blender_meshes))
@@ -694,7 +702,16 @@ def parse_meshes(blender_meshes, psk_file):
         print("Mesh Name:",current_obj.name)
         current_mesh = current_obj.data
         
-        #if len(current_obj.materials) > 0:
+        #collect a list of the material names
+        if len(current_obj.material_slots) > 0:
+            counter = 0
+            while counter < len(current_obj.material_slots):
+                MaterialName.append(current_obj.material_slots[counter].name)
+                print("Material Name:",current_obj.material_slots[counter].name)
+                #create the current material
+                psk_file.GetMatByIndex(counter)
+                #print("materials: ",MaterialName[counter])
+                counter += 1
         #    object_mat = current_obj.materials[0]
         object_material_index = current_obj.active_material_index
     
@@ -925,10 +942,27 @@ def parse_meshes(blender_meshes, psk_file):
             psk_file.VertexGroups[bonegroup.bone] = vert_list
         
         #unrealtriangulatebool #this will remove the mesh from the scene
-        if (bpy.context.scene.unrealtriangulatebool == True):
+        '''
+        if (bpy.context.scene.unrealtriangulatebool == True) and (bDeleteMergeMesh == True):
+            #if bDeleteMergeMesh == True:
+            #    print("Removing merge mesh.")
             print("Remove tmp Mesh [ " ,current_obj.name, " ] from scene >"  ,(bpy.context.scene.unrealtriangulatebool ))
             bpy.ops.object.mode_set(mode='OBJECT') # set it in object
             bpy.context.scene.objects.unlink(current_obj)
+        el
+        '''
+        if bDeleteMergeMesh == True:
+            print("Remove Merge tmp Mesh [ " ,current_obj.name, " ] from scene >"  ,(bpy.context.scene.unrealtriangulatebool ))
+            bpy.ops.object.mode_set(mode='OBJECT') # set it in object
+            bpy.context.scene.objects.unlink(current_obj)
+        elif bpy.context.scene.unrealtriangulatebool == True:
+            print("Remove tri tmp Mesh [ " ,current_obj.name, " ] from scene >"  ,(bpy.context.scene.unrealtriangulatebool ))
+            bpy.ops.object.mode_set(mode='OBJECT') # set it in object
+            bpy.context.scene.objects.unlink(current_obj)
+        #if bDeleteMergeMesh == True:
+            #print("Remove merge Mesh [ " ,current_obj.name, " ] from scene")
+            #bpy.ops.object.mode_set(mode='OBJECT') # set it in object
+            #bpy.context.scene.objects.unlink(current_obj)
         
 def make_fquat(bquat):
     quat = FQuat()
@@ -1471,11 +1505,39 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                 psa_file.AddAnimation(anim)
                 print("==== Finish Action Build(s) ====")
     
-exportmessage = "Export Finish"        
+exportmessage = "Export Finish" 
+
+def meshmerge(selectedobjects):
+    bpy.ops.object.mode_set(mode='OBJECT')
+    cloneobjects = []
+    if len(selectedobjects) > 1:
+        print("selectedobjects:",len(selectedobjects))
+        count = 0 #reset count
+        for count in range(len( selectedobjects)):
+            #print("Index:",count)
+            if selectedobjects[count] != None:
+                me_da = selectedobjects[count].data.copy() #copy data
+                me_ob = selectedobjects[count].copy() #copy object
+                #note two copy two types else it will use the current data or mesh
+                me_ob.data = me_da
+                bpy.context.scene.objects.link(me_ob)#link the object to the scene #current object location
+                print("Index:",count,"clone object",me_ob.name)
+                cloneobjects.append(me_ob)
+        #bpy.ops.object.mode_set(mode='OBJECT')
+        for i in bpy.data.objects: i.select = False #deselect all objects
+        count = 0 #reset count
+        #bpy.ops.object.mode_set(mode='OBJECT')
+        for count in range(len( cloneobjects)):
+            if count == 0:
+                bpy.context.scene.objects.active = cloneobjects[count]
+                print("Set Active Object:",cloneobjects[count].name)
+            cloneobjects[count].select = True
+        bpy.ops.object.join()
+        return cloneobjects[0]
         
 def fs_callback(filename, context):
     #this deal with repeat export and the reset settings
-    global bonedata, BBCount, nbone, exportmessage
+    global bonedata, BBCount, nbone, exportmessage,bDeleteMergeMesh
     bonedata = []#clear array
     BBCount = 0
     nbone = 0
@@ -1524,16 +1586,47 @@ def fs_callback(filename, context):
     print("Mesh Count:",len(blender_meshes)," Armature Count:",len(blender_armature))
     print("====================================")
     print("Checking Mesh Condtion(s):")
+    #if there 1 mesh in scene add to the array
     if len(blender_meshes) == 1:
         print(" - One Mesh Scene")
+    #if there more than one mesh and one mesh select add to array
     elif (len(blender_meshes) > 1) and (len(selectmesh) == 1):
         blender_meshes = []
         blender_meshes.append(selectmesh[0])
         print(" - One Mesh [Select]")
+    elif (len(blender_meshes) > 1) and (len(selectmesh) >= 1):
+        #code build check for merge mesh before ops
+        print("More than one mesh is selected!")
+        centermesh = []
+        notcentermesh = []
+        countm = 0
+        for countm in range(len(selectmesh)):
+            #selectmesh[]
+            if selectmesh[countm].location.x == 0 and selectmesh[countm].location.y == 0 and selectmesh[countm].location.z == 0:
+                centermesh.append(selectmesh[countm])
+            else:
+                notcentermesh.append(selectmesh[countm])
+        if len(centermesh) > 0:
+            print("Center Object Found!")
+            blender_meshes = []
+            selectmesh = []
+            countm = 0
+            for countm in range(len(centermesh)):
+                selectmesh.append(centermesh[countm])
+            for countm in range(len(notcentermesh)):
+                selectmesh.append(notcentermesh[countm])
+            blender_meshes.append(meshmerge(selectmesh))
+            bDeleteMergeMesh = True
+        else:
+            bDeleteMergeMesh = False
+            bmesh = False
+            print("Center Object Not Found")
     else:
         print(" - Too Many Meshes!")
         print(" - Select One Mesh Object!")
         bmesh = False
+        bDeleteMergeMesh = False
+		
     print("====================================")
     print("Checking Armature Condtion(s):")
     if len(blender_armature) == 1:
@@ -1546,7 +1639,7 @@ def fs_callback(filename, context):
         barmature = False
     bMeshScale = True
     bMeshCenter = True
-    if blender_meshes[0] !=None:
+    if len(blender_meshes) > 0:
         if blender_meshes[0].scale.x == 1 and blender_meshes[0].scale.y == 1 and blender_meshes[0].scale.z == 1:
             #print("Okay")
             bMeshScale = True
@@ -1559,6 +1652,8 @@ def fs_callback(filename, context):
         else:
             print("Error, Mesh Object not center.",blender_meshes[0].location)
             bMeshCenter = False
+    else:
+        bmesh = False
     bArmatureScale = True
     bArmatureCenter = True
     if blender_armature[0] !=None:
