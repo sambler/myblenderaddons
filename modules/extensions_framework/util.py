@@ -52,8 +52,15 @@ def path_relative_to_export(p):
 	"""Return a path that is relative to the export path"""
 	global export_path
 	p = filesystem_path(p)
+	ep = os.path.dirname(export_path)
+	
+	if os.sys.platform == 'win32':
+		# Prevent an error whereby python thinks C: and c: are different drives
+		if p[1] == ':': p[0] = p[0].lower()
+		if ep[1] == ':': ep[0] = ep[0].lower()
+	
 	try:
-		relp = os.path.relpath(p, os.path.dirname(export_path))
+		relp = os.path.relpath(p, ep)
 	except ValueError: # path on different drive on windows
 		relp = p
 	
