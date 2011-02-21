@@ -56,8 +56,8 @@ def path_relative_to_export(p):
 	
 	if os.sys.platform == 'win32':
 		# Prevent an error whereby python thinks C: and c: are different drives
-		if p[1] == ':': p[0] = p[0].lower()
-		if ep[1] == ':': ep[0] = ep[0].lower()
+		if p[1] == ':': p = p[0].lower() + p[1:]
+		if ep[1] == ':': ep = ep[0].lower() + ep[1:]
 	
 	try:
 		relp = os.path.relpath(p, ep)
