@@ -255,7 +255,7 @@ class property_group_renderer(bpy.types.Panel):
 										args.update({
 											optional_arg: current_property[optional_arg],
 										})
-								layout.menu(current_property['menu'] **args)
+								layout.menu(current_property['menu'], **args)
 							
 							elif current_property['type'] in ['text']:
 								layout.label(
