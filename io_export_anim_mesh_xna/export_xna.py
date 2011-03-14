@@ -1763,7 +1763,7 @@ def export_fbx(operator, context, filepath="",
 
         obs = [(ob_base, ob_base.matrix_world)]
         if ob_base.dupli_type != 'NONE':
-            ob_base.create_dupli_list(scene)
+            ob_base.dupli_list_create(scene)
             obs = [(dob.object, dob.matrix) for dob in ob_base.dupli_list]
 
         for ob, mtx in obs:
@@ -1784,7 +1784,7 @@ def export_fbx(operator, context, filepath="",
             elif EXP_MESH:
                 origData = True
                 if tmp_ob_type != 'MESH':
-                    try:	me = ob.create_mesh(scene, True, 'PREVIEW')
+                    try:	me = ob.to_mesh(scene, True, 'PREVIEW')
                     except:	me = None
                     if me:
                         meshes_to_clear.append( me )
@@ -1793,7 +1793,7 @@ def export_fbx(operator, context, filepath="",
                 else:
                     # Mesh Type!
                     if EXP_MESH_APPLY_MOD:
-                        me = ob.create_mesh(scene, True, 'PREVIEW')
+                        me = ob.to_mesh(scene, True, 'PREVIEW')
 
                         # print ob, me, me.getVertGroupNames()
                         meshes_to_clear.append( me )
@@ -1866,7 +1866,7 @@ def export_fbx(operator, context, filepath="",
                     ob_meshes.append( my_mesh )
 
         # not forgetting to free dupli_list
-        if ob_base.dupli_list: ob_base.free_dupli_list()
+        if ob_base.dupli_list: ob_base.dupli_list_clear()
 
     # To export animations the armature must be in the POSE position not the REST position 
     # so in most cases the script reverts to POSE when the bind pose has been saved. (JCB)
