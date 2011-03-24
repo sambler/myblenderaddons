@@ -20,8 +20,8 @@ bl_info = {
     "name": "Pipe Joints",
     "author": "Buerbaum Martin (Pontiac)",
     "version": (0, 10, 7),
-    "blender": (2, 5, 3),
-    "api": 32411,
+    "blender": (2, 5, 7),
+    "api": 35622,
     "location": "View3D > Add > Mesh > Pipe Joints",
     "description": "Adds 5 pipe Joint types to the Add Mesh menu",
     "warning": "",
@@ -1126,8 +1126,6 @@ class INFO_MT_mesh_pipe_joints_add(bpy.types.Menu):
 
 ################################
 
-import space_info
-
 
 # Define "Pipe Joints" menu
 def menu_func(self, context):
@@ -1138,14 +1136,15 @@ def register():
     bpy.utils.register_module(__name__)
 
     # Add "Pipe Joints" menu to the "Add Mesh" menu
-    space_info.INFO_MT_mesh_add.append(menu_func)
+    bpy.types.INFO_MT_mesh_add.append(menu_func)
 
 
 def unregister():
     bpy.utils.unregister_module(__name__)
 
     # Remove "Pipe Joints" menu from the "Add Mesh" menu.
-    space_info.INFO_MT_mesh_add.remove(menu_func)
+    bpy.types.INFO_MT_mesh_add.remove(menu_func)
+
 
 if __name__ == "__main__":
     register()

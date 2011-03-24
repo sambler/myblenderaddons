@@ -20,8 +20,8 @@ bl_info = {
     "name": "Extras",
     "author": "Pontiac, Fourmadmen, meta-androcto",
     "version": (0, 5),
-    "blender": (2, 5, 6),
-    "api": 33832,
+    "blender": (2, 5, 7),
+    "api": 35622,
     "location": "View3D > Add > Mesh > Extras",
     "description": "Adds Star, Wedge, & Sqorus objects.",
     "warning": "",
@@ -522,7 +522,6 @@ class INFO_MT_mesh_extras_add(bpy.types.Menu):
 
 
 # Register all operators and panels
-import space_info
 
 # Define "Extras" menu
 def menu_func(self, context):
@@ -533,14 +532,14 @@ def register():
     bpy.utils.register_module(__name__)
 
     # Add "Extras" menu to the "Add Mesh" menu
-    space_info.INFO_MT_mesh_add.append(menu_func)
+    bpy.types.INFO_MT_mesh_add.append(menu_func)
 
 
 def unregister():
     bpy.utils.unregister_module(__name__)
 
     # Remove "Extras" menu from the "Add Mesh" menu.
-    space_info.INFO_MT_mesh_add.remove(menu_func)
+    bpy.types.INFO_MT_mesh_add.remove(menu_func)
 
 if __name__ == "__main__":
     register()

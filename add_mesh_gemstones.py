@@ -20,8 +20,8 @@ bl_info = {
     "name": "Gemstones",
     "author": "Pontiac, Fourmadmen, Dreampainter",
     "version": (0, 4),
-    "blender": (2, 5, 6),
-    "api": 32411,
+    "blender": (2, 5, 7),
+    "api": 35622,
     "location": "View3D > Add > Mesh > Gemstones",
     "description": "Adds various gemstone (Diamond & Gem) meshes.",
     "warning": "",
@@ -347,7 +347,6 @@ class INFO_MT_mesh_gemstones_add(bpy.types.Menu):
 
 
 # Register all operators and panels
-import space_info
 
 
 # Define "Gemstones" menu
@@ -359,14 +358,15 @@ def register():
     bpy.utils.register_module(__name__)
 
     # Add "Gemstones" menu to the "Add Mesh" menu
-    space_info.INFO_MT_mesh_add.append(menu_func)
+    bpy.types.INFO_MT_mesh_add.append(menu_func)
 
 
 def unregister():
     bpy.utils.unregister_module(__name__)
 
     # Remove "Gemstones" menu from the "Add Mesh" menu.
-    space_info.INFO_MT_mesh_add.remove(menu_func)
+    bpy.types.INFO_MT_mesh_add.remove(menu_func)
+
 
 if __name__ == "__main__":
     register()

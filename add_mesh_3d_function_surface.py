@@ -20,8 +20,8 @@ bl_info = {
     "name": "3D Function Surfaces",
     "author": "Buerbaum Martin (Pontiac)",
     "version": (0, 3, 7),
-    "blender": (2, 5, 6),
-    "api": 34093,
+    "blender": (2, 5, 7),
+    "api": 35622,
     "location": "View3D > Add > Mesh",
     "description": "Create Objects using Math Formulas",
     "warning": "",
@@ -497,7 +497,6 @@ class AddXYZFunctionSurface(bpy.types.Operator):
 
 
 ################################
-import space_info
 
 
 # Define "3D Function Surface" menu
@@ -517,16 +516,18 @@ def register():
     bpy.utils.register_module(__name__)
 
     # Add menus to the "Add Mesh" menu
-    space_info.INFO_MT_mesh_add.append(menu_func_z)
-    space_info.INFO_MT_mesh_add.append(menu_func_xyz)
+    INFO_MT_mesh_add = bpy.types.INFO_MT_mesh_add
+    INFO_MT_mesh_add.append(menu_func_z)
+    INFO_MT_mesh_add.append(menu_func_xyz)
 
 
 def unregister():
     bpy.utils.unregister_module(__name__)
 
     # Remove menus from the "Add Mesh" menu.
-    space_info.INFO_MT_mesh_add.remove(menu_func_z)
-    space_info.INFO_MT_mesh_add.remove(menu_func_xyz)
+    INFO_MT_mesh_add = bpy.types.INFO_MT_mesh_add
+    INFO_MT_mesh_add.remove(menu_func_z)
+    INFO_MT_mesh_add.remove(menu_func_xyz)
 
 if __name__ == "__main__":
     register()

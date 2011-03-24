@@ -19,9 +19,9 @@
 bl_info = {
     "name": "Fracture Tools",
     "author": "pildanovak",
-    "version": (2,0),
-    "blender": (2, 5, 3),
-    "api": 31965,
+    "version": (2, 0),
+    "blender": (2, 5, 7),
+    "api": 35622,
     "location": "Search > Fracture Object & Add -> Fracture Helper Objects",
     "description": "Fractured Object, Bomb, Projectile, Recorder",
     "warning": "",
@@ -58,8 +58,6 @@ class INFO_MT_add_fracture_objects(bpy.types.Menu):
         layout.operator("object.import_fracture_recorder",
             text="Rigidbody Recorder")
 
-import space_info
-
 
 def menu_func(self, context):
     self.layout.menu("INFO_MT_add_fracture_objects", icon="PLUGIN")
@@ -69,14 +67,15 @@ def register():
     bpy.utils.register_module(__name__)
 
     # Add the "add fracture objects" menu to the "Add" menu
-    space_info.INFO_MT_add.append(menu_func)
+    bpy.types.INFO_MT_add.append(menu_func)
 
 
 def unregister():
     bpy.utils.unregister_module(__name__)
 
     # Remove "add fracture objects" menu from the "Add" menu.
-    space_info.INFO_MT_add.remove(menu_func)
+    bpy.types.INFO_MT_add.remove(menu_func)
+
 
 if __name__ == "__main__":
     register()

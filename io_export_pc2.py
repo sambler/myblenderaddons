@@ -20,8 +20,8 @@ bl_info = {
     "name": "Export Pointcache (.pc2)",
     "author": "Florian Meyer (tstscr)",
     "version": (1, 0),
-    "blender": (2, 5, 4),
-    "api": 33047,
+    "blender": (2, 5, 7),
+    "api": 35622,
     "location": "File > Export",
     "description": "Export Mesh Pointcache to .pc2",
     "warning": "",
@@ -60,7 +60,7 @@ def do_export(context, props, filepath):
     end = props.range_end
     sampling = float(props.sampling)
     apply_modifiers = props.apply_modifiers
-    me = ob.create_mesh(sc, apply_modifiers, 'PREVIEW')
+    me = ob.to_mesh(sc, apply_modifiers, 'PREVIEW')
     vertCount = len(me.vertices)
     sampletimes = getSampling(start, end, sampling)
     sampleCount = len(sampletimes)
@@ -75,7 +75,7 @@ def do_export(context, props, filepath):
     
     for frame in sampletimes:
         sc.frame_set(frame)
-        me = ob.create_mesh(sc, apply_modifiers, 'PREVIEW')
+        me = ob.to_mesh(sc, apply_modifiers, 'PREVIEW')
         
         if len(me.vertices) != vertCount:
             file.close()
