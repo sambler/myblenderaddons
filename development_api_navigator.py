@@ -664,12 +664,12 @@ def register_keymaps():
     km = kc.keymaps.get("Text")
     if km is None:
          km = kc.keymaps.new(name="Text")
-    kmi = km.items.new('api_navigator.toggle_doc', 'ESC', 'PRESS')
+    kmi = km.keymap_items.new('api_navigator.toggle_doc', 'ESC', 'PRESS')
 
 
 def unregister_keymaps():
     km = bpy.data.window_managers["WinMan"].keyconfigs.default.keymaps["Text"]
-    kmi = km.items["api_navigator.toggle_doc"]
+    kmi = km.keymap_items["api_navigator.toggle_doc"]
     km.items.remove(kmi)
 
 
