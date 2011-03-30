@@ -21,7 +21,7 @@ bl_info = {
     "author": "Nick Keeline(nrk)",
     "version": (1,0),
     "blender": (2, 5, 7),
-    "api": 35622,
+    "api": 35853,
     "location": "View3D > Tool Shelf > Cloud Generator Panel",
     "description": "Creates Volumetric Clouds",
     "warning": "",
@@ -516,7 +516,7 @@ class GenerateCloud(bpy.types.Operator):
             #Don't subdivide object or smooth if smoothing box not checked.
             if scene.cloudsmoothing:            
                 bpy.ops.mesh.subdivide(number_cuts=2, fractal=0, smoothness=1)
-                bpy.ops.object.location_apply()
+ #               bpy.ops.object.location_apply()
                 bpy.ops.mesh.vertices_smooth(repeat=20)
             bpy.ops.mesh.tris_convert_to_quads()
             bpy.ops.mesh.faces_shade_smooth()
