@@ -391,16 +391,16 @@ def assign_mat(matname="Default"):
                 ob.data.materials.append(target)    
                 
             #now assign the material:
-                me =ob.data
-                if allfaces:
-                    for f in me.faces:
+            me =ob.data
+            if allfaces:
+                for f in me.faces:
+                    f.material_index = index
+            elif allfaces == False:
+                for f in me.faces:
+                    if f.select:
                         f.material_index = index
-                elif allfaces == False:
-                    for f in me.faces:
-                        if f.select:
-                            f.material_index = index
-                me.update()
-            
+            me.update()
+        
 
 
     #restore the active object
@@ -702,10 +702,10 @@ def unregister():
 
     kc = bpy.data.window_managers[0].keyconfigs.default
     km = kc.keymaps["3D View"]
-    for kmi in km.keymap_items:
+    for kmi in km.items:
         if kmi.idname == 'wm.call_menu':
             if kmi.properties.name ==  "VIEW3D_MT_master_material":
-                km.keymap_items.remove(kmi)
+                km.items.remove(kmi)
                 break
 
 if __name__ == "__main__":
