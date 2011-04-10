@@ -21,7 +21,7 @@ bl_info = {
     "blender": (2, 5, 7),
     "api": 36079,
     "location": "File > Export > XNA FBX Animated Model (*.fbx)",
-    "description": "Export XNA models and animations",
+    "description": "Export FBX models and animations for use in XNA",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
         "Scripts/Import-Export/Blender-toXNA",
