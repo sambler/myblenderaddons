@@ -15,13 +15,13 @@
 # ***** END GPL LICENCE BLOCK *****
 
 bl_info = {
-    "name": "Blender to XNA",
+    "name": "Export XNA format (.fbx)",
     "author": "John C Brown, JCBDigger (@MistyManor)",
     "version": (1, 2),
     "blender": (2, 5, 7),
-    "api": 35622,
-    "location": "File > Export > XNA FBX Animated Model",
-    "description": "Export the model and animations for use in XNA",
+    "api": 36079,
+    "location": "File > Export > XNA FBX Animated Model (*.fbx)",
+    "description": "Export FBX models and animations for use in XNA",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"\
         "Scripts/Import-Export/Blender-toXNA",
