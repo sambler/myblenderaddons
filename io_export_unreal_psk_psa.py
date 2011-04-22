@@ -83,11 +83,12 @@ import time
 import datetime
 import bpy
 import mathutils
+import random
 import operator
 import sys
 
-from struct import pack, calcsize
 
+from struct import pack, calcsize
 
 # REFERENCE MATERIAL JUST IN CASE:
 # 
@@ -111,6 +112,12 @@ SIZE_VVERTEX = 16
 SIZE_VPOINT = 12
 SIZE_VTRIANGLE = 12
 MaterialName = []
+
+# ======================================================================
+# TODO: remove this 1am hack
+nbone = 0
+bDeleteMergeMesh = False
+exportmessage = "Export Finish" 
 
 ########################################################################
 # Generic Object->Integer mapping
@@ -609,7 +616,6 @@ def is_1d_face(blender_face,mesh):
 
 ##################################################
 # http://en.wikibooks.org/wiki/Blender_3D:_Blending_Into_Python/Cookbook#Triangulate_NMesh
-bDeleteMergeMesh = False
 #blender 2.50 format using the Operators/command convert the mesh to tri mesh
 def triangulateNMesh(object):
     global bDeleteMergeMesh
@@ -654,46 +660,10 @@ def triangulateNMesh(object):
         me_ob = object
     return me_ob
 
-#Blender Bone Index
-class BBone:
-    def __init__(self):
-        self.bone = ""
-        self.index = 0
-bonedata = []
-BBCount = 0    
-#deal with mesh bones groups vertex point
-def BoneIndex(bone):
-    global BBCount, bonedata
-    #print("//==============")
-    #print(bone.name , "ID:",BBCount)
-    BB = BBone()
-    BB.bone = bone.name
-    BB.index = BBCount
-    bonedata.append(BB)
-    BBCount += 1
-    for current_child_bone in bone.children:
-        BoneIndex(current_child_bone)
-
-def BoneIndexArmature(blender_armature):
-    global BBCount
-    #print("\n Buildng bone before mesh \n")
-    #objectbone = blender_armature.pose #Armature bone
-    #print(blender_armature)
-    objectbone = blender_armature[0].pose 
-    #print(dir(ArmatureData))
-    
-    for bone in objectbone.bones:
-        if(bone.parent is None):
-            BoneIndex(bone)
-            #BBCount += 1
-            break
-    
-
 # Actual object parsing functions
 def parse_meshes(blender_meshes, psk_file):
     #this is use to call the bone name and the index array for group index matches
-    global bonedata,bDeleteMergeMesh
-    #print("BONE DATA",len(bonedata))
+    global bDeleteMergeMesh
     print ("----- parsing meshes -----")
     print("Number of Object Meshes:",len(blender_meshes))
     for current_obj in blender_meshes: #number of mesh that should be one mesh here
@@ -888,11 +858,8 @@ def parse_meshes(blender_meshes, psk_file):
                     tri.SmoothingGroups = 0
                 
                 tri.MatIndex = object_material_index
-                
-                
                 #print(tri)
-                psk_file.AddFace(tri)
-                
+                psk_file.AddFace(tri)                
             else:
                 discarded_face_count = discarded_face_count + 1
                 
@@ -902,7 +869,7 @@ def parse_meshes(blender_meshes, psk_file):
         if len(points.dict) > 32767:
            raise RuntimeError("Vertex point reach max limited 32767 in pack data. Your",len(points.dict))
         print (" -- Dumping Mesh Wedge -- LEN:",len(wedges.dict))
-        		
+        
         for wedge in wedges.items():
             psk_file.AddWedge(wedge)
             
@@ -919,16 +886,17 @@ def parse_meshes(blender_meshes, psk_file):
         #verts to bones for influences by having the VertexGroup named the same thing as
         #the bone
 
-        #vertex group.
-        for bonegroup in bonedata:
-            #print("bone gourp build:",bonegroup.bone)
+        #vertex group
+        for obvgroup in current_obj.vertex_groups:
+            #print("bone gourp build:",obvgroup.name)#print bone name
+            #print(dir(obvgroup))
             vert_list = []
             for current_vert in current_mesh.vertices:
                 #print("INDEX V:",current_vert.index)
                 vert_index = current_vert.index
                 for vgroup in current_vert.groups:#vertex groupd id
                     vert_weight = vgroup.weight
-                    if(bonegroup.index == vgroup.group):
+                    if(obvgroup.index == vgroup.group):
                         p = VPoint()
                         vpos = current_vert.co * current_obj.matrix_local
                         p.Point.X = vpos.x
@@ -939,8 +907,8 @@ def parse_meshes(blender_meshes, psk_file):
                         v_item = (point_index, vert_weight)
                         vert_list.append(v_item)
             #bone name, [point id and wieght]
-            #print("Add Vertex Group:",bonegroup.bone, " No. Points:",len(vert_list))
-            psk_file.VertexGroups[bonegroup.bone] = vert_list
+            #print("Add Vertex Group:",obvgroup.name, " No. Points:",len(vert_list))
+            psk_file.VertexGroups[obvgroup.name] = vert_list
         
         #unrealtriangulatebool #this will remove the mesh from the scene
         '''
@@ -967,7 +935,6 @@ def parse_meshes(blender_meshes, psk_file):
         
 def make_fquat(bquat):
     quat = FQuat()
-    
     #flip handedness for UT = set x,y,z to negative (rotate in other direction)
     quat.X = -bquat.x
     quat.Y = -bquat.y
@@ -986,9 +953,6 @@ def make_fquat_default(bquat):
     quat.W = bquat.w
     return quat
 
-# =================================================================================================
-# TODO: remove this 1am hack
-nbone = 0
 def parse_bone(blender_bone, psk_file, psa_file, parent_id, is_root_bone, parent_matrix, parent_root):
     global nbone     # look it's evil!
     #print '-------------------- Dumping Bone ---------------------- '
@@ -996,7 +960,6 @@ def parse_bone(blender_bone, psk_file, psa_file, parent_id, is_root_bone, parent
     #If bone does not have parent that mean it the root bone
     if blender_bone.parent is None:
         parent_root = blender_bone
-    
     
     child_count = len(blender_bone.children)
     #child of parent
@@ -1164,9 +1127,8 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
     print ("Default FPS: 24" )
     
     cur_frame_index = 0
-    
-    if bpy.context.scene.unrealactionexportall :#if exporting all actions is ture then go do some work.
-        print("Exporting all action:",bpy.context.scene.unrealactionexportall)
+    if (bpy.context.scene.UEActionSetSettings == '1') or (bpy.context.scene.UEActionSetSettings == '2'):
+        print("Action Set(s) Settings Idx:",bpy.context.scene.UEActionSetSettings)
         print("[==== Action list Start====]")
         
         print("Number of Action set(s):",len(bpy.data.actions))
@@ -1186,7 +1148,8 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
         
         for arm in blender_armatures:
             amatureobject = arm
-            
+        #print(dir(amatureobject))
+        collection = amatureobject.myCollectionUEA #collection of the object
         print("\n[==== Armature Object ====]")
         if amatureobject != None:
             print("Name:",amatureobject.name)
@@ -1196,6 +1159,20 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
         print("[=========================]")
         
         for ActionNLA in bpy.data.actions:
+            FoundAction = True
+            if bpy.context.scene.UEActionSetSettings == '2':                
+                for c in collection:
+                    if c.name == ActionNLA.name:
+                        if c.mybool == True:
+                            FoundAction = True
+                        else:
+                            FoundAction = False
+                        break
+                if FoundAction == False:
+                    print("========================================")
+                    print("Skipping Action Set!",ActionNLA.name)
+                    print("========================================")
+                    #break
             print("\n==== Action Set ====")
             nobone = 0
             baction = True
@@ -1209,14 +1186,14 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                         break
             #if action groups matches the bones length and names matching the gourps do something
             if (len(ActionNLA.groups) == len(bonenames)) and (nobone == len(ActionNLA.groups)):
-                print("Action Set match: Pass")
+                #print("Action Set match: Pass")
                 baction = True
             else:
-                print("Action Set match: Fail")
-                print("Action Name:",ActionNLA.name)
+                #print("Action Set match: Fail")
+                #print("Action Name:",ActionNLA.name)
                 baction = False
             
-            if baction == True:
+            if (baction == True) and (FoundAction == True):
                 arm = amatureobject #set armature object
                 if not arm.animation_data:
                     print("======================================")
@@ -1231,7 +1208,10 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                     print("Armature has no animation, skipping...")
                     print("======================================")
                     break
+                print("Last Action Name:",arm.animation_data.action.name)
                 arm.animation_data.action = ActionNLA
+                print("Set Action Name:",arm.animation_data.action.name)
+                bpy.context.scene.update()
                 act = arm.animation_data.action
                 action_name = act.name
                 
@@ -1243,7 +1223,7 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                     
                 #this deal with action export control
                 if bHaveAction == True:
-                    
+                    print("------------------------------------")
                     print("Action Name:",action_name)
                     #look for min and max frame that current set keys
                     framemin, framemax = act.frame_range
@@ -1314,13 +1294,41 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                             head = pose_bone.head
                             
                             posebonemat = mathutils.Matrix(pose_bone.matrix)
+                            #print("quat",posebonemat)
+                            #
+                            # Error looop action get None in matrix
+                            # looping on each armature give invert and normalize for None
+                            #
                             parent_pose = pose_bone.parent
                             if parent_pose != None:
                                 parentposemat = mathutils.Matrix(parent_pose.matrix)
                                 #blender 2.4X it been flip around with new 2.50 (mat1 * mat2) should now be (mat2 * mat1)
+                                #print("posebonemat",posebonemat)
+                                #print("parentposemat",parentposemat.inverted())
+                                #print("parentposemat",dir(parentposemat))
+                                '''
+                                parentposematinvert = parentposemat.invert()
+                                if parentposematinvert == None:
+                                    posebonemat = parentposemat.inverted() * posebonemat
+                                else:
+                                    posebonemat = parentposemat.invert() * posebonemat
+                                '''
                                 posebonemat = parentposemat.invert() * posebonemat
+                                    
                             head = posebonemat.to_translation()
                             quat = posebonemat.to_quaternion().normalize()
+                            #print("to_quaternion:",posebonemat.to_quaternion())
+                            quat2 = mathutils.Quaternion(posebonemat.to_quaternion())
+                            #print("to_quaternion2:",dir(quat2))
+                            #if quat == None:
+                                #quat = posebonemat.to_quaternion().normalized()
+                            
+                            
+                            #print("quat",(posebonemat.to_quaternion().normalized()))
+                            #print("quat",dir(posebonemat.to_quaternion().normalized()))
+                            #print("pose_bone name:",pose_bone.name)
+                            #print("head",head)
+                            #print("quat",quat)
                             vkey = VQuatAnimKey()
                             vkey.Position.X = head.x
                             vkey.Position.Y = head.y
@@ -1343,21 +1351,20 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                             
                             #print ("Diff = ", diff)
                             vkey.Time = float(diff)/float(anim_rate)
-                            
                             psa_file.AddRawKey(vkey)
                             
                     #done looping frames
                     #done looping armatures
                     #continue adding animInfoBinary counts here
                 
-                    anim.TotalBones = len(unique_bone_indexes)
-                    print("Bones Count:",anim.TotalBones)
-                    anim.TrackTime = float(frame_count) / anim.AnimRate
-                    print("Time Track Frame:",anim.TrackTime)
-                    psa_file.AddAnimation(anim)
+                anim.TotalBones = len(unique_bone_indexes)
+                print("Bones Count:",anim.TotalBones)
+                anim.TrackTime = float(frame_count) / anim.AnimRate
+                print("Time Track Frame:",anim.TrackTime)
+                psa_file.AddAnimation(anim)
         print("==== Finish Action Build(s) ====")
     else:
-        print("Exporting one action:",bpy.context.scene.unrealactionexportall)
+        print("[==== Action Set Single Export====]")
         #list of armature objects
         for arm in blender_armatures:
             #check if there animation data from armature or something
@@ -1387,8 +1394,7 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                 
             #this deal with action export control
             if bHaveAction == True:
-                print("")
-                print("==== Action Set ====")
+                print("---- Action Start ----")
                 print("Action Name:",action_name)
                 #look for min and max frame that current set keys
                 framemin, framemax = act.frame_range
@@ -1492,7 +1498,6 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                         
                         #print ("Diff = ", diff)
                         vkey.Time = float(diff)/float(anim_rate)
-                        
                         psa_file.AddRawKey(vkey)
                         
                 #done looping frames
@@ -1504,10 +1509,9 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
                 anim.TrackTime = float(frame_count) / anim.AnimRate
                 print("Time Track Frame:",anim.TrackTime)
                 psa_file.AddAnimation(anim)
-                print("==== Finish Action Build(s) ====")
+                print("---- Action End ----")
+                print("==== Finish Action Build ====")
     
-exportmessage = "Export Finish" 
-
 def meshmerge(selectedobjects):
     bpy.ops.object.mode_set(mode='OBJECT')
     cloneobjects = []
@@ -1538,9 +1542,7 @@ def meshmerge(selectedobjects):
         
 def fs_callback(filename, context):
     #this deal with repeat export and the reset settings
-    global bonedata, BBCount, nbone, exportmessage,bDeleteMergeMesh
-    bonedata = []#clear array
-    BBCount = 0
+    global nbone, exportmessage, bDeleteMergeMesh
     nbone = 0
     
     start_time = time.clock()
@@ -1684,8 +1686,6 @@ def fs_callback(filename, context):
         exportmessage = "Export Finish!"
         #print("blender_armature:",dir(blender_armature[0]))
         #print(blender_armature[0].scale)
-        #need to build a temp bone index for mesh group vertex
-        BoneIndexArmature(blender_armature)
 
         try:
             #######################
@@ -1792,17 +1792,17 @@ bpy.types.Scene.unrealexport_settings = EnumProperty(
     name="Export:",
     description="Select a export settings (psk/psa/all)...",
     items = exporttypedata, default = '0')
-        
+	
+bpy.types.Scene.UEActionSetSettings = EnumProperty(
+    name="Action Set(s) Export Type",
+    description="For Exporting Single, All, and Select Action Set(s).",
+    items = [("0","Single","Single Action Set Export"),("1","All","All Action Sets Export"),("2","Select","Select Action Set(s) Export")], default = '0')        
+	
 bpy.types.Scene.unrealtriangulatebool = BoolProperty(
     name="Triangulate Mesh",
     description="Convert Quad to Tri Mesh Boolean...",
     default=False)
     
-bpy.types.Scene.unrealactionexportall = BoolProperty(
-    name="All Actions",
-    description="This let you export all the actions from current armature that matches bone name in action groups names.",
-    default=False)
-
 bpy.types.Scene.unrealdisplayactionsets = BoolProperty(
     name="Show Action Set(s)",
     description="Display Action Sets Information.",
@@ -1817,13 +1817,82 @@ bpy.types.Scene.unrealexportpsa = BoolProperty(
     name="bool export psa",
     description="bool for exporting this psa format",
     default=True)
+	
+class UEAPropertyGroup(bpy.types.PropertyGroup):
+    ## create Properties for the collection entries:
+    mystring = bpy.props.StringProperty()
+    mybool = bpy.props.BoolProperty(name="Export",description="Check if you want to export the action set.",default = False)
+	
+bpy.utils.register_class(UEAPropertyGroup) 
+ 
+## create CollectionProperty and link it to the property class
+bpy.types.Object.myCollectionUEA = bpy.props.CollectionProperty(type = UEAPropertyGroup)
+bpy.types.Object.myCollectionUEA_index = bpy.props.IntProperty(min = -1, default = -1)
+
+## create operator to add or remove entries to/from  the Collection
+class OBJECT_OT_add_remove_Collection_Items_UE(bpy.types.Operator):
+    bl_label = "Add or Remove"
+    bl_idname = "collection.add_remove_ueactions"
+    __doc__ = """Button for Add, Remove, Refresh Action Set(s) list."""
+    set = bpy.props.StringProperty()
+ 
+    def invoke(self, context, event):
+        obj = context.object
+        collection = obj.myCollectionUEA
+        if self.set == "remove":
+            print("remove")
+            index = obj.myCollectionUEA_index
+            collection.remove(index)       # This remove on item in the collection list function of index value
+        if self.set == "add":
+            print("add")
+            added = collection.add()        # This add at the end of the collection list
+            added.name = "Action"+ str(random.randrange(0, 101, 2))
+        if self.set == "refresh":
+            print("refresh")
+            ArmatureSelect = None
+            ActionNames = []
+            BoneNames = []
+            for obj in bpy.data.objects:
+                if obj.type == 'ARMATURE' and obj.select == True:
+                    print("Armature Name:",obj.name)
+                    ArmatureSelect = obj
+                    for bone in obj.pose.bones:
+                        BoneNames.append(bone.name)
+                    break
+            actionsetmatchcount = 0	
+            for ActionNLA in bpy.data.actions:
+                nobone = 0
+                for group in ActionNLA.groups:	
+                    for abone in BoneNames:
+                        if abone == group.name:
+                            nobone += 1
+                            break
+                    if (len(ActionNLA.groups) == len(BoneNames)) and (nobone == len(ActionNLA.groups)):
+                        actionsetmatchcount += 1
+                        ActionNames.append(ActionNLA.name)
+            #print(dir(collection))
+            #print("collection:",len(collection))
+            print("action list check")
+            for action in ActionNames:
+                BfoundAction = False
+                #print("action:",action)
+                for c in collection:
+                    #print(c.name)
+                    if c.name == action:
+                        BfoundAction = True
+                        break
+                if BfoundAction == False:
+                    added = collection.add()        # This add at the end of the collection list
+                    added.name = action
+        #print("finish...")
+        return {'FINISHED'} 
 
 class ExportUDKAnimData(bpy.types.Operator):
     global exportmessage
     '''Export Skeleton Mesh / Animation Data file(s)'''
     bl_idname = "export_anim.udk" # this is important since its how bpy.ops.export.udk_anim_data is constructed
     bl_label = "Export PSK/PSA"
-    __doc__ = "One mesh and one armature else select one mesh or armature to be exported."
+    __doc__ = """One mesh and one armature else select one mesh or armature to be exported."""
 
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
@@ -1877,78 +1946,44 @@ class VIEW3D_PT_unrealtools_objectmode(bpy.types.Panel):
         layout = self.layout
         rd = context.scene
         layout.prop(rd, "unrealexport_settings",expand=True)        
-        #layout.operator("object.UnrealExport")#button#blender 2.55 version
-        layout.operator(OBJECT_OT_UnrealExport.bl_idname)#button blender #2.56 version
-        #print("Button Name:",OBJECT_OT_UnrealExport.bl_idname) #2.56 version
+        layout.operator(OBJECT_OT_UnrealExport.bl_idname)
         #FPS #it use the real data from your scene
         layout.prop(rd.render, "fps")
         
-        layout.prop(rd, "unrealactionexportall")
+        layout.prop(rd, "UEActionSetSettings")
         layout.prop(rd, "unrealdisplayactionsets")
-        #print("unrealdisplayactionsets:",rd.unrealdisplayactionsets)
-        if rd.unrealdisplayactionsets:
-            layout.label(text="Total Action Set(s):" + str(len(bpy.data.actions)))
-		    #armature data
-            amatureobject = None
-            bonenames = [] #bone name of the armature bones list 
-            #layout.label(text="object(s):" + str(len(bpy.data.objects)))
-            
-            for obj in bpy.data.objects:
+        
+        ArmatureSelect = None
+        for obj in bpy.data.objects:
                 if obj.type == 'ARMATURE' and obj.select == True:
-                    #print(dir(obj))
-                    amatureobject = obj
+                    #print("Armature Name:",obj.name)
+                    ArmatureSelect = obj
                     break
-                elif obj.type == 'ARMATURE':
-                    amatureobject = obj
-        
-            if amatureobject != None:
-                layout.label(text="Armature: " + amatureobject.name)
-                #print("Armature:",amatureobject.name)
-                boxactionset = layout.box()
-                for bone in amatureobject.pose.bones:
-                    bonenames.append(bone.name)
-                actionsetmatchcount = 0	
-                for ActionNLA in bpy.data.actions:
-                    nobone = 0
-                    for group in ActionNLA.groups:	
-                        for abone in bonenames:
-                            #print("name:>>",abone)
-                            if abone == group.name:
-                                nobone += 1
-                                break
-                    if (len(ActionNLA.groups) == len(bonenames)) and (nobone == len(ActionNLA.groups)):
-                        actionsetmatchcount += 1
-                        #print("Action Set match: Pass")
-                        boxactionset.label(text="Action Name: " + ActionNLA.name)
-                layout.label(text="Match Found: " + str(actionsetmatchcount))
-        
-        layout.operator(OBJECT_OT_UTSelectedFaceSmooth.bl_idname)
+        #display armature actions list
+        if ArmatureSelect != None and rd.unrealdisplayactionsets == True:
+            layout.label(("Selected: "+ArmatureSelect.name))
+            row = layout.row()
+            row.template_list(obj, "myCollectionUEA", obj, "myCollectionUEA_index")                        # This show list for the collection
+            col = row.column(align=True)
+            col.operator("collection.add_remove_ueactions", icon="ZOOMIN", text="").set = "add"            # This show a plus sign button
+            col.operator("collection.add_remove_ueactions", icon="ZOOMOUT", text="").set = "remove"        # This show a minus sign button        
+            col.operator("collection.add_remove_ueactions", icon="FILE_REFRESH", text="").set = "refresh"  # This show a refresh sign button
+            
+            ##change name of Entry:
+            if obj.myCollectionUEA:
+                entry = obj.myCollectionUEA[obj.myCollectionUEA_index]
+                layout.prop(entry, "name")
+                layout.prop(entry, "mybool")
+        layout.operator(OBJECT_OT_UTSelectedFaceSmooth.bl_idname)        
         layout.operator(OBJECT_OT_UTRebuildArmature.bl_idname)
         layout.operator(OBJECT_OT_UTRebuildMesh.bl_idname)
-        #row = layout.row()
-        #row.label(text="Action Set(s)(not build)")
-        #for action in  bpy.data.actions:
-            #print(dir( action))
-            #print(action.frame_range)
-            #row = layout.row()
-            #row.prop(action, "name")
-            
-            #print(dir(action.groups[0]))
-            #for g in action.groups:#those are bones
-                #print("group...")
-                #print(dir(g))
-                #print("////////////")
-                #print((g.name))
-                #print("////////////")
-            
-            #row.label(text="Active:" + action.select)
-        btrimesh = False
+        layout.operator(OBJECT_OT_ToggleConsle.bl_idname)
         
 class OBJECT_OT_UnrealExport(bpy.types.Operator):
     global exportmessage
     bl_idname = "export_mesh.udk"  # XXX, name???
     bl_label = "Unreal Export"
-    __doc__ = "Select export setting for .psk/.psa or both."
+    __doc__ = """Select export setting for .psk/.psa or both."""
     
     def invoke(self, context, event):
         print("Init Export Script:")
@@ -1966,38 +2001,43 @@ class OBJECT_OT_UnrealExport(bpy.types.Operator):
             print("Exporting ALL...")
 
         default_path = os.path.splitext(bpy.data.filepath)[0] + ".psk"
-        fs_callback(default_path, bpy.context)
-        
+        fs_callback(default_path, bpy.context)        
         #self.report({'WARNING', 'INFO'}, exportmessage)
         self.report({'INFO'}, exportmessage)
         return{'FINISHED'}   
 
+class OBJECT_OT_ToggleConsle(bpy.types.Operator):
+    global exportmessage
+    bl_idname = "object.toggleconsle"  # XXX, name???
+    bl_label = "Toggle Console"
+    __doc__ = "Show or Hide Console."
+    
+    def invoke(self, context, event):
+        print("Init Export Script:")
+        bpy.ops.wm.console_toggle()
+        return{'FINISHED'} 
+
 class OBJECT_OT_UTSelectedFaceSmooth(bpy.types.Operator):
     bl_idname = "object.utselectfacesmooth"  # XXX, name???
     bl_label = "Select Smooth faces"
-    __doc__ = "It will only select smooth faces that is select mesh."
+    __doc__ = """It will only select smooth faces that is select mesh."""
     
     def invoke(self, context, event):
-        #print("Init Export Script:")        
+        print("----------------------------------------")
+        print("Init Select Face(s):")
+        bselected = False
         for obj in bpy.data.objects:
-            #print(dir(obj))
-            #print(dir(obj))
             if obj.type == 'MESH' and obj.select == True:
                 smoothcount = 0
                 flatcount = 0
                 bpy.ops.object.mode_set(mode='OBJECT')#it need to go into object mode to able to select the faces
                 for i in bpy.context.scene.objects: i.select = False #deselect all objects
-                obj.select = True
-                bpy.context.scene.objects.active = obj
-                #print("Mesh found!",obj.name)
-                #bpy.ops.object.mode_set(mode='EDIT')
-                #print(len(obj.data.faces))
+                obj.select = True #set current object select
+                bpy.context.scene.objects.active = obj #set active object
                 for face in obj.data.faces:
-                    #print(dir(face))
                     if face.use_smooth == True:
                         face.select = True
                         smoothcount += 1
-                        #print("selected:",face.select)
                     else:
                         flatcount += 1
                         face.select = False
@@ -2005,20 +2045,27 @@ class OBJECT_OT_UTSelectedFaceSmooth(bpy.types.Operator):
                     #print(("smooth:",face.use_smooth))
                 bpy.context.scene.update()
                 bpy.ops.object.mode_set(mode='EDIT')
-                print("Select Smooth Count:",smoothcount," Flat Count:",flatcount)
-				
+                print("Select Smooth Count(s):",smoothcount," Flat Count(s):",flatcount)
+                bselected = True
                 break
-        #objects = bpy.data.objects
-        print("Selected faces exectue!")        
+        if bselected:
+            print("Selected Face(s) Exectue!")
+            self.report({'INFO'}, "Selected Face(s) Exectue!")
+        else:
+            print("Didn't select Mesh Object!")
+            self.report({'INFO'}, "Didn't Select Mesh Object!")
+        print("----------------------------------------")        
         return{'FINISHED'}
 		
 class OBJECT_OT_UTRebuildArmature(bpy.types.Operator):
     bl_idname = "object.utrebuildarmature"  # XXX, name???
     bl_label = "Rebuild Armature"
-    __doc__ = "If mesh is deform when importing to unreal engine try this. It rebuild the bones one at the time by select one armature object scrape to raw setup build."
+    __doc__ = """If mesh is deform when importing to unreal engine try this. It rebuild the bones one at the time by select one armature object scrape to raw setup build."""
     
     def invoke(self, context, event):
-        
+        print("----------------------------------------")
+        print("Init Rebuild Armature...")
+        bselected = False
         for obj in bpy.data.objects:
             if obj.type == 'ARMATURE' and obj.select == True:
                 currentbone = [] #select armature for roll copy
@@ -2061,8 +2108,14 @@ class OBJECT_OT_UTRebuildArmature(bpy.types.Operator):
                 print("New Bone Count",len(ob_new.data.edit_bones))
                 print("Rebuild Armture Finish:",ob_new.name)
                 bpy.context.scene.update()
+                bselected = True
                 break
-        self.report({'INFO'}, "Rebuild Armature Finish!")
+        if bselected:
+            self.report({'INFO'}, "Rebuild Armature Finish!")
+        else:
+            self.report({'INFO'}, "Didn't Select Armature Object!")
+        print("End of Rebuild Armature.")
+        print("----------------------------------------")
         return{'FINISHED'}
 		
 # rounded the vert locations to save a bit of blurb.. change the round value or remove for accuracy i suppose
@@ -2078,62 +2131,144 @@ def unpack_list(list_of_tuples):
 class OBJECT_OT_UTRebuildMesh(bpy.types.Operator):
     bl_idname = "object.utrebuildmesh"  # XXX, name???
     bl_label = "Rebuild Mesh"
-    __doc__ = "Work In Progress. Support only Quad faces. It rebuild the mesh from scrape from the selected mesh."
+    __doc__ = """It rebuild the mesh from scrape from the selected mesh object."""
     
     def invoke(self, context, event):
-        #print("Init Export Script:")
+        print("----------------------------------------")
+        print("Init Mesh Bebuild...")
+        bselected = False
         for obj in bpy.data.objects:
             if obj.type == 'MESH' and obj.select == True:
                 for i in bpy.context.scene.objects: i.select = False #deselect all objects
                 obj.select = True
                 bpy.context.scene.objects.active = obj
                 bpy.ops.object.mode_set(mode='OBJECT')
-				
-                #bpy.ops.object.mode_set(mode='EDIT')
+                me_ob = bpy.data.meshes.new(("Re_"+obj.name))
                 mesh = obj.data
                 faces = []
                 verts = []
                 smoothings = []
-                facecount  = 0
+                uvfaces = []
+                #print(dir(mesh))
+                print("creating array build mesh...")
+                uv_layer = mesh.uv_textures.active
                 for face in mesh.faces:
-                    facecount += 1
+                    v = []
+                    smoothings.append(face.use_smooth)#smooth or flat in boolean
+                    if uv_layer != None:#check if there texture data exist
+                        faceUV = uv_layer.data[face.index]
+                        #print(len(faceUV.uv))
+                        uvs = []
+                        for uv in faceUV.uv:
+                            #vert = mesh.vertices[videx]
+                            #print("UV:",uv[0],":",uv[1])
+                            uvs.append((uv[0],uv[1]))
+                        #print(uvs)
+                        uvfaces.append(uvs)
+                    for videx in face.vertices:
+                        vert = mesh.vertices[videx]
+                        v.append(videx)
+                    faces.append(v)                    
+                #vertex positions
+                for vertex in mesh.vertices:
+                    verts.append(vertex.co.to_tuple())				
+                #vertices weight groups into array
+                vertGroups = {} #array in strings
+                for vgroup in obj.vertex_groups:
+                    #print(dir(vgroup))
+                    #print("name:",(vgroup.name),"index:",vgroup.index)
+                    #vertex in index and weight
+                    vlist = []
+                    for v in mesh.vertices:
+                        for vg in v.groups:
+                            if vg.group == vgroup.index:
+                                vlist.append((v.index,vg.weight))
+                                #print((v.index,vg.weight))
+                    vertGroups[vgroup.name] = vlist					
+                '''
+				#Fail for this method
+				#can't covert the tri face plogyon
+                for face in mesh.faces:
                     x = [f for f in face.vertices]
                     faces.extend(x)
-                    #print(dir(face))
                     smoothings.append(face.use_smooth)
-                    
-                #print("faces",len(faces),"face count:",facecount,"Covert:",len(faces)//4)
-                    #print(x)
-                
                 for vertex in mesh.vertices:
-                    #verts.extend([(vertex.co[0],vertex.co[1],vertex.co[2])])
                     verts.append(vertex.co.to_tuple())
-                #print("Face/Vertex Array")
-                me_ob = bpy.data.meshes.new("ReBuildMesh")
                 me_ob.vertices.add(len(verts))
-                #print("Vertex Count:",len(verts))
-                #for face in faces:
-                    #print("------")
-                    #print(face)
                 me_ob.faces.add(len(faces)//4)
-                #print(facecount)
-                #me_ob.faces.add(facecount - 3)
-                #print("Face Count:",len(faces)//4)
                 me_ob.vertices.foreach_set("co", unpack_list(verts))
-                #me_ob.vertices.foreach_set("co", verts)
                 me_ob.faces.foreach_set("vertices_raw", faces)
                 me_ob.faces.foreach_set("use_smooth", smoothings)
-                me_ob.update_tag()
+                '''
+                #test dummy mesh
+                #verts = [(-1,1,0),(1,1,0),(1,-1,0),(-1,-1,0),(0,1,1),(0,-1,1)]
+                #faces = [(0,1,2,3),(1,2,5,4),(0,3,5,4),(0,1,4),(2,3,5)]
+                #for f in faces:
+                    #print("face",f)
+                #for v in verts:
+                    #print("vertex",v)
+                #me_ob = bpy.data.objects.new("ReBuildMesh",me_ob)
+                print("creating mesh object...")
+                me_ob.from_pydata(verts, [], faces)
+                me_ob.faces.foreach_set("use_smooth", smoothings)#smooth array from face
                 me_ob.update()
-                obmesh = bpy.data.objects.new("ReBuildMesh",me_ob)
+                #check if there is uv faces
+                if len(uvfaces) > 0:
+                    uvtex = me_ob.uv_textures.new(name="retex")
+                    for i, face in enumerate(me_ob.faces):
+                        blender_tface = uvtex.data[i] #face
+                        mfaceuv = uvfaces[i]
+                        if len(mfaceuv) == 3:
+                            blender_tface.uv1 = mfaceuv[0];
+                            blender_tface.uv2 = mfaceuv[1];
+                            blender_tface.uv3 = mfaceuv[2];
+                        if len(mfaceuv) == 4:
+                            blender_tface.uv1 = mfaceuv[0];
+                            blender_tface.uv2 = mfaceuv[1];
+                            blender_tface.uv3 = mfaceuv[2];
+                            blender_tface.uv4 = mfaceuv[3];
+                
+                obmesh = bpy.data.objects.new(("Re_"+obj.name),me_ob)
+                bpy.context.scene.update()
+                #Build tmp materials
+                materialname = "ReMaterial"
+                for matcount in mesh.materials:
+                    matdata = bpy.data.materials.new(materialname)
+                    me_ob.materials.append(matdata)
+                #assign face to material id
+                for face in mesh.faces:
+                    #print(dir(face))
+                    me_ob.faces[face.index].material_index = face.material_index
+                #vertices weight groups
+                for vgroup in vertGroups:
+                    #print("vgroup",vgroup)#name of group
+                    #print(dir(vgroup))
+                    #print(vertGroups[vgroup])
+                    group = obmesh.vertex_groups.new(vgroup)
+                    #print("group index",group.index)
+                    for v in vertGroups[vgroup]:
+                        group.add([v[0]], v[1], 'ADD')# group.add(array[vertex id],weight,add)
+                        #print("[vertex id, weight]",v) #array (0,0)
+                        #print("[vertex id, weight]",v[0],":",v[1]) #array (0,0)
                 bpy.context.scene.objects.link(obmesh)
+                print("Mesh Material Count:",len(me_ob.materials))
+                for mat in me_ob.materials:
+                    print("-Material:",mat.name)
                 print("Object Name:",obmesh.name)
                 bpy.context.scene.update()
+                #bpy.ops.wm.console_toggle()
+                bselected = True
                 break
-        print("Finish Mesh Build...")
-        self.report({'INFO'}, "Rebuild Mesh Finish!")
+        if bselected:
+            self.report({'INFO'}, "Rebuild Mesh Finish!")
+            print("Finish Mesh Build...")
+        else:
+            self.report({'INFO'}, "Didn't Select Mesh Object!")
+            print("Didn't Select Mesh Object!")
+        print("----------------------------------------")
+        
         return{'FINISHED'}
-		
+
 def menu_func(self, context):
     #bpy.context.scene.unrealexportpsk = True
     #bpy.context.scene.unrealexportpsa = True

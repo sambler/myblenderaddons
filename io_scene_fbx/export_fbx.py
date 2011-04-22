@@ -35,34 +35,6 @@ import bpy
 from mathutils import Vector, Matrix
 
 
-# XXX not used anymore, images are copied one at a time
-def copy_images(dest_dir, textures):
-    import shutil
-
-    if not dest_dir.endswith(os.sep):
-        dest_dir += os.sep
-
-    image_paths = set()
-    for tex in textures:
-        image_paths.add(bpy.path.abspath(tex.filepath))
-
-    # Now copy images
-    copyCount = 0
-    for image_path in image_paths:
-        if Blender.sys.exists(image_path):
-            # Make a name for the target path.
-            dest_image_path = dest_dir + image_path.split('\\')[-1].split('/')[-1]
-            if not Blender.sys.exists(dest_image_path):  # Image isnt already there
-                print("\tCopying %r > %r" % (image_path, dest_image_path))
-                try:
-                    shutil.copy(image_path, dest_image_path)
-                    copyCount += 1
-                except:
-                    print("\t\tWarning, file failed to copy, skipping.")
-
-    print('\tCopied %d images' % copyCount)
-
-
 # I guess FBX uses degrees instead of radians (Arystan).
 # Call this function just before writing to FBX.
 # 180 / math.pi == 57.295779513
@@ -157,25 +129,6 @@ def sane_takename(data):
 def sane_groupname(data):
     return sane_name(data, sane_name_mapping_group)
 
-# def derived_paths(fname_orig, basepath, FORCE_CWD=False):
-# 	'''
-# 	fname_orig - blender path, can be relative
-# 	basepath - fname_rel will be relative to this
-# 	FORCE_CWD - dont use the basepath, just add a ./ to the filepath.
-# 		use when we know the file will be in the basepath.
-# 	'''
-# 	fname = bpy.path.abspath(fname_orig)
-# # 	fname = Blender.sys.expandpath(fname_orig)
-# 	fname_strip = os.path.basename(fname)
-# # 	fname_strip = strip_path(fname)
-# 	if FORCE_CWD:
-# 		fname_rel = '.' + os.sep + fname_strip
-# 	else:
-# 		fname_rel = bpy.path.relpath(fname, basepath)
-# # 		fname_rel = Blender.sys.relpath(fname, basepath)
-# 	if fname_rel.startswith('//'): fname_rel = '.' + os.sep + fname_rel[2:]
-# 	return fname, fname_strip, fname_rel
-
 
 def mat4x4str(mat):
     return '%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f,%.15f' % tuple([f for v in mat for f in v])
@@ -251,33 +204,31 @@ header_comment = \
 def save_single(operator, scene, filepath="",
         GLOBAL_MATRIX=None,
         context_objects=None,
-        EXP_MESH=True,
-        EXP_MESH_APPLY_MOD=True,
-        EXP_ARMATURE=True,
-        EXP_LAMP=True,
-        EXP_CAMERA=True,
-        EXP_EMPTY=True,
-        EXP_IMAGE_COPY=False,
+        object_types={'EMPTY', 'CAMERA', 'LAMP', 'ARMATURE', 'MESH'},
+        mesh_apply_modifiers=True,
+        mesh_smooth_type='FACE',
         ANIM_ENABLE=True,
         ANIM_OPTIMIZE=True,
         ANIM_OPTIMIZE_PRECISSION=6,
         ANIM_ACTION_ALL=False,
         use_metadata=True,
+        path_mode='AUTO',
     ):
 
-    # testing
-    mtx_x90 = Matrix.Rotation(math.pi / 2.0, 3, 'X')  # used
+    import io_utils
+
+    mtx_x90 = Matrix.Rotation(math.pi / 2.0, 3, 'X')
     mtx4_z90 = Matrix.Rotation(math.pi / 2.0, 4, 'Z')
 
     if GLOBAL_MATRIX is None:
         GLOBAL_MATRIX = Matrix()
 
-    # end batch support
-
     # Use this for working out paths relative to the export location
-    basepath = os.path.dirname(filepath) or '.'
-    basepath += os.sep
-# 	basepath = Blender.sys.dirname(filepath)
+    base_src = os.path.dirname(bpy.data.filepath)
+    base_dst = os.path.dirname(filepath)
+
+    # collect images to copy
+    copy_set = set()
 
     # ----------------------------------------------
     # storage classes
@@ -1139,22 +1090,6 @@ def save_single(operator, scene, filepath="",
         file.write('\n\t\t}')
         file.write('\n\t}')
 
-    def copy_image(image):
-        fn = bpy.path.abspath(image.filepath)
-        fn_strip = os.path.basename(fn)
-
-        if EXP_IMAGE_COPY:
-            rel = fn_strip
-            fn_abs_dest = os.path.join(basepath, fn_strip)
-            if not os.path.exists(fn_abs_dest):
-                shutil.copy(fn, fn_abs_dest)
-        elif bpy.path.is_subdir(fn, basepath):
-            rel = os.path.relpath(fn, basepath)
-        else:
-            rel = fn
-
-        return (rel, fn_strip)
-
     # tex is an Image (Arystan)
     def write_video(texname, tex):
         # Same as texture really!
@@ -1168,10 +1103,10 @@ def save_single(operator, scene, filepath="",
             Property: "Width", "int", "",0
             Property: "Height", "int", "",0''')
         if tex:
-            fname_rel, fname_strip = copy_image(tex)
-# 			fname, fname_strip, fname_rel = derived_paths(tex.filepath, basepath, EXP_IMAGE_COPY)
+            fname_rel = io_utils.path_reference(tex.filepath, base_src, base_dst, path_mode, "", copy_set)
+            fname_strip = os.path.basename(fname_rel)
         else:
-            fname = fname_strip = fname_rel = ''
+            fname_strip = fname_rel = ""
 
         file.write('\n\t\t\tProperty: "Path", "charptr", "", "%s"' % fname_strip)
 
@@ -1188,8 +1123,6 @@ def save_single(operator, scene, filepath="",
         UseMipMap: 0''')
 
         file.write('\n\t\tFilename: "%s"' % fname_strip)
-        if fname_strip:
-            fname_strip = '/' + fname_strip
         file.write('\n\t\tRelativeFilename: "%s"' % fname_rel)  # make relative
         file.write('\n\t}')
 
@@ -1229,10 +1162,10 @@ def save_single(operator, scene, filepath="",
         file.write('\n\t\tMedia: "Video::%s"' % texname)
 
         if tex:
-            fname_rel, fname_strip = copy_image(tex)
-# 			fname, fname_strip, fname_rel = derived_paths(tex.filepath, basepath, EXP_IMAGE_COPY)
+            fname_rel = io_utils.path_reference(tex.filepath, base_src, base_dst, path_mode, "", copy_set)
+            fname_strip = os.path.basename(fname_rel)
         else:
-            fname = fname_strip = fname_rel = ''
+            fname_strip = fname_rel = ""
 
         file.write('\n\t\tFileName: "%s"' % fname_strip)
         file.write('\n\t\tRelativeFilename: "%s"' % fname_rel)  # need some make relative command
@@ -1459,7 +1392,8 @@ def save_single(operator, scene, filepath="",
         file.write('\n\t\t}')
 
         # Write Face Smoothing
-        file.write('''
+        if mesh_smooth_type == 'FACE':
+            file.write('''
         LayerElementSmoothing: 0 {
             Version: 102
             Name: ""
@@ -1467,22 +1401,23 @@ def save_single(operator, scene, filepath="",
             ReferenceInformationType: "Direct"
             Smoothing: ''')
 
-        i = -1
-        for f in me_faces:
-            if i == -1:
-                file.write('%i' % f.use_smooth)
-                i = 0
-            else:
-                if i == 54:
-                    file.write('\n\t\t\t ')
+            i = -1
+            for f in me_faces:
+                if i == -1:
+                    file.write('%i' % f.use_smooth)
                     i = 0
-                file.write(',%i' % f.use_smooth)
-            i += 1
+                else:
+                    if i == 54:
+                        file.write('\n\t\t\t ')
+                        i = 0
+                    file.write(',%i' % f.use_smooth)
+                i += 1
 
-        file.write('\n\t\t}')
+            file.write('\n\t\t}')
 
-        # Write Edge Smoothing
-        file.write('''
+        elif mesh_smooth_type == 'EDGE':
+            # Write Edge Smoothing
+            file.write('''
         LayerElementSmoothing: 0 {
             Version: 101
             Name: ""
@@ -1490,19 +1425,23 @@ def save_single(operator, scene, filepath="",
             ReferenceInformationType: "Direct"
             Smoothing: ''')
 
-        i = -1
-        for ed in me_edges:
-            if i == -1:
-                file.write('%i' % (ed.use_edge_sharp))
-                i = 0
-            else:
-                if i == 54:
-                    file.write('\n\t\t\t ')
+            i = -1
+            for ed in me_edges:
+                if i == -1:
+                    file.write('%i' % (ed.use_edge_sharp))
                     i = 0
-                file.write(',%i' % (ed.use_edge_sharp))
-            i += 1
+                else:
+                    if i == 54:
+                        file.write('\n\t\t\t ')
+                        i = 0
+                    file.write(',%i' % (ed.use_edge_sharp))
+                i += 1
 
-        file.write('\n\t\t}')
+            file.write('\n\t\t}')
+        elif mesh_smooth_type == 'OFF':
+            pass
+        else:
+            raise Exception("invalid mesh_smooth_type: %r" % mesh_smooth_type)
 
         # Write VertexColor Layers
         # note, no programs seem to use this info :/
@@ -1728,6 +1667,14 @@ def save_single(operator, scene, filepath="",
                 TypedIndex: 0
             }''')
 
+        # Smoothing info
+        if mesh_smooth_type != 'OFF':
+            file.write('''
+            LayerElement:  {
+                Type: "LayerElementSmoothing"
+                TypedIndex: 0
+            }''')
+
         # Always write this
         if do_textures:
             file.write('''
@@ -1831,7 +1778,7 @@ def save_single(operator, scene, filepath="",
 
 ## XXX
 
-    if EXP_ARMATURE:
+    if 'ARMATURE' in object_types:
         # This is needed so applying modifiers dosnt apply the armature deformation, its also needed
         # ...so mesh objects return their rest worldspace matrix when bone-parents are exported as weighted meshes.
         # set every armature to its rest, backup the original values so we done mess up the scene
@@ -1851,33 +1798,33 @@ def save_single(operator, scene, filepath="",
     for ob_base in context_objects:
 
         # ignore dupli children
-        if ob_base.parent and ob_base.parent.dupli_type != 'NONE':
+        if ob_base.parent and ob_base.parent.dupli_type in {'VERTS', 'FACES'}:
             continue
 
-        obs = [(ob_base, ob_base.matrix_world)]
+        obs = [(ob_base, ob_base.matrix_world.copy())]
         if ob_base.dupli_type != 'NONE':
             ob_base.dupli_list_create(scene)
-            obs = [(dob.object, dob.matrix) for dob in ob_base.dupli_list]
+            obs = [(dob.object, dob.matrix.copy()) for dob in ob_base.dupli_list]
 
         for ob, mtx in obs:
 # 		for ob, mtx in BPyObject.getDerivedObjects(ob_base):
             tmp_ob_type = ob.type
             if tmp_ob_type == 'CAMERA':
-                if EXP_CAMERA:
+                if 'CAMERA' in object_types:
                     ob_cameras.append(my_object_generic(ob, mtx))
             elif tmp_ob_type == 'LAMP':
-                if EXP_LAMP:
+                if 'LAMP' in object_types:
                     ob_lights.append(my_object_generic(ob, mtx))
             elif tmp_ob_type == 'ARMATURE':
-                if EXP_ARMATURE:
+                if 'ARMATURE' in object_types:
                     # TODO - armatures dont work in dupligroups!
                     if ob not in ob_arms:
                         ob_arms.append(ob)
                     # ob_arms.append(ob) # replace later. was "ob_arms.append(sane_obname(ob), ob)"
             elif tmp_ob_type == 'EMPTY':
-                if EXP_EMPTY:
+                if 'EMPTY' in object_types:
                     ob_null.append(my_object_generic(ob, mtx))
-            elif EXP_MESH:
+            elif 'MESH' in object_types:
                 origData = True
                 if tmp_ob_type != 'MESH':
                     try:
@@ -1891,7 +1838,7 @@ def save_single(operator, scene, filepath="",
                         origData = False
                 else:
                     # Mesh Type!
-                    if EXP_MESH_APPLY_MOD:
+                    if mesh_apply_modifiers:
                         me = ob.to_mesh(scene, True, 'PREVIEW')
 
                         # print ob, me, me.getVertGroupNames()
@@ -1913,7 +1860,7 @@ def save_single(operator, scene, filepath="",
 # 						del tmp_colbits
 
                 if me:
-# 					# This WILL modify meshes in blender if EXP_MESH_APPLY_MOD is disabled.
+# 					# This WILL modify meshes in blender if mesh_apply_modifiers is disabled.
 # 					# so strictly this is bad. but only in rare cases would it have negative results
 # 					# say with dupliverts the objects would rotate a bit differently
 # 					if EXP_MESH_HQ_NORMALS:
@@ -1941,7 +1888,7 @@ def save_single(operator, scene, filepath="",
                         else:
                             materials[None, None] = None
 
-                    if EXP_ARMATURE:
+                    if 'ARMATURE' in object_types:
                         armob = ob.find_armature()
                         blenParentBoneName = None
 
@@ -1985,7 +1932,7 @@ def save_single(operator, scene, filepath="",
         if ob_base.dupli_list:
             ob_base.dupli_list_clear()
 
-    if EXP_ARMATURE:
+    if 'ARMATURE' in object_types:
         # now we have the meshes, restore the rest arm position
         for i, arm in enumerate(bpy.data.armatures):
             arm.pose_position = ob_arms_orig_rest[i]
@@ -2260,7 +2207,7 @@ Objects:  {''')
                 if me in iter(my_bone.blenMeshes.values()):
                     write_sub_deformer_skin(my_mesh, my_bone, weights)
 
-    # Write pose's really weired, only needed when an armature and mesh are used together
+    # Write pose's really weird, only needed when an armature and mesh are used together
     # each by themselves dont need pose data. for now only pose meshes and bones
 
     file.write('''
@@ -2810,11 +2757,10 @@ Takes:  {''')
     ob_meshes[:] = []
     ob_null[:] = []
 
-    # copy images if enabled
-# 	if EXP_IMAGE_COPY:
-# # 		copy_images( basepath,  [ tex[1] for tex in textures if tex[1] != None ])
-# 		bpy.util.copy_images( [ tex[1] for tex in textures if tex[1] != None ], basepath)
     file.close()
+
+    # copy all collected files.
+    io_utils.path_reference_copy(copy_set)
 
     print('export finished in %.4f sec.' % (time.clock() - start_time))
     return {'FINISHED'}
