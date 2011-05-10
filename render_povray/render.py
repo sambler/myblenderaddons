@@ -333,9 +333,9 @@ def write_pov(filename, scene=None, info_callback=None):
             if not ob.pov.collect_photons:
                 tabWrite("photons{collect off}\n")
 
-            if pov_photons_refraction or pov_photons_reflection:
+            else:
                 tabWrite("photons{\n")
-                tabWrite("target\n")
+                tabWrite("target %.3g\n" % ob.pov.spacing_multiplier)
                 if pov_photons_refraction:
                     tabWrite("refraction on\n")
                 if pov_photons_reflection:

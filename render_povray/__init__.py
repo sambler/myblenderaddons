@@ -426,6 +426,14 @@ class RenderPovSettingsObject(bpy.types.PropertyGroup):
                         " that generate caustics often don't need to show any on themselves).",
             default=True)
 
+    #Photons spacing_multiplier
+    spacing_multiplier = FloatProperty(
+            name="Photons Spacing Multiplier",
+            description="Multiplier value relative to global spacing of photons. " \
+                        "Decrease by half to get 4x more photons at surface of " \
+                        "this object (or 8x media photons than specified in the globals",
+            min=0.01, max=1.00, default=1.00)
+
     ##################################CustomPOV Code############################
     #Only DUMMIES below for now:
     replacement_text = StringProperty(
