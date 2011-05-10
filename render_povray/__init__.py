@@ -353,11 +353,15 @@ class RenderPovSettingsMaterial(bpy.types.PropertyGroup):
             default=False)
 
     photons_dispersion = FloatProperty(
-            name="chromatic dispersion",
+            name="Chromatic Dispersion",
             description="Light passing through will be separated according to wavelength. " \
                         "This ratio of refractive indices for violet to red controls how much " \
                         "the colors are spread out 1 = no dispersion, good values are 1.01 to 1.1",
             min=1.0000, max=10.000, soft_min=1.0000, soft_max=1.1000, precision=4, default=1.0000)
+
+    photons_dispersion_samples = IntProperty(
+            name="Dispersion Samples", description="Number of color-steps for dispersion",
+            min=2, max=128, default=7)
 
     photons_reflection = BoolProperty(
             name="Reflective Photon Caustics",

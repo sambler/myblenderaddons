@@ -492,6 +492,7 @@ class MATERIAL_PT_povray_caustics(MaterialButtonsPanel, bpy.types.Panel):
                 col.prop(mat.pov, "fake_caustics_power", slider=True)
             elif mat.pov.refraction_type == "2":
                 col.prop(mat.pov, "photons_dispersion", slider=True)
+                col.prop(mat.pov, "photons_dispersion_samples", slider=True)
             col.prop(mat.pov, "photons_reflection")
 
             if mat.pov.refraction_type == "0" and not mat.pov.photons_reflection:
