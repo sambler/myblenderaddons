@@ -320,24 +320,32 @@ def create_materials(filepath, material_libs, unique_materials, unique_material_
 
         elif type == 'Ka':
             mtex = blender_material.texture_slots.add()
+            mtex.use_map_color_diffuse = False
+
             mtex.texture = texture
             mtex.texture_coords = 'UV'
             mtex.use_map_ambient = True
 
         elif type == 'Ks':
             mtex = blender_material.texture_slots.add()
+            mtex.use_map_color_diffuse = False
+
             mtex.texture = texture
             mtex.texture_coords = 'UV'
             mtex.use_map_specular = True
 
         elif type == 'Bump':
             mtex = blender_material.texture_slots.add()
+            mtex.use_map_color_diffuse = False
+
             mtex.texture = texture
             mtex.texture_coords = 'UV'
             mtex.use_map_normal = True
 
         elif type == 'D':
             mtex = blender_material.texture_slots.add()
+            mtex.use_map_color_diffuse = False
+
             mtex.texture = texture
             mtex.texture_coords = 'UV'
             mtex.use_map_alpha = True
@@ -348,6 +356,8 @@ def create_materials(filepath, material_libs, unique_materials, unique_material_
 
         elif type == 'refl':
             mtex = blender_material.texture_slots.add()
+            mtex.use_map_color_diffuse = False
+
             mtex.texture = texture
             mtex.texture_coords = 'UV'
             mtex.use_map_reflect = True
@@ -364,7 +374,7 @@ def create_materials(filepath, material_libs, unique_materials, unique_material_
 
     #Create new materials
     for name in unique_materials:  # .keys()
-        if name != None:
+        if name is not None:
             unique_materials[name] = bpy.data.materials.new(name.decode('utf-8', "replace"))
             unique_material_images[name] = None, False  # assign None to all material images to start with, add to later.
 
@@ -386,10 +396,7 @@ def create_materials(filepath, material_libs, unique_materials, unique_material_
                     pass
                 elif line.startswith(b'newmtl'):
                     context_material_name = line_value(line.split())
-                    if context_material_name in unique_materials:
-                        context_material = unique_materials[context_material_name]
-                    else:
-                        context_material = None
+                    context_material = unique_materials.get(context_material_name)
 
                 elif context_material:
                     # we need to make a material to assign properties to it.
@@ -980,7 +987,7 @@ def load(operator, context, filepath,
     '''
     print('\nimporting obj %r' % filepath)
 
-    filepath = filepath.encode()
+    filepath = os.fsencode(filepath)
 
     if use_split_objects or use_split_groups:
         use_groups_as_vgroups = False
