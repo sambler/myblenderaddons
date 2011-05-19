@@ -45,7 +45,7 @@ class bvh_node_class(object):
     'has_rot',  # Conveinience function, bool, same as (channels[3]!=-1 or channels[4]!=-1 channels[5]!=-1)
     'temp')  # use this for whatever you want
 
-    _eul_order_lookup = {\
+    _eul_order_lookup = {
         (0, 1, 2): 'XYZ',
         (0, 2, 1): 'XZY',
         (1, 0, 2): 'YXZ',
@@ -487,7 +487,7 @@ def bvh_node_dict2armature(context, bvh_name, bvh_nodes, rotate_mode='XYZ', fram
                 if rotate_mode == 'QUATERNION':
                     pose_bone.rotation_quaternion = bone_rotation_matrix.to_quaternion()
                 else:
-                    euler = bone_rotation_matrix.to_euler(bvh_node.rot_order_str, prev_euler[i])
+                    euler = bone_rotation_matrix.to_euler(pose_bone.rotation_mode, prev_euler[i])
                     pose_bone.rotation_euler = euler
                     prev_euler[i] = euler
 

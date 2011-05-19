@@ -250,9 +250,9 @@ def main(File, Path, LayerViewers, MixerViewers, LayerOffset,\
     
     for Area in Areas:
         if Area.type == 'VIEW_3D':
-            Area.active_space.viewport_shade = 'TEXTURED'
-            Area.active_space.show_textured_solid = True
-            Area.active_space.show_floor = False
+            Area.spaces.active.viewport_shade = 'TEXTURED'
+            Area.spaces.active.show_textured_solid = True
+            Area.spaces.active.show_floor = False
     
     #-------------------------------------------------
     # 3D LAYERS
@@ -293,7 +293,8 @@ def main(File, Path, LayerViewers, MixerViewers, LayerOffset,\
         enter_editmode=False,\
         rotation=(0, 0, pi))
         
-        bpy.ops.object.rotation_apply()
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
+
         
         Active = bpy.context.active_object
         
@@ -310,7 +311,7 @@ def main(File, Path, LayerViewers, MixerViewers, LayerOffset,\
             
         Active.dimensions = float(Coords[0])*LayerScale, float(Coords[1])*LayerScale, 0
         
-        bpy.ops.object.scale_apply()
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
         
         bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
         

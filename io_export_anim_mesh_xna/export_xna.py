@@ -2777,9 +2777,8 @@ Takes:  {''')
 # ** User interface
 
 from bpy.props import *
-from io_utils import ExportHelper
+from bpy_extras.io_utils import ExportHelper
 
-# io_utils is in the user folder .../2.55/scripts/modules 
 
 class ExportFBXmodel(bpy.types.Operator, ExportHelper):
     '''Export model data to an ASCII Autodesk FBX for import in to XNA'''

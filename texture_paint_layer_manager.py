@@ -4,18 +4,18 @@ bl_info = {
     "version": (1, 0),
     "blender": (2, 5, 7),
     "api": 35964,
-    "location": "Texture paint 'nkey' panel",
+    "location": "Texture Paint > Properties > Texture Paint Layers Panels",
     "description": "Adds a layer manager for image based texture slots in paint and quick add layer tools",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/3D_interaction/Texture_paint_layers",
     "tracker_url": "http://projects.blender.org/tracker/index.php?func=detail&aid=26789",
-    "category": "Texture"}
+    "category": "Other"}
         
         
 import bpy
 from bpy.props import*
 import os
-from io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper
 
 
 #-------------------------------------------

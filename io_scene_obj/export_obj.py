@@ -24,7 +24,7 @@ import shutil
 
 import bpy
 import mathutils
-import io_utils
+import bpy_extras.io_utils
 
 
 def name_compat(name):
@@ -78,7 +78,14 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
         file.write('newmtl %s\n' % mtl_mat_name)  # Define a new material: matname_imgname
 
         if mat:
-            file.write('Ns %.6f\n' % ((mat.specular_hardness - 1) * 1.9607843137254901))  # Hardness, convert blenders 1-511 to MTL's
+            # convert from blenders spec to 0 - 1000 range.
+            if mat.specular_shader == 'WARDISO':
+                tspec = (0.4 - mat.specular_slope) / 0.0004
+            else:
+                tspec = (mat.specular_hardness - 1) * 1.9607843137254901
+            file.write('Ns %.6f\n' % tspec)
+            del tspec
+
             file.write('Ka %.6f %.6f %.6f\n' % tuple(c * mat.ambient for c in worldAmb))  # Ambient, uses mirror colour,
             file.write('Kd %.6f %.6f %.6f\n' % tuple(c * mat.diffuse_intensity for c in mat.diffuse_color))  # Diffuse
             file.write('Ks %.6f %.6f %.6f\n' % tuple(c * mat.specular_intensity for c in mat.specular_color))  # Specular
@@ -108,7 +115,7 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
         # Write images!
         if face_img:  # We have an image on the face!
             # write relative image path
-            rel = io_utils.path_reference(face_img.filepath, source_dir, dest_dir, path_mode, "", copy_set)
+            rel = bpy_extras.io_utils.path_reference(face_img.filepath, source_dir, dest_dir, path_mode, "", copy_set)
             file.write('map_Kd %s\n' % rel)  # Diffuse mapping image
 
         if mat:  # No face image. if we havea material search for MTex image.
@@ -135,7 +142,7 @@ def write_mtl(scene, filepath, path_mode, copy_set, mtl_dict):
                             image_map["map_Ns"] = image
 
             for key, image in image_map.items():
-                filepath = io_utils.path_reference(image.filepath, source_dir, dest_dir, path_mode, "", copy_set)
+                filepath = bpy_extras.io_utils.path_reference(image.filepath, source_dir, dest_dir, path_mode, "", copy_set)
                 file.write('%s %s\n' % (key, repr(filepath)[1:-1]))
 
         file.write('\n\n')
@@ -650,7 +657,7 @@ def write_file(filepath, objects, scene,
         write_mtl(scene, mtlfilepath, EXPORT_PATH_MODE, copy_set, mtl_dict)
 
     # copy all collected files.
-    io_utils.path_reference_copy(copy_set)
+    bpy_extras.io_utils.path_reference_copy(copy_set)
 
     print("OBJ Export time: %.2f" % (time.clock() - time1))
 
