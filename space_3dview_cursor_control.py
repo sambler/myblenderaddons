@@ -17,16 +17,31 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+
+# Blender Add-Ons menu registration (in User Prefs)
+bl_info = {
+    'name': 'Cursor Control',
+    'author': 'Morgan Mörtsell (Seminumerical)',
+    'version': (0, 6, 0),
+    'blender': (2, 5, 7),
+    'api': 36147,
+    'location': 'View3D > Properties > Cursor',
+    'description': 'Control the Cursor',
+    'warning': '', # used for warning icon and text in addons panel
+    'wiki_url': 'http://blenderpythonscripts.wordpress.com/',
+    'tracker_url': '',
+    'category': '3D View'}
+
+
+
 """
-
-
   TODO:
 
       IDEAS:
           More saved locations... add, remove, lock, caption
 
       LATER:
-          Wiki Page: http://wiki.blender.org/index.php/Extensions:2.5/Py/Scripts/3D_interaction
+
           Blender SVN upload...
 
       ISSUES:
@@ -42,6 +57,23 @@
       QUESTIONS:
 
 
+
+  2011-05-10 - Refactoring: changes due to splitting of misc_utils.py...
+  2011-05-08 - Refactoring: changes due to seminumerical.py renamed to misc_utils.py...
+                   ...and moved bl_info
+--- 0.6.0 ---------------------------------------------------------------------------------------
+  2011-04-23 - Adaptations for the 2.57 API
+                  Matrix.invert() now mutates 'self'
+                  Vector.normalize() now mutates 'self'
+  2011-04-21 - Adaptations for the 2.57 API
+                  Updated registration procedures
+                  Forced to change some identifiers to all lower case
+               Removed some old code interferring with Cursor History
+--- pre 0.5.0 -----------------------------------------------------------------------------------
+  2011-01-29 - Refactoring: Cursor Memory extracted to separate source.
+               Refactoring: Cursor History extracted to separate source.
+               Added menu under Mesh->Snap
+               Bugfix: move to and mirror around saved location works again.
   2011-01-16 - Small cleanup
                Step length added to Control panel
                Added move_to_SL to Control, and reworked SL_recall for Memory panel
@@ -100,42 +132,26 @@
                Thanks to Buerbaum Martin (Pontiac). I peeked a bit at his code for registering a callback...
 """
 
-# Blender Add-Ons menu registration (in User Prefs)
-bl_addon_info = {
-    'name': 'Cursor Control',
-    'author': 'Morgan Mörtsell (Seminumerical)',
-    'version': (0, 5, 0),
-    'blender': (2, 5, 6),
-    'api': 34074,
-    'location': 'View3D > Properties > Cursor',
-    'description': 'Control the Cursor',
-    'warning': '', # used for warning icon and text in addons panel
-    'wiki_url': 'http://blenderpythonscripts.wordpress.com/',
-    'tracker_url': '',
-    'category': '3D View'}
-
 
 
 import bpy
-from mathutils import Vector, Matrix
 import bgl
-from mathutils import geometry
-from seminumerical import *
 import math
+from mathutils import Vector, Matrix
+from mathutils import geometry
+from misc_utils import *
+from constants_utils import *
+from cursor_utils import *
+from ui_utils import *
+from geometry_utils import *
 
-PHI = 1.61803398874989484820
-PHI_INV = 1/PHI
 
 
-# Precision for display of float values.
 PRECISION = 4
 
 
 
-class CursorControlData(bpy.types.IDPropertyGroup):
-    # SL Location
-    savedLocationDraw = bpy.props.BoolProperty(description="Draw SL cursor in 3D view",default=1)
-    savedLocation = bpy.props.FloatVectorProperty(name="",description="Saved Location",precision=PRECISION)
+class CursorControlData(bpy.types.PropertyGroup):
     # Step length properties
     stepLengthEnable = bpy.props.BoolProperty(name="Use step length",description="Use step length",default=0)
     stepLengthMode = bpy.props.EnumProperty(items=[
@@ -146,13 +162,6 @@ class CursorControlData(bpy.types.IDPropertyGroup):
     stepLengthValue = bpy.props.FloatProperty(name="",precision=PRECISION,default=PHI)
     # Property for linex result select...
     linexChoice = bpy.props.IntProperty(name="",default=-1)
-    # History tracker
-    historyDraw = bpy.props.BoolProperty(description="Draw history trace in 3D view",default=1)
-    historyDepth = 144
-    historyWindow = 12
-    historyPosition = [-1] # Integer must be in a list or else it can not be written to
-    historyLocation = []
-    #historySuppression = [False] # Boolean must be in a list or else it can not be written to
 
     def hideLinexChoice(self):
         self.linexChoice = -1
@@ -170,47 +179,27 @@ class CursorControlData(bpy.types.IDPropertyGroup):
             c = CursorAccess.getCursor()
             if((Vector(c)-Vector(v)).length>0):
                 if self.stepLengthMode=='Absolute':
-                    v = (Vector(v)-Vector(c)).normalize()*self.stepLengthValue + Vector(c)
+                    v = Vector(v)-Vector(c)
+                    v.normalize()
+                    v = v*self.stepLengthValue + Vector(c)
                 if self.stepLengthMode=='Proportional':
                     v = (Vector(v)-Vector(c))*self.stepLengthValue + Vector(c)
         CursorAccess.setCursor(Vector(v))
+        
+    def guiStates(self,context):
+        tvs = 0
+        tes = 0
+        tfs = 0
+        edit_mode = False
+        obj = context.active_object
+        if (context.mode == 'EDIT_MESH'):
+            if (obj and obj.type=='MESH' and obj.data):
+                tvs = obj.data.total_vert_sel
 
-    def addHistoryLocation(self, l):
-        if(self.historyPosition[0]==-1):
-            self.historyLocation.append(l.copy())
-            self.historyPosition[0]=0
-            return
-        if(l==self.historyLocation[self.historyPosition[0]]):
-            return
-        #if self.historySuppression[0]:
-            #self.historyPosition[0] = self.historyPosition[0] - 1
-        #else:
-            #self.hideLinexChoice()
-        while(len(self.historyLocation)>self.historyPosition[0]+1):
-            self.historyLocation.pop(self.historyPosition[0]+1)
-        #self.historySuppression[0] = False
-        self.historyLocation.append(l.copy())
-        if(len(self.historyLocation)>self.historyDepth):
-            self.historyLocation.pop(0)
-        self.historyPosition[0] = len(self.historyLocation)-1
-        #print (self.historyLocation)
-
-    #def enableHistorySuppression(self):
-        #self.historySuppression[0] = True
-
-    def previousLocation(self):
-        if(self.historyPosition[0]<=0):
-            return
-        self.historyPosition[0] = self.historyPosition[0] - 1
-        CursorAccess.setCursor(self.historyLocation[self.historyPosition[0]].copy())
-
-    def nextLocation(self):
-        if(self.historyPosition[0]<0):
-            return
-        if(self.historyPosition[0]+1==len(self.historyLocation)):
-            return
-        self.historyPosition[0] = self.historyPosition[0] + 1
-        CursorAccess.setCursor(self.historyLocation[self.historyPosition[0]].copy())
+                tes = obj.data.total_edge_sel
+                tfs = obj.data.total_face_sel
+                edit_mode = True
+        return (tvs, tes, tfs, edit_mode)
 
 
 
@@ -286,95 +275,9 @@ class VIEW3D_OT_cursor_to_active_object_center(bpy.types.Operator):
 
 
 
-class VIEW3D_OT_cursor_SL_save(bpy.types.Operator):
-    '''Save cursor location.'''
-    bl_idname = "view3d.cursor_SL_save"
-    bl_label = "Save cursor location."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.savedLocation = CursorAccess.getCursor()
-        CursorAccess.setCursor(cc.savedLocation)
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_SL_swap(bpy.types.Operator):
-    '''Swap cursor location.'''
-    bl_idname = "view3d.cursor_SL_swap"
-    bl_label = "Swap cursor location."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        location = CursorAccess.getCursor().copy()
-        cc = context.scene.cursor_control
-        CursorAccess.setCursor(cc.savedLocation)
-        cc.savedLocation = location
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_SL_recall(bpy.types.Operator):
-    '''Recall cursor location.'''
-    bl_idname = "view3d.cursor_SL_recall"
-    bl_label = "Recall cursor location."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.hideLinexChoice()
-        CursorAccess.setCursor(cc.savedLocation)
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_previous(bpy.types.Operator):
-    '''Previous cursor location.'''
-    bl_idname = "view3d.cursor_previous"
-    bl_label = "Previous cursor location."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.hideLinexChoice()
-        cc.previousLocation()
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_next(bpy.types.Operator):
-    '''Next cursor location.'''
-    bl_idname = "view3d.cursor_next"
-    bl_label = "Next cursor location."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.hideLinexChoice()
-        cc.nextLocation()
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_to_SL(bpy.types.Operator):
+class VIEW3D_OT_cursor_to_sl(bpy.types.Operator):
     '''Move to saved location.'''
-    bl_idname = "view3d.cursor_to_SL"
+    bl_idname = "view3d.cursor_to_sl"
     bl_label = "Move to saved location."
     bl_options = {'REGISTER'}
 
@@ -383,15 +286,17 @@ class VIEW3D_OT_cursor_to_SL(bpy.types.Operator):
 
     def execute(self, context):
         cc = context.scene.cursor_control
-        cc.hideLinexChoice()
-        cc.setCursor(cc.savedLocation)
+        if hasattr(context.scene, "cursor_memory"):
+            cm = context.scene.cursor_memory
+            cc.hideLinexChoice()
+            cc.setCursor(cm.savedLocation)
         return {'FINISHED'}
 
 
 
-class VIEW3D_OT_cursor_to_SL_mirror(bpy.types.Operator):
+class VIEW3D_OT_cursor_to_sl_mirror(bpy.types.Operator):
     '''Mirror cursor around SL or selection.'''
-    bl_idname = "view3d.cursor_to_SL_mirror"
+    bl_idname = "view3d.cursor_to_sl_mirror"
     bl_label = "Mirror cursor around SL or selection."
     bl_options = {'REGISTER'}
 
@@ -409,7 +314,9 @@ class VIEW3D_OT_cursor_to_SL_mirror(bpy.types.Operator):
         cc.hideLinexChoice()
         
         if obj==None or obj.data.total_vert_sel==0:
-            self.mirror(cc, Vector(cc.savedLocation))
+            if hasattr(context.scene, "cursor_memory"):
+                cm = context.scene.cursor_memory
+                self.mirror(cc, Vector(cm.savedLocation))
             return {'FINISHED'}
 
         mat = obj.matrix_world
@@ -419,7 +326,8 @@ class VIEW3D_OT_cursor_to_SL_mirror(bpy.types.Operator):
             self.mirror(cc, Vector(sf[0].co)*mat)
             return {'FINISHED'}
 
-        mati = mat.copy().invert()      
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
 
         if obj.data.total_vert_sel==2:
@@ -468,7 +376,8 @@ class VIEW3D_OT_cursor_to_vertex(bpy.types.Operator):
         cc.hideLinexChoice()
         obj = context.active_object
         mat = obj.matrix_world
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         vs = obj.data.vertices
         c = Vector(CursorAccess.getCursor())*mati
         v = None
@@ -512,7 +421,8 @@ class VIEW3D_OT_cursor_to_line(bpy.types.Operator):
             return {'FINISHED'}
         if obj.data.total_edge_sel<2:
             return {'CANCELLED'}
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
         q = None
         d = -1
@@ -557,7 +467,8 @@ class VIEW3D_OT_cursor_to_edge(bpy.types.Operator):
             return {'FINISHED'}
         if obj.data.total_edge_sel<2:
             return {'CANCELLED'}
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
         q = None
         d = -1
@@ -608,7 +519,8 @@ class VIEW3D_OT_cursor_to_plane(bpy.types.Operator):
             cc.setCursor(q)
             return {'FINISHED'}
 
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
         q = None
         d = -1
@@ -642,7 +554,8 @@ class VIEW3D_OT_cursor_to_face(bpy.types.Operator):
         obj = bpy.context.active_object
         mesh = obj.data.vertices
         mat = obj.matrix_world
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
         if obj.data.total_vert_sel==3:
             sf = [f for f in obj.data.vertices if f.select == 1]
@@ -748,7 +661,6 @@ class VIEW3D_OT_cursor_to_linex(bpy.types.Operator):
         
         if len(qq)==2:
             cc = context.scene.cursor_control
-            #cc.enableHistorySuppression()
             cc.cycleLinexCoice(2)
             q = qq[cc.linexChoice]
 
@@ -774,7 +686,8 @@ class VIEW3D_OT_cursor_to_cylinderaxis(bpy.types.Operator):
         obj = bpy.context.active_object
         mesh = obj.data.vertices
         mat = obj.matrix_world
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
 
         sf = [f for f in obj.data.vertices if f.select == 1]
@@ -805,7 +718,8 @@ class VIEW3D_OT_cursor_to_spherecenter(bpy.types.Operator):
         obj = bpy.context.active_object
         mesh = obj.data.vertices
         mat = obj.matrix_world
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
 
         if obj.data.total_vert_sel==3:
@@ -852,7 +766,8 @@ class VIEW3D_OT_cursor_to_perimeter(bpy.types.Operator):
         obj = bpy.context.active_object
         mesh = obj.data.vertices
         mat = obj.matrix_world
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
 
         if obj.data.total_vert_sel==3:
@@ -899,7 +814,8 @@ class VIEW3D_OT_cursor_to_perimeter(bpy.types.Operator):
         #obj = bpy.context.active_object
         #mesh = obj.data.vertices
         #mat = obj.matrix_world
-        #mati = mat.copy().invert()
+        #mati = mat.copy()
+        #mati.invert()
         #c = Vector(CursorAccess.getCursor())*mati
 
         #if obj.data.total_vert_sel==3:
@@ -924,74 +840,6 @@ class VIEW3D_OT_cursor_to_perimeter(bpy.types.Operator):
             #cc.stepLengthValue = d
             #return {'FINISHED'}
         #return {'CANCELLED'}
-
-
-
-class VIEW3D_OT_cursor_draw_enable(bpy.types.Operator):
-    '''Show cursor memory.'''
-    bl_idname = "view3d.cursor_draw_enable"
-    bl_label = "Show cursor memory."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.savedLocationDraw = True
-        BlenderFake.forceRedraw()
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_draw_disable(bpy.types.Operator):
-    '''Hide cursor memory.'''
-    bl_idname = "view3d.cursor_draw_disable"
-    bl_label = "Hide cursor memory."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.savedLocationDraw = False
-        BlenderFake.forceRedraw()
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_history_enable(bpy.types.Operator):
-    '''Show cursor trace.'''
-    bl_idname = "view3d.cursor_history_enable"
-    bl_label = "Show cursor trace."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.historyDraw = True
-        BlenderFake.forceRedraw()
-        return {'FINISHED'}
-
-
-
-class VIEW3D_OT_cursor_history_disable(bpy.types.Operator):
-    '''Hide cursor trace.'''
-    bl_idname = "view3d.cursor_history_disable"
-    bl_label = "Hide cursor trace."
-    bl_options = {'REGISTER'}
-
-    def modal(self, context, event):
-        return {'FINISHED'}
-
-    def execute(self, context):
-        cc = context.scene.cursor_control
-        cc.historyDraw = False
-        BlenderFake.forceRedraw()
-        return {'FINISHED'}
 
 
 
@@ -1040,7 +888,7 @@ class VIEW3D_OT_cursor_stepval_phi2(bpy.types.Operator):
 
     def execute(self, context):
         cc = context.scene.cursor_control
-        cc.stepLengthValue = PHI*PHI
+        cc.stepLengthValue = PHI_SQ
         BlenderFake.forceRedraw()
         return {'FINISHED'}
 
@@ -1062,7 +910,8 @@ class VIEW3D_OT_cursor_stepval_vvdist(bpy.types.Operator):
         obj = bpy.context.active_object
         mesh = obj.data.vertices
         mat = obj.matrix_world
-        mati = mat.copy().invert()
+        mati = mat.copy()
+        mati.invert()
         c = Vector(CursorAccess.getCursor())*mati
 
         sf = [f for f in obj.data.vertices if f.select == 1]
@@ -1093,27 +942,14 @@ class VIEW3D_PT_cursor(bpy.types.Panel):
         return 0
 
     def draw_header(self, context):
-        layout = self.layout
-        cc = context.scene.cursor_control
+        pass
  
-        #layout.prop(sce, "cursor_control.savedLocationDraw")
-
     def draw(self, context):
         layout = self.layout
         sce = context.scene
 
-        tvs = 0
-        tes = 0
-        tfs = 0
-        edit_mode = False
-        obj = context.active_object
-        if (context.mode == 'EDIT_MESH'):
-            if (obj and obj.type=='MESH' and obj.data):
-                tvs = obj.data.total_vert_sel
-
-                tes = obj.data.total_edge_sel
-                tfs = obj.data.total_face_sel
-                edit_mode = True
+        cc = context.scene.cursor_control
+        (tvs,tes,tfs,edit_mode) = cc.guiStates(context)
 
         # Mesh data elements
         if(edit_mode):
@@ -1127,7 +963,7 @@ class VIEW3D_PT_cursor(bpy.types.Panel):
         # Geometry from mesh
         if(edit_mode):
             row = layout.row()
-            GUI.drawIconButton(tvs<=3 or tfs==1 , row, 'MOD_MIRROR'  , "view3d.cursor_to_SL_mirror")
+            GUI.drawIconButton(tvs<=3 or tfs==1 , row, 'MOD_MIRROR'  , "view3d.cursor_to_sl_mirror")
             GUI.drawIconButton(tes==2, row, 'PARTICLE_TIP', "view3d.cursor_to_linex")
             GUI.drawIconButton(tvs>1 , row, 'ROTATECENTER', "view3d.cursor_to_vertex_median")  #EDITMODE_HLT
             GUI.drawIconButton(tvs==3 or tvs==4, row, 'FORCE_FORCE'  , "view3d.cursor_to_spherecenter")
@@ -1144,9 +980,9 @@ class VIEW3D_PT_cursor(bpy.types.Panel):
         row = layout.row()
         GUI.drawIconButton(True                       , row, 'WORLD_DATA'    , "view3d.cursor_to_origin")
         GUI.drawIconButton(context.active_object!=None, row, 'ROTACTIVE'       , "view3d.cursor_to_active_object_center")
-        GUI.drawIconButton(True                       , row, 'CURSOR'        , "view3d.cursor_to_SL")
-        #GUI.drawIconButton(True, row, 'GRID'          , "view3d.cursor_SL_recall")
-        #GUI.drawIconButton(True, row, 'SNAP_INCREMENT', "view3d.cursor_SL_recall")
+        GUI.drawIconButton(True                       , row, 'CURSOR'        , "view3d.cursor_to_sl")
+        #GUI.drawIconButton(True, row, 'GRID'          , "view3d.cursor_sl_recall")
+        #GUI.drawIconButton(True, row, 'SNAP_INCREMENT', "view3d.cursor_sl_recall")
         #row.label("("+str(cc.linexChoice)+")")
         cc = context.scene.cursor_control
         if cc.linexChoice>=0:
@@ -1166,237 +1002,72 @@ class VIEW3D_PT_cursor(bpy.types.Panel):
             GUI.drawTextButton(True, row, 'Phi'      , "view3d.cursor_stepval_phi")
             GUI.drawTextButton(True, row, 'Phi²'      , "view3d.cursor_stepval_phi2")
             GUI.drawIconButton(tvs==2, row, 'EDGESEL'      , "view3d.cursor_stepval_vvdist")
-        
 
-
-
-class VIEW3D_PT_cursor_SL(bpy.types.Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_label = "Cursor Memory"
-    bl_default_closed = True
-
-    @classmethod
-    def poll(self, context):
-        # Display in object or edit mode.
-        if (context.area.type == 'VIEW_3D' and
-            (context.mode == 'EDIT_MESH'
-            or context.mode == 'OBJECT')):
-            return 1
-
-        return 0
-
-    def draw_header(self, context):
-        layout = self.layout
-        cc = context.scene.cursor_control
-        if cc.savedLocationDraw:
-            GUI.drawIconButton(True, layout, 'RESTRICT_VIEW_OFF', "view3d.cursor_draw_disable", False)
-        else:
-            GUI.drawIconButton(True, layout, 'RESTRICT_VIEW_ON' , "view3d.cursor_draw_enable", False)
-        #layout.prop(sce, "cursor_control.savedLocationDraw")
-
-    def draw(self, context):
-        layout = self.layout
-        sce = context.scene
-        cc = context.scene.cursor_control
-
-        row = layout.row()
-        col = row.column()
-        row2 = col.row()
-        GUI.drawIconButton(True, row2, 'FORWARD', "view3d.cursor_SL_save")
-        row2 = col.row()
-        GUI.drawIconButton(True, row2, 'FILE_REFRESH', "view3d.cursor_SL_swap")
-        row2 = col.row()
-        GUI.drawIconButton(True, row2, 'BACK'        , "view3d.cursor_SL_recall")
-        col = row.column()
-        col.prop(cc, "savedLocation")
-
-class VIEW3D_PT_cursor_history(bpy.types.Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_label = "Cursor History"
-    bl_default_closed = True
-
-    @classmethod
-    def poll(self, context):
-        # Display in object or edit mode.
-        if (context.area.type == 'VIEW_3D' and
-            (context.mode == 'EDIT_MESH'
-            or context.mode == 'OBJECT')):
-            return 1
-
-        return 0
-
-    def draw_header(self, context):
-        layout = self.layout
-        cc = context.scene.cursor_control
-        if cc.historyDraw:
-            GUI.drawIconButton(True, layout, 'RESTRICT_VIEW_OFF', "view3d.cursor_history_disable", False)
-        else:
-            GUI.drawIconButton(True, layout, 'RESTRICT_VIEW_ON' , "view3d.cursor_history_enable", False)
-
-    def draw(self, context):
-        layout = self.layout
-        sce = context.scene
-        cc = context.scene.cursor_control
-
-        row = layout.row()
-        row.label("Navigation: ")
-        GUI.drawIconButton(cc.historyPosition[0]>0, row, 'PLAY_REVERSE', "view3d.cursor_previous")
-        #if(cc.historyPosition[0]<0):
-            #row.label("  --  ")
-        #else:
-            #row.label("  "+str(cc.historyPosition[0])+"  ")
-        GUI.drawIconButton(cc.historyPosition[0]<len(cc.historyLocation)-1, row, 'PLAY', "view3d.cursor_next")
-
-        row = layout.row()
-        col = row.column()
-        col.prop(CursorAccess.findSpace(), "cursor_location")
-
-        cc.addHistoryLocation(CursorAccess.getCursor())
-  
-                
 
   
-class VIEW3D_PT_cursor_init(bpy.types.Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_label = "Register callback"
-    bl_default_closed = True
-
-    @classmethod
-    def poll(cls, context):
-        print ("Cursor Control draw-callback registration...")
-        sce = context.scene
-        if context.area.type == 'VIEW_3D':
-            for reg in context.area.regions:
-                if reg.type == 'WINDOW':
-                    # Register callback for SL-draw
-                    reg.callback_add(
-                        cursor_draw_SL,
-                        (cls,context),
-                        'POST_PIXEL')
-                    print ("Cursor Control draw-callback registered")
-                    # Unregister to prevent double registration...
-                    bpy.types.unregister(VIEW3D_PT_cursor_init)
-        else:
-            print("View3D not found, cannot run operator")
-        return 0
-
-    def draw_header(self, context):
-        pass
-
+class CursorControlMenu(bpy.types.Menu):
+    """menu"""
+    bl_idname = "cursor_control_calls"
+    bl_label = "Cursor Control"
+    
     def draw(self, context):
-        pass
-
-def cursor_draw_SL(cls,context):
-    cc = context.scene.cursor_control
-
-    draw = 0
-    if hasattr(cc, "savedLocationDraw"):
-        draw = cc.savedLocationDraw
-
-    if(draw):
-        bgl.glEnable(bgl.GL_BLEND)
-        bgl.glShadeModel(bgl.GL_FLAT)
-        p1 = Vector(cc.savedLocation)
-        location = region3d_get_2d_coordinates(context, p1)
-        alpha = 1-PHI_INV
-        # Circle
-        color = ([0.33, 0.33, 0.33],
-            [1, 1, 1],
-            [0.33, 0.33, 0.33],
-            [1, 1, 1],
-            [0.33, 0.33, 0.33],
-            [1, 1, 1],
-            [0.33, 0.33, 0.33],
-            [1, 1, 1],
-            [0.33, 0.33, 0.33],
-            [1, 1, 1],
-            [0.33, 0.33, 0.33],
-            [1, 1, 1],
-            [0.33, 0.33, 0.33],
-            [1, 1, 1])
-        offset = ([-4.480736161291701, -8.939966636005579],
-            [-0.158097634992133, -9.998750178787843],
-            [4.195854066857877, -9.077158622037636],
-            [7.718765411993642, -6.357724476147943],
-            [9.71288060283854, -2.379065025383466],
-            [9.783240669628, 2.070797430975971],
-            [7.915909938224691, 6.110513059466902],
-            [4.480736161291671, 8.939966636005593],
-            [0.15809763499209872, 9.998750178787843],
-            [-4.195854066857908, 9.077158622037622],
-            [-7.718765411993573, 6.357724476148025],
-            [-9.712880602838549, 2.379065025383433],
-            [-9.783240669627993, -2.070797430976005],
-            [-7.915909938224757, -6.110513059466818])
-        bgl.glBegin(bgl.GL_LINE_LOOP)
-        for i in range(14):
-            bgl.glColor4f(color[i][0], color[i][1], color[i][2], alpha)
-            bgl.glVertex2f(location[0]+offset[i][0], location[1]+offset[i][1])
-        bgl.glEnd()
-
-        # Crosshair
-        offset2 = 20
-        offset = 5
-        bgl.glColor4f(0, 0, 0, alpha)
-        bgl.glBegin(bgl.GL_LINE_STRIP)
-        bgl.glVertex2f(location[0]-offset2, location[1])
-        bgl.glVertex2f(location[0]- offset, location[1])
-        bgl.glEnd()
-        bgl.glBegin(bgl.GL_LINE_STRIP)
-        bgl.glVertex2f(location[0]+ offset, location[1])
-        bgl.glVertex2f(location[0]+offset2, location[1])
-        bgl.glEnd()
-        bgl.glBegin(bgl.GL_LINE_STRIP)
-        bgl.glVertex2f(location[0], location[1]-offset2)
-        bgl.glVertex2f(location[0], location[1]- offset)
-        bgl.glEnd()
-        bgl.glBegin(bgl.GL_LINE_STRIP)
-        bgl.glVertex2f(location[0], location[1]+ offset)
-        bgl.glVertex2f(location[0], location[1]+offset2)
-        bgl.glEnd()
-
-    draw = 0
-    if hasattr(cc, "historyDraw"):
-        draw = cc.historyDraw
-
-    if(draw):
-        bgl.glEnable(bgl.GL_BLEND)
-        bgl.glShadeModel(bgl.GL_FLAT)
-        alpha = 1-PHI_INV
-        # History Trace
-        if cc.historyPosition[0]<0:
-            return
-        bgl.glBegin(bgl.GL_LINE_STRIP)
-        ccc = 0
-        for iii in range(cc.historyWindow+1):
-            ix_rel = iii - int(cc.historyWindow / 2)
-            ix = cc.historyPosition[0] + ix_rel
-            if(ix<0 or ix>=len(cc.historyLocation)):
-                continue
-            ppp = region3d_get_2d_coordinates(context, cc.historyLocation[ix])
-            if(ix_rel<=0):
-                bgl.glColor4f(0, 0, 0, alpha)
-            else:
-                bgl.glColor4f(1, 0, 0, alpha)
-            bgl.glVertex2f(ppp[0], ppp[1])
-            ccc = ccc + 1
-        bgl.glEnd()
-
+        layout = self.layout
+        layout.operator_context = 'INVOKE_REGION_WIN'
+        #layout.operator(VIEW3D_OT_cursor_to_vertex.bl_idname, text = "Vertex")
+        #layout.operator(VIEW3D_OT_cursor_to_line.bl_idname, text = "Line")
+        #obj = context.active_object
+        #if (context.mode == 'EDIT_MESH'):
+            #if (obj and obj.type=='MESH' and obj.data):
+        cc = context.scene.cursor_control
+        (tvs,tes,tfs,edit_mode) = cc.guiStates(context)
         
+        if(edit_mode):
+            if(tvs>=1):
+                layout.operator(VIEW3D_OT_cursor_to_vertex.bl_idname, text = "Closest Vertex")
+            if(tvs==2 or tes>=1):
+                layout.operator(VIEW3D_OT_cursor_to_line.bl_idname, text = "Closest Line")
+            if(tvs==2 or tes>=1):
+                layout.operator(VIEW3D_OT_cursor_to_edge.bl_idname, text = "Closest Edge")
+            if(tvs==3 or tfs>=1):
+                layout.operator(VIEW3D_OT_cursor_to_plane.bl_idname, text = "Closest Plane")
+            if(tvs==3 or tfs>=1):
+                layout.operator(VIEW3D_OT_cursor_to_face.bl_idname, text = "Closest Face")
+
+        if(edit_mode):
+            if(tvs<=3 or tfs==1):
+                layout.operator(VIEW3D_OT_cursor_to_sl_mirror.bl_idname, text = "Mirror")
+            if(tes==2):
+                layout.operator(VIEW3D_OT_cursor_to_linex.bl_idname, text = "Line Intersection")
+            if(tvs>1):
+                layout.operator(VIEW3D_OT_cursor_to_vertex_median.bl_idname, text = "Vertex Median")
+            if(tvs==3 or tvs==4):
+                layout.operator(VIEW3D_OT_cursor_to_spherecenter.bl_idname, text = "Circle Center")
+            if(tvs==3 or tvs==4):
+                layout.operator(VIEW3D_OT_cursor_to_perimeter.bl_idname, text = "Circle Perimeter")
         
-        
+        layout.operator(VIEW3D_OT_cursor_to_origin.bl_idname, text = "World Origin")
+        layout.operator(VIEW3D_OT_cursor_to_active_object_center.bl_idname, text = "Active Object")
+        layout.operator(VIEW3D_OT_cursor_to_sl.bl_idname, text = "Cursor Memory")
+
+
+
+def menu_callback(self, context):
+    #obj = context.active_object
+    #if (context.mode == 'EDIT_MESH'):
+        #if (obj and obj.type=='MESH' and obj.data):
+    self.layout.menu(CursorControlMenu.bl_idname, icon="PLUGIN")
 
 def register():
+    bpy.utils.register_module(__name__)
     # Register Cursor Control Structure
     bpy.types.Scene.cursor_control = bpy.props.PointerProperty(type=CursorControlData, name="")
-        
-
+    # Register menu
+    bpy.types.VIEW3D_MT_snap.append(menu_callback)
 
 def unregister():
-    pass
+    # Register menu
+    bpy.types.VIEW3D_MT_snap.remove(menu_callback)
+    bpy.utils.unregister_module(__name__)
 
 
 if __name__ == "__main__":
