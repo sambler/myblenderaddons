@@ -25,8 +25,6 @@ import os
 import time
 import struct
 
-from bpy_extras.io_utils import load_image
-
 import bpy
 import mathutils
 
@@ -240,6 +238,8 @@ def add_texture_to_material(image, texture, material, mapto):
 
 
 def process_next_chunk(file, previous_chunk, importedObjects, IMAGE_SEARCH):
+    from bpy_extras.image_utils import load_image
+
     #print previous_chunk.bytes_read, 'BYTES READ'
     contextObName = None
     contextLamp = [None, None]  # object, Data
@@ -339,17 +339,11 @@ def process_next_chunk(file, previous_chunk, importedObjects, IMAGE_SEARCH):
         ob = bpy.data.objects.new(contextObName, bmesh)
         object_dictionary[contextObName] = ob
         SCN.objects.link(ob)
-
-        '''
-        if contextMatrix_tx:
-            ob.setMatrix(contextMatrix_tx)
-        '''
+        importedObjects.append(ob)
 
         if contextMatrix_rot:
             ob.matrix_local = contextMatrix_rot
             object_matrix[ob] = contextMatrix_rot.copy()
-
-        importedObjects.append(ob)
 
     #a spare chunk
     new_chunk = chunk()
@@ -667,6 +661,7 @@ def process_next_chunk(file, previous_chunk, importedObjects, IMAGE_SEARCH):
             if child is None:
                 child = bpy.data.objects.new(object_name, None)  # create an empty object
                 SCN.objects.link(child)
+                importedObjects.append(child)
 
             object_list.append(child)
             object_parent.append(hierarchy)
@@ -779,7 +774,12 @@ def process_next_chunk(file, previous_chunk, importedObjects, IMAGE_SEARCH):
             ob.data.transform(pivot_matrix)
 
 
-def load_3ds(filepath, context, IMPORT_CONSTRAIN_BOUNDS=10.0, IMAGE_SEARCH=True, APPLY_MATRIX=True):
+def load_3ds(filepath,
+             context,
+             IMPORT_CONSTRAIN_BOUNDS=10.0,
+             IMAGE_SEARCH=True,
+             APPLY_MATRIX=True,
+             global_matrix=None):
     global SCN
 
     # XXX
@@ -787,6 +787,9 @@ def load_3ds(filepath, context, IMPORT_CONSTRAIN_BOUNDS=10.0, IMAGE_SEARCH=True,
 # 		return
 
     print("importing 3DS: %r..." % (filepath), end="")
+
+    if bpy.ops.object.select_all.poll():
+        bpy.ops.object.select_all(action='DESELECT')
 
     time1 = time.clock()
 # 	time1 = Blender.sys.time()
@@ -837,6 +840,15 @@ def load_3ds(filepath, context, IMPORT_CONSTRAIN_BOUNDS=10.0, IMAGE_SEARCH=True,
             if ob.type == 'MESH':
                 me = ob.data
                 me.transform(ob.matrix_local.inverted())
+
+    # print(importedObjects)
+    if global_matrix:
+        for ob in importedObjects:
+            if ob.parent is None:
+                ob.matrix_world = ob.matrix_world * global_matrix
+
+    for ob in importedObjects:
+        ob.select = True
 
     # Done DUMMYVERT
     """
@@ -903,6 +915,21 @@ def load_3ds(filepath, context, IMPORT_CONSTRAIN_BOUNDS=10.0, IMAGE_SEARCH=True,
     file.close()
 
 
-def load(operator, context, filepath="", constrain_size=0.0, use_image_search=True, use_apply_transform=True):
-    load_3ds(filepath, context, IMPORT_CONSTRAIN_BOUNDS=constrain_size, IMAGE_SEARCH=use_image_search, APPLY_MATRIX=use_apply_transform)
+def load(operator,
+         context,
+         filepath="",
+         constrain_size=0.0,
+         use_image_search=True,
+         use_apply_transform=True,
+         global_matrix=None,
+         ):
+
+    load_3ds(filepath,
+             context,
+             IMPORT_CONSTRAIN_BOUNDS=constrain_size,
+             IMAGE_SEARCH=use_image_search,
+             APPLY_MATRIX=use_apply_transform,
+             global_matrix=global_matrix,
+             )
+
     return {'FINISHED'}

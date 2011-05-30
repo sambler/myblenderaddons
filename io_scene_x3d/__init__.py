@@ -40,8 +40,8 @@ if "bpy" in locals():
 
 
 import bpy
-from bpy.props import StringProperty, BoolProperty
-from bpy_extras.io_utils import ImportHelper, ExportHelper
+from bpy.props import StringProperty, BoolProperty, EnumProperty
+from bpy_extras.io_utils import ImportHelper, ExportHelper, axis_conversion
 
 
 class ImportX3D(bpy.types.Operator, ImportHelper):
@@ -52,9 +52,38 @@ class ImportX3D(bpy.types.Operator, ImportHelper):
     filename_ext = ".x3d"
     filter_glob = StringProperty(default="*.x3d;*.wrl", options={'HIDDEN'})
 
+    axis_forward = EnumProperty(
+            name="Forward",
+            items=(('X', "X Forward", ""),
+                   ('Y', "Y Forward", ""),
+                   ('Z', "Z Forward", ""),
+                   ('-X', "-X Forward", ""),
+                   ('-Y', "-Y Forward", ""),
+                   ('-Z', "-Z Forward", ""),
+                   ),
+            default='Z',
+            )
+
+    axis_up = EnumProperty(
+            name="Up",
+            items=(('X', "X Up", ""),
+                   ('Y', "Y Up", ""),
+                   ('Z', "Z Up", ""),
+                   ('-X', "-X Up", ""),
+                   ('-Y', "-Y Up", ""),
+                   ('-Z', "-Z Up", ""),
+                   ),
+            default='-Y',
+            )
+
     def execute(self, context):
         from . import import_x3d
-        return import_x3d.load(self, context, **self.as_keywords(ignore=("filter_glob",)))
+
+        keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "filter_glob"))
+        global_matrix = axis_conversion(from_forward=self.axis_forward, from_up=self.axis_up).to_4x4()
+        keywords["global_matrix"] = global_matrix
+
+        return import_x3d.load(self, context, **keywords)
 
 
 class ExportX3D(bpy.types.Operator, ExportHelper):
@@ -67,12 +96,42 @@ class ExportX3D(bpy.types.Operator, ExportHelper):
 
     use_selection = BoolProperty(name="Selection Only", description="Export selected objects only", default=False)
     use_apply_modifiers = BoolProperty(name="Apply Modifiers", description="Use transformed mesh data from each object", default=True)
-    use_triangulate = BoolProperty(name="Triangulate", description="Triangulate quads.", default=False)
+    use_triangulate = BoolProperty(name="Triangulate", description="Write quads into 'IndexedTriangleSet'", default=True)
     use_compress = BoolProperty(name="Compress", description="GZip the resulting file, requires a full python install", default=False)
+
+    axis_forward = EnumProperty(
+            name="Forward",
+            items=(('X', "X Forward", ""),
+                   ('Y', "Y Forward", ""),
+                   ('Z', "Z Forward", ""),
+                   ('-X', "-X Forward", ""),
+                   ('-Y', "-Y Forward", ""),
+                   ('-Z', "-Z Forward", ""),
+                   ),
+            default='Z',
+            )
+
+    axis_up = EnumProperty(
+            name="Up",
+            items=(('X', "X Up", ""),
+                   ('Y', "Y Up", ""),
+                   ('Z', "Z Up", ""),
+                   ('-X', "-X Up", ""),
+                   ('-Y', "-Y Up", ""),
+                   ('-Z', "-Z Up", ""),
+                   ),
+            default='-Y',
+            )
 
     def execute(self, context):
         from . import export_x3d
-        return export_x3d.save(self, context, **self.as_keywords(ignore=("check_existing", "filter_glob")))
+        from mathutils import Matrix
+
+        keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "check_existing", "filter_glob"))
+        global_matrix = axis_conversion(to_forward=self.axis_forward, to_up=self.axis_up).to_4x4()
+        keywords["global_matrix"] = global_matrix
+
+        return export_x3d.save(self, context, **keywords)
 
 
 def menu_func_import(self, context):

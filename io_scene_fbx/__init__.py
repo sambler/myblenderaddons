@@ -56,11 +56,11 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
 
-    use_selection = BoolProperty(name="Selected Objects", description="Export selected objects on visible layers", default=True)
+    use_selection = BoolProperty(name="Selected Objects", description="Export selected objects on visible layers", default=False)
 # 	EXP_OBS_SCENE = BoolProperty(name="Scene Objects", description="Export all objects in this scene", default=True)
     global_scale = FloatProperty(name="Scale", description="Scale all data, (Note! some imports dont support scaled armatures)", min=0.01, max=1000.0, soft_min=0.01, soft_max=1000.0, default=1.0)
 
-    global_axis_forward = EnumProperty(
+    axis_forward = EnumProperty(
             name="Forward",
             items=(('X', "X Forward", ""),
                    ('Y', "Y Forward", ""),
@@ -69,10 +69,10 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ('-Y', "-Y Forward", ""),
                    ('-Z', "-Z Forward", ""),
                    ),
-            default='Y',
+            default='-Z',
             )
 
-    global_axis_up = EnumProperty(
+    axis_up = EnumProperty(
             name="Up",
             items=(('X', "X Up", ""),
                    ('Y', "Y Up", ""),
@@ -81,7 +81,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ('-Y', "-Y Up", ""),
                    ('-Z', "-Z Up", ""),
                    ),
-            default='Z',
+            default='Y',
             )
 
     object_types = EnumProperty(
@@ -138,13 +138,13 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
         if not self.filepath:
             raise Exception("filepath not set")
 
-        GLOBAL_MATRIX = Matrix()
-        GLOBAL_MATRIX[0][0] = GLOBAL_MATRIX[1][1] = GLOBAL_MATRIX[2][2] = self.global_scale
-        GLOBAL_MATRIX = GLOBAL_MATRIX * axis_conversion(to_forward=self.global_axis_forward, to_up=self.global_axis_up).to_4x4()
+        global_matrix = Matrix()
+        global_matrix[0][0] = global_matrix[1][1] = global_matrix[2][2] = self.global_scale
+        global_matrix = global_matrix * axis_conversion(to_forward=self.axis_forward, to_up=self.axis_up).to_4x4()
 
-        keywords = self.as_keywords(ignore=("global_axis_forward", "global_axis_up", "global_scale", "check_existing", "filter_glob"))
-        keywords["GLOBAL_MATRIX"] = GLOBAL_MATRIX
-        print(GLOBAL_MATRIX)
+        keywords = self.as_keywords(ignore=("axis_forward", "axis_up", "global_scale", "check_existing", "filter_glob"))
+        keywords["global_matrix"] = global_matrix
+
         from . import export_fbx
         return export_fbx.save(self, context, **keywords)
 

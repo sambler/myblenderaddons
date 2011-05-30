@@ -21,23 +21,11 @@
 DEBUG = False
 
 # This should work without a blender at all
-from os.path import exists
-
-
-def baseName(path):
-    return path.split('/')[-1].split('\\')[-1]
-
-
-def dirName(path):
-    return path[:-len(baseName(path))]
+import os
 
 
 def imageConvertCompat(path):
 
-    try:
-        import os
-    except:
-        return path
     if os.sep == '\\':
         return path  # assime win32 has quicktime, dont convert
 
@@ -51,7 +39,7 @@ def imageConvertCompat(path):
         # print('\n'+path+'\n'+path_to+'\n')
         os.system('convert "%s" "%s"' % (path, path_to))  # for now just hope we have image magick
 
-        if exists(path_to):
+        if os.path.exists(path_to):
             return path_to
 
     return path
@@ -267,10 +255,10 @@ def is_nodeline(i, words):
     # Ok, we have a { after some values
     # Check the values are not fields
     for i, val in enumerate(words):
-        if i != 0 and words[i - 1] in ('DEF', 'USE'):
+        if i != 0 and words[i - 1] in {'DEF', 'USE'}:
             # ignore anything after DEF, it is a ID and can contain any chars.
             pass
-        elif val[0].isalpha() and val not in ('TRUE', 'FALSE'):
+        elif val[0].isalpha() and val not in {'TRUE', 'FALSE'}:
             pass
         else:
             # There is a number in one of the values, therefor we are not a node.
@@ -957,14 +945,14 @@ class vrmlNode(object):
                 urls.append(url)
                 urls.append(bpy.path.resolve_ncase(urls[-1]))
 
-                urls.append(dirName(self.getFilename()) + url)
+                urls.append(os.path.join(os.path.dirname(self.getFilename()), url))
                 urls.append(bpy.path.resolve_ncase(urls[-1]))
 
-                urls.append(dirName(self.getFilename()) + baseName(url))
+                urls.append(os.path.join(os.path.dirname(self.getFilename()), os.path.basename(url)))
                 urls.append(bpy.path.resolve_ncase(urls[-1]))
 
                 try:
-                    url = [url for url in urls if exists(url)][0]
+                    url = [url for url in urls if os.path.exists(url)][0]
                     url_found = True
                 except:
                     url_found = False
@@ -1189,7 +1177,7 @@ class vrmlNode(object):
                     value_all = value.split()
 
                     def iskey(k):
-                        if k[0] != '"' and k[0].isalpha() and k.upper() not in ('TRUE', 'FALSE'):
+                        if k[0] != '"' and k[0].isalpha() and k.upper() not in {'TRUE', 'FALSE'}:
                             return True
                         return False
 
@@ -1337,7 +1325,7 @@ class x3dNode(vrmlNode):
                 return
 
         for x3dChildNode in self.x3dNode.childNodes:
-            if x3dChildNode.nodeType in (x3dChildNode.TEXT_NODE, x3dChildNode.COMMENT_NODE, x3dChildNode.CDATA_SECTION_NODE):
+            if x3dChildNode.nodeType in {x3dChildNode.TEXT_NODE, x3dChildNode.COMMENT_NODE, x3dChildNode.CDATA_SECTION_NODE}:
                 continue
 
             node_type = NODE_NORMAL
@@ -1548,7 +1536,7 @@ import math
 MATRIX_Z_TO_Y = Matrix.Rotation(math.pi / 2.0, 4, 'X')
 
 
-def getFinalMatrix(node, mtx, ancestry):
+def getFinalMatrix(node, mtx, ancestry, global_matrix):
 
     transform_nodes = [node_tx for node_tx in ancestry if node_tx.getSpec() == 'Transform']
     if node.getSpec() == 'Transform':
@@ -1563,7 +1551,7 @@ def getFinalMatrix(node, mtx, ancestry):
         mtx = mat * mtx
 
     # worldspace matrix
-    mtx = MATRIX_Z_TO_Y * mtx
+    mtx = mtx * global_matrix
 
     return mtx
 
@@ -2049,7 +2037,7 @@ def importMesh_Box(geom, ancestry):
     return bpymesh
 
 
-def importShape(node, ancestry):
+def importShape(node, ancestry, global_matrix):
     vrmlname = node.getDefName()
     if not vrmlname:
         vrmlname = 'Shape'
@@ -2122,7 +2110,7 @@ def importShape(node, ancestry):
                 if ima_url is None:
                     print("\twarning, image with no URL, this is odd")
                 else:
-                    bpyima = image_utils.image_load(ima_url, dirName(node.getFilename()), place_holder=False, recursive=False, convert_callback=imageConvertCompat)
+                    bpyima = image_utils.image_load(ima_url, os.path.dirname(node.getFilename()), place_holder=False, recursive=False, convert_callback=imageConvertCompat)
                     if bpyima:
                         texture = bpy.data.textures.new("XXX", 'IMAGE')
                         texture.image = bpyima
@@ -2226,7 +2214,7 @@ def importShape(node, ancestry):
 
             # Can transform data or object, better the object so we can instance the data
             #bpymesh.transform(getFinalMatrix(node))
-            bpyob.matrix_world = getFinalMatrix(node, None, ancestry)
+            bpyob.matrix_world = getFinalMatrix(node, None, ancestry, global_matrix)
 
 
 def importLamp_PointLight(node, ancestry):
@@ -2312,7 +2300,7 @@ def importLamp_SpotLight(node, ancestry):
     return bpylamp, mtx
 
 
-def importLamp(node, spec, ancestry):
+def importLamp(node, spec, ancestry, global_matrix):
     if spec == 'PointLight':
         bpylamp, mtx = importLamp_PointLight(node, ancestry)
     elif spec == 'DirectionalLight':
@@ -2326,10 +2314,10 @@ def importLamp(node, spec, ancestry):
     bpyob = node.blendObject = bpy.data.objects.new("TODO", bpylamp)
     bpy.context.scene.objects.link(bpyob)
 
-    bpyob.matrix_world = getFinalMatrix(node, mtx, ancestry)
+    bpyob.matrix_world = getFinalMatrix(node, mtx, ancestry. global_matrix)
 
 
-def importViewpoint(node, ancestry):
+def importViewpoint(node, ancestry, global_matrix):
     name = node.getDefName()
     if not name:
         name = 'Viewpoint'
@@ -2348,10 +2336,10 @@ def importViewpoint(node, ancestry):
 
     bpyob = node.blendObject = bpy.data.objects.new("TODO", bpycam)
     bpy.context.scene.objects.link(bpyob)
-    bpyob.matrix_world = getFinalMatrix(node, mtx, ancestry)
+    bpyob.matrix_world = getFinalMatrix(node, mtx, ancestry, global_matrix)
 
 
-def importTransform(node, ancestry):
+def importTransform(node, ancestry, global_matrix):
     name = node.getDefName()
     if not name:
         name = 'Transform'
@@ -2359,7 +2347,7 @@ def importTransform(node, ancestry):
     bpyob = node.blendObject = bpy.data.objects.new(name, None)
     bpy.context.scene.objects.link(bpyob)
 
-    bpyob.matrix_world = getFinalMatrix(node, None, ancestry)
+    bpyob.matrix_world = getFinalMatrix(node, None, ancestry, global_matrix)
 
     # so they are not too annoying
     bpyob.empty_draw_type = 'PLAIN_AXES'
@@ -2525,7 +2513,7 @@ ROUTE champFly001.bindTime TO vpTs.set_startTime
                     set_data_from_node = defDict[from_id]
                     translatePositionInterpolator(set_data_from_node, action, ancestry)
 
-                if to_type in ('set_orientation', 'rotation'):
+                if to_type in {'set_orientation', 'rotation'}:
                     action = getIpo(to_id)
                     set_data_from_node = defDict[from_id]
                     translateOrientationInterpolator(set_data_from_node, action, ancestry)
@@ -2541,7 +2529,12 @@ ROUTE champFly001.bindTime TO vpTs.set_startTime
                 translateTimeSensor(time_node, action, ancestry)
 
 
-def load_web3d(path, PREF_FLAT=False, PREF_CIRCLE_DIV=16, HELPER_FUNC=None):
+def load_web3d(path,
+               PREF_FLAT=False,
+               PREF_CIRCLE_DIV=16,
+               global_matrix=None,
+               HELPER_FUNC=None,
+               ):
 
     # Used when adding blender primitives
     GLOBALS['CIRCLE_DETAIL'] = PREF_CIRCLE_DIV
@@ -2555,6 +2548,9 @@ def load_web3d(path, PREF_FLAT=False, PREF_CIRCLE_DIV=16, HELPER_FUNC=None):
     if not root_node:
         print(msg)
         return
+
+    if global_matrix is None:
+        global_matrix = Matrix()
 
     # fill with tuples - (node, [parents-parent, parent])
     all_nodes = root_node.getSerialized([], [])
@@ -2575,15 +2571,15 @@ def load_web3d(path, PREF_FLAT=False, PREF_CIRCLE_DIV=16, HELPER_FUNC=None):
             # by an external script. - gets first pick
             pass
         if spec == 'Shape':
-            importShape(node, ancestry)
-        elif spec in ('PointLight', 'DirectionalLight', 'SpotLight'):
-            importLamp(node, spec, ancestry)
+            importShape(node, ancestry, global_matrix)
+        elif spec in {'PointLight', 'DirectionalLight', 'SpotLight'}:
+            importLamp(node, spec, ancestry, global_matrix)
         elif spec == 'Viewpoint':
-            importViewpoint(node, ancestry)
+            importViewpoint(node, ancestry, global_matrix)
         elif spec == 'Transform':
             # Only use transform nodes when we are not importing a flat object hierarchy
             if PREF_FLAT == False:
-                importTransform(node, ancestry)
+                importTransform(node, ancestry, global_matrix)
             '''
         # These are delt with later within importRoute
         elif spec=='PositionInterpolator':
@@ -2650,11 +2646,12 @@ def load_web3d(path, PREF_FLAT=False, PREF_CIRCLE_DIV=16, HELPER_FUNC=None):
         del child_dict
 
 
-def load(operator, context, filepath=""):
+def load(operator, context, filepath="", global_matrix=None):
 
     load_web3d(filepath,
                PREF_FLAT=True,
                PREF_CIRCLE_DIV=16,
+               global_matrix=global_matrix,
                )
 
     return {'FINISHED'}
