@@ -120,14 +120,12 @@ def export(file,
         gpu_shader_dummy_mat = bpy.data.materials.new('X3D_DYMMY_MAT')
         gpu_shader_cache[None] = gpu.export_shader(scene, gpu_shader_dummy_mat)
 
-
 ##########################################################
 # Writing nodes routines
 ##########################################################
 
     def writeHeader(ident):
         filepath = fw.__self__.name
-        #bfile = sys.expandpath( Blender.Get('filepath') ).replace('<', '&lt').replace('>', '&gt')
         bfile = repr(os.path.basename(filepath).replace('<', '&lt').replace('>', '&gt'))[1:-1]  # use outfile name
         fw('%s<?xml version="1.0" encoding="UTF-8"?>\n' % ident)
         if use_h3d:
@@ -156,17 +154,17 @@ def export(file,
         fw('%s</X3D>' % ident)
         return ident
 
-    def writeViewpoint(ident, ob, mat, scene):
+    def writeViewpoint(ident, obj, mat, scene):
         loc, quat, scale = mat.decompose()
 
         ident_step = ident + (' ' * (-len(ident) + \
         fw('%s<Viewpoint ' % ident)))
-        fw('DEF="%s"\n' % clean_str(ob.name))
-        fw(ident_step + 'description="%s"\n' % ob.name)
+        fw('DEF="%s"\n' % clean_str(obj.name))
+        fw(ident_step + 'description="%s"\n' % obj.name)
         fw(ident_step + 'centerOfRotation="0 0 0"\n')
         fw(ident_step + 'position="%3.2f %3.2f %3.2f"\n' % loc[:])
         fw(ident_step + 'orientation="%3.2f %3.2f %3.2f %3.2f"\n' % (quat.axis[:] + (quat.angle, )))
-        fw(ident_step + 'fieldOfView="%.3g"\n' % ob.data.angle)
+        fw(ident_step + 'fieldOfView="%.3g"\n' % obj.data.angle)
         fw(ident_step + '/>\n')
 
     def writeFog(ident, world):
@@ -195,8 +193,8 @@ def export(file,
         fw(ident_step + 'avatarSize="0.25, 1.75, 0.75"\n')
         fw(ident_step + '/>\n')
 
-    def writeSpotLight(ident, ob, mtx, lamp, world):
-        safeName = clean_str(ob.name)
+    def writeSpotLight(ident, obj, mtx, lamp, world):
+        safeName = clean_str(obj.name)
         if world:
             ambi = world.ambient_color
             amb_intensity = ((ambi[0] + ambi[1] + ambi[2]) / 3.0) / 2.5
@@ -229,8 +227,8 @@ def export(file,
         fw(ident_step + 'location="%.4g %.4g %.4g"\n' % location)
         fw(ident_step + '/>\n')
 
-    def writeDirectionalLight(ident, ob, mtx, lamp, world):
-        safeName = clean_str(ob.name)
+    def writeDirectionalLight(ident, obj, mtx, lamp, world):
+        safeName = clean_str(obj.name)
         if world:
             ambi = world.ambient_color
             # ambi = world.amb
@@ -252,9 +250,9 @@ def export(file,
         fw(ident_step + 'direction="%.4g %.4g %.4g"\n' % orientation)
         fw(ident_step + '/>\n')
 
-    def writePointLight(ident, ob, mtx, lamp, world):
+    def writePointLight(ident, obj, mtx, lamp, world):
 
-        safeName = clean_str(ob.name)
+        safeName = clean_str(obj.name)
         if world:
             ambi = world.ambient_color
             # ambi = world.amb
@@ -297,9 +295,9 @@ def export(file,
                 return "%s" % (newname)
     secureName.nodeID = 0
 
-    def writeIndexedFaceSet(ident, ob, mesh, mtx, world):
+    def writeIndexedFaceSet(ident, obj, mesh, mtx, world):
 
-        shape_name_x3d = clean_str(ob.name)
+        shape_name_x3d = clean_str(obj.name)
         mesh_name_x3d = clean_str(mesh.name)
 
         if not mesh.faces:
@@ -435,7 +433,7 @@ def export(file,
                         gpu_shader = gpu_shader_cache.get(material)  # material can be 'None', uses dummy cache
                         if gpu_shader is None:
                             gpu_shader = gpu_shader_cache[material] = gpu.export_shader(scene, material)
-                            
+
                             if 1:  # XXX DEBUG
                                 gpu_shader_tmp = gpu.export_shader(scene, material)
                                 import pprint
@@ -445,7 +443,6 @@ def export(file,
                                 pprint.pprint(gpu_shader_tmp, width=120)
                                 #pprint.pprint(val['vertex'])
                                 del gpu_shader_tmp
-                            
 
                     fw('%s<Appearance>\n' % ident)
                     ident += '\t'
@@ -484,7 +481,7 @@ def export(file,
                     if use_h3d:
                         mat_tmp = material if material else gpu_shader_dummy_mat
                         writeMaterialH3D(ident, mat_tmp, clean_str(mat_tmp.name, ''), world,
-                                         ob, gpu_shader)
+                                         obj, gpu_shader)
                         del mat_tmp
                     else:
                         writeMaterial(ident, material, clean_str(material.name, ''), world)
@@ -612,11 +609,10 @@ def export(file,
                                 fw('%.3g %.3g %.3g ' % x3d_v[0][slot_col])
                             fw('" />\n')
 
-
                         if use_h3d:
                             # write attributes
                             for gpu_attr in gpu_shader['attributes']:
-                                
+
                                 # UVs
                                 if gpu_attr['type'] == gpu.CD_MTFACE:
                                     if gpu_attr['datatype'] == gpu.GPU_DATA_2F:
@@ -703,7 +699,7 @@ def export(file,
                                     fw('%.6g %.6g %.6g ' % v.co[:])
                                 fw('"\n')
                                 fw(ident_step + '/>\n')
-                                
+
                                 is_coords_written = True
 
                                 if use_normals:
@@ -766,7 +762,7 @@ def export(file,
 
             emit = mat.emit
             ambient = mat.ambient / 3.0
-            diffuseColor = tuple(mat.diffuse_color)
+            diffuseColor = mat.diffuse_color[:]
             if world:
                 ambiColor = tuple(((c * mat.ambient) * 2.0) for c in world.ambient_color)
             else:
@@ -794,7 +790,7 @@ def export(file,
             fw(ident_step + '/>\n')
 
     def writeMaterialH3D(ident, mat, material_id, world,
-                         ob, gpu_shader):
+                         obj, gpu_shader):
 
         fw('%s<Material />\n' % ident)
         if mat.tag:
@@ -828,7 +824,6 @@ def export(file,
             #~ GPU_DYNAMIC_SAMPLER_2DBUFFER 12
             #~ GPU_DYNAMIC_SAMPLER_2DIMAGE 13
             #~ GPU_DYNAMIC_SAMPLER_2DSHADOW 14
-
 
             '''
             inline const char* typeToString( X3DType t ) {
@@ -875,7 +870,7 @@ def export(file,
               case  MFMATRIX3D: return "MFMatrix3d";
               case  SFMATRIX4D: return "SFMatrix4d";
               case  MFMATRIX4D: return "MFMatrix4d";
-              case UNKNOWN_X3D_TYPE: 
+              case UNKNOWN_X3D_TYPE:
               default:return "UNKNOWN_X3D_TYPE";
             '''
             import gpu
@@ -907,14 +902,14 @@ def export(file,
                 elif uniform['type'] == gpu.GPU_DYNAMIC_LAMP_DYNCOL:
                     # odd  we have both 3, 4 types.
                     lamp = bpy.data.objects[uniform['lamp']].data
-                    value = '%.6g %.6g %.6g' % (mathutils.Vector(lamp.color) * lamp.energy)[:]
+                    value = '%.6g %.6g %.6g' % (lamp.color * lamp.energy)[:]
                     if uniform['datatype'] == gpu.GPU_DATA_3F:
                         fw('%s<field name="%s" type="SFVec3f" accessType="inputOutput" value="%s" />\n' % (ident, uniform['varname'], value))
                     elif uniform['datatype'] == gpu.GPU_DATA_4F:
                         fw('%s<field name="%s" type="SFVec4f" accessType="inputOutput" value="%s 1.0" />\n' % (ident, uniform['varname'], value))
                     else:
                         assert(0)
-                        
+
                 elif uniform['type'] == gpu.GPU_DYNAMIC_LAMP_DYNVEC:
                     if uniform['datatype'] == gpu.GPU_DATA_3F:
                         value = '%.6g %.6g %.6g' % (mathutils.Vector((0.0, 0.0, 1.0)) * (global_matrix * bpy.data.objects[uniform['lamp']].matrix_world).to_quaternion()).normalized()[:]
@@ -933,14 +928,14 @@ def export(file,
 
                 elif uniform['type'] == gpu.GPU_DYNAMIC_OBJECT_IMAT:
                     if uniform['datatype'] == gpu.GPU_DATA_16F:
-                        value = ' '.join(['%.6f' % f for v in (global_matrix * ob.matrix_world).inverted() for f in v])
+                        value = ' '.join(['%.6f' % f for v in (global_matrix * obj.matrix_world).inverted() for f in v])
                         fw('%s<field name="%s" type="SFMatrix4f" accessType="inputOutput" value="%s" />\n' % (ident, uniform['varname'], value))
                     else:
                         assert(0)
 
                 elif uniform['type'] == gpu.GPU_DYNAMIC_SAMPLER_2DSHADOW:
                     pass  # XXX, shadow buffers not supported.
-                
+
                 elif uniform['type'] == gpu.GPU_DYNAMIC_SAMPLER_2DBUFFER:
                     if uniform['datatype'] == gpu.GPU_DATA_1I:
                         if 1:
@@ -1083,57 +1078,56 @@ def export(file,
         ident = '\t\t'
 
         if use_selection:
-            objects = (o for o in scene.objects if o.is_visible(scene) and o.select)
+            objects = (obj for obj in scene.objects if obj.is_visible(scene) and o.select)
         else:
-            objects = (o for o in scene.objects if o.is_visible(scene))
+            objects = (obj for obj in scene.objects if obj.is_visible(scene))
 
-        for ob_main in objects:
+        for obj_main in objects:
 
-            free, derived = create_derived_objects(scene, ob_main)
+            free, derived = create_derived_objects(scene, obj_main)
 
             if derived is None:
                 continue
 
-            for ob, ob_mat in derived:
-                objType = ob.type
-                objName = ob.name
-                ob_mat = global_matrix * ob_mat
+            for obj, obj_matrix in derived:
+                obj_type = obj.type
+                obj_matrix = global_matrix * obj_matrix
 
-                if objType == 'CAMERA':
-                    writeViewpoint(ident, ob, ob_mat, scene)
-                elif objType in ('MESH', 'CURVE', 'SURF', 'FONT'):
-                    if (objType != 'MESH') or (use_apply_modifiers and ob.is_modified(scene, 'PREVIEW')):
+                if obj_type == 'CAMERA':
+                    writeViewpoint(ident, obj, obj_matrix, scene)
+                elif obj_type in ('MESH', 'CURVE', 'SURF', 'FONT'):
+                    if (obj_type != 'MESH') or (use_apply_modifiers and obj.is_modified(scene, 'PREVIEW')):
                         try:
-                            me = ob.to_mesh(scene, use_apply_modifiers, 'PREVIEW')
+                            me = obj.to_mesh(scene, use_apply_modifiers, 'PREVIEW')
                         except:
                             me = None
                     else:
-                        me = ob.data
+                        me = obj.data
 
                     if me is not None:
-                        writeIndexedFaceSet(ident, ob, me, ob_mat, world)
+                        writeIndexedFaceSet(ident, obj, me, obj_matrix, world)
 
                         # free mesh created with create_mesh()
-                        if me != ob.data:
+                        if me != obj.data:
                             bpy.data.meshes.remove(me)
 
-                elif objType == 'LAMP':
-                    data = ob.data
+                elif obj_type == 'LAMP':
+                    data = obj.data
                     datatype = data.type
                     if datatype == 'POINT':
-                        writePointLight(ident, ob, ob_mat, data, world)
+                        writePointLight(ident, obj, obj_matrix, data, world)
                     elif datatype == 'SPOT':
-                        writeSpotLight(ident, ob, ob_mat, data, world)
+                        writeSpotLight(ident, obj, obj_matrix, data, world)
                     elif datatype == 'SUN':
-                        writeDirectionalLight(ident, ob, ob_mat, data, world)
+                        writeDirectionalLight(ident, obj, obj_matrix, data, world)
                     else:
-                        writeDirectionalLight(ident, ob, ob_mat, data, world)
+                        writeDirectionalLight(ident, obj, obj_matrix, data, world)
                 else:
                     #print "Info: Ignoring [%s], object type [%s] not handle yet" % (object.name,object.getType)
                     pass
 
             if free:
-                free_derived_objects(ob_main)
+                free_derived_objects(obj_main)
 
         ident = writeFooter(ident)
 
@@ -1146,7 +1140,7 @@ def export(file,
     if use_h3d:
         bpy.data.materials.remove(gpu_shader_dummy_mat)
 
-    print('Info: finished X3D export to %r'    % file.name)
+    print('Info: finished X3D export to %r' % file.name)
 
 
 ##########################################################
@@ -1164,18 +1158,13 @@ def save(operator, context, filepath="",
          global_matrix=None,
          ):
 
-    if use_compress:
-        if not filepath.lower().endswith('.x3dz'):
-            filepath = '.'.join(filepath.split('.')[:-1]) + '.x3dz'
-    else:
-        if not filepath.lower().endswith('.x3d'):
-            filepath = '.'.join(filepath.split('.')[:-1]) + '.x3d'
+    py.path.ensure_ext(filepath, '.x3dz' if use_compress else '.x3d')
 
     if bpy.ops.object.mode_set.poll():
         bpy.ops.object.mode_set(mode='OBJECT')
 
     file = None
-    if filepath.lower().endswith('.x3dz'):
+    if use_compress:
         try:
             import gzip
             file = gzip.open(filepath, 'w')
