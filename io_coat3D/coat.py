@@ -281,12 +281,13 @@ class SCENE_OT_export(bpy.types.Operator):
 
         if(not(os.path.isfile(checkname)) or coat3D.exportover):
             if(coat3D.export_pos):
+                bpy.ops.object.transform_apply(location=True,rotation=True,scale=True)
 
                 bpy.ops.export_scene.obj(filepath=checkname,use_selection=True,
                 use_apply_modifiers=coat3D.exportmod,use_blen_objects=False, group_by_material= True,
                 use_materials = False,keep_vertex_order = True,axis_forward='Y',axis_up='Z')
 
-                coat3D.export_on = True
+                coa.export_on = True
             else:
                 coat3D.loca = obj.location
                 coat3D.rota = obj.rotation_euler
@@ -302,7 +303,7 @@ class SCENE_OT_export(bpy.types.Operator):
                 obj.location = coat3D.loca
                 obj.rotation_euler = coat3D.rota
                 obj.scale = coat3D.scal
-                coat3D.export_on = True
+                coa.export_on = True
                     
 
 

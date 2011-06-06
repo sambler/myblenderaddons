@@ -57,6 +57,7 @@ def register():
         objectdir = StringProperty(name="ObjectPath", subtype="FILE_PATH")
         texturefolder = StringProperty(name="Texture folder:", subtype="DIR_PATH")
         path3b = StringProperty(name="3B Path", subtype="FILE_PATH")
+        export_on = BoolProperty(name="Export_On", description="Add Modifiers and export.",default= False)
 
 
     class SceneCoat3D(bpy.types.PropertyGroup):
@@ -120,11 +121,7 @@ def register():
             description="Export Coarse.",
             default= True
         )
-        export_on = BoolProperty(
-            name="Export_On",
-            description="Add Modifiers and export.",
-            default= False
-        )
+   
         smooth_on = BoolProperty(
             name="Auto Smooth",
             description="Add Modifiers and export.",
