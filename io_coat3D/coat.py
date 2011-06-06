@@ -25,6 +25,7 @@ from bpy.props import *
 from io_coat3D import tex
 import os
 import linecache
+import math
 
 bpy.coat3D = dict()
 bpy.coat3D['active_coat'] = ''
@@ -220,6 +221,11 @@ class SCENE_PT_Settings(ObjectButtonsPanel,bpy.types.Panel):
             row.label(text="3b path:")
             row = layout.row()
             row.prop(coa,"path3b",text="")
+            row = layout.row()
+            row.label(text="Default Folder:")
+            row = layout.row()
+            row.prop(coat3D,"defaultfolder",text="")
+            
         #colL = row.column()
         #colR = row.column()
         #colL.prop(coat3D,"export_box")
@@ -278,7 +284,7 @@ class SCENE_OT_export(bpy.types.Operator):
 
                 bpy.ops.export_scene.obj(filepath=checkname,use_selection=True,
                 use_apply_modifiers=coat3D.exportmod,use_blen_objects=False, group_by_material= True,
-                use_materials = False,keep_vertex_order = True)
+                use_materials = False,keep_vertex_order = True,axis_forward='Y',axis_up='Z')
 
                 coat3D.export_on = True
             else:
@@ -291,7 +297,7 @@ class SCENE_OT_export(bpy.types.Operator):
 
                 bpy.ops.export_scene.obj(filepath=checkname,use_selection=True,
                 use_apply_modifiers=coat3D.exportmod,use_blen_objects=False, group_by_material= True,
-                use_materials = False,keep_vertex_order = True)
+                use_materials = False,keep_vertex_order = True,axis_forward='Y',axis_up='Z')
 
                 obj.location = coat3D.loca
                 obj.rotation_euler = coat3D.rota
@@ -364,61 +370,31 @@ class SCENE_OT_import(bpy.types.Operator):
                 os.remove(mtl)
 
             
-            bpy.ops.import_scene.obj(filepath=coa.objectdir)
+            bpy.ops.import_scene.obj(filepath=coa.objectdir,axis_forward='Y',axis_up='Z')
             obj_proxy = scene.objects[0]
+            bpy.ops.object.select_all(action='TOGGLE')
+            obj_proxy.select = True
+            bpy.ops.object.transform_apply(rotation=True)
             proxy_mat = obj_proxy.material_slots[0].material
             obj_proxy.data.materials.pop(0)
             proxy_mat.user_clear()
             bpy.data.materials.remove(proxy_mat)
             bpy.ops.object.select_all(action='TOGGLE')
             
-            if(coat3D.export_pos):
-                scene.objects.active = objekti
-                objekti.select = True
-                coat3D.cursor = bpy.context.scene.cursor_location
-                bpy.context.scene.cursor_location = (0.0,0.0,0.0)
-                bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+          
+            
+            scene.objects.active = obj_proxy
 
-                scene.objects.active = obj_proxy
-                
-                obj_data = objekti.data.id_data
-                objekti.data = obj_proxy.data.id_data
+            obj_data = objekti.data.id_data
+            objekti.data = obj_proxy.data.id_data
+            if(bpy.data.meshes[obj_data.name].users == 0):
+                bpy.data.meshes.remove(obj_data)
+                objekti.data.id_data.name = obj_data.name
 
-                if(coat3D.export_on):
-                    objekti.scale = (1,1,1)
-                    objekti.rotation_euler = (0,0,0)
-                    
-                if(bpy.data.meshes[obj_data.name].users == 0):
-                    bpy.data.meshes.remove(obj_data)
-                    objekti.data.id_data.name = obj_data.name
-
-                bpy.ops.object.select_all(action='TOGGLE')
-
-                obj_proxy.select = True
-                bpy.ops.object.delete()
-                objekti.select = True
-                bpy.context.scene.objects.active = objekti
-                if(coat3D.export_on):
-                    bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
-                    coat3D.export_on = False
-
-                else:
-                    objekti.location = coat3D.loca
-                    objekti.rotation_euler = coat3D.rota
-                    bpy.ops.object.origin_set(type='GEOMETRY_ORIGIN', center='MEDIAN')
-            else:
-                scene.objects.active = obj_proxy
-
-                obj_data = objekti.data.id_data
-                objekti.data = obj_proxy.data.id_data
-                if(bpy.data.meshes[obj_data.name].users == 0):
-                    bpy.data.meshes.remove(obj_data)
-                    objekti.data.id_data.name = obj_data.name
-
-                obj_proxy.select = True
-                bpy.ops.object.delete()
-                objekti.select = True
-                bpy.context.scene.objects.active = objekti
+            obj_proxy.select = True
+            bpy.ops.object.delete()
+            objekti.select = True
+            bpy.context.scene.objects.active = objekti
 
                 
                 

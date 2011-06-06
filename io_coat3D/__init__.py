@@ -60,10 +60,18 @@ def register():
 
 
     class SceneCoat3D(bpy.types.PropertyGroup):
-        exchangedir = StringProperty(
+
+        defaultfolder = StringProperty(
             name="FilePath",
             subtype="DIR_PATH",
         )
+        exchangedir = StringProperty(
+            name="FilePath",
+            subtype="DIR_PATH"
+        )
+
+    
+        
         wasactive = StringProperty(
             name="Pass active object",
         )
