@@ -286,9 +286,11 @@ class SCENE_OT_export(bpy.types.Operator):
                 bpy.ops.export_scene.obj(filepath=checkname,use_selection=True,
                 use_apply_modifiers=coat3D.exportmod,use_blen_objects=False, group_by_material= True,
                 use_materials = False,keep_vertex_order = True,axis_forward='Y',axis_up='Z')
+                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
 
                 coa.export_on = True
             else:
+                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
                 coat3D.loca = obj.location
                 coat3D.rota = obj.rotation_euler
                 coat3D.scal = obj.scale
@@ -303,7 +305,7 @@ class SCENE_OT_export(bpy.types.Operator):
                 obj.location = coat3D.loca
                 obj.rotation_euler = coat3D.rota
                 obj.scale = coat3D.scal
-                coa.export_on = True
+                coa.export_on = False
                     
 
 
@@ -375,6 +377,9 @@ class SCENE_OT_import(bpy.types.Operator):
             obj_proxy = scene.objects[0]
             bpy.ops.object.select_all(action='TOGGLE')
             obj_proxy.select = True
+            if(coa.export_on):
+                bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='MEDIAN')
+                
             bpy.ops.object.transform_apply(rotation=True)
             proxy_mat = obj_proxy.material_slots[0].material
             obj_proxy.data.materials.pop(0)
