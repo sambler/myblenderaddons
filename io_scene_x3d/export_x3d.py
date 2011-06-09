@@ -903,8 +903,8 @@ def export(file,
             fw('%s<ComposedShader DEF=%s language="GLSL" >\n' % (ident, material_id))
             ident += '\t'
 
-            shader_url_frag = 'shaders/glsl_%s.frag' % material_id
-            shader_url_vert = 'shaders/glsl_%s.vert' % material_id
+            shader_url_frag = 'shaders/glsl_%s.frag' % material_id[1:-1]
+            shader_url_vert = 'shaders/glsl_%s.vert' % material_id[1:-1]
 
             # write files
             shader_dir = os.path.join(dirname, 'shaders')
@@ -935,6 +935,10 @@ def export(file,
                     else:
                         assert(0)
 
+                elif uniform['type'] == gpu.GPU_DYNAMIC_LAMP_DYNENERGY:
+                    # not used ?
+                    assert(0)
+
                 elif uniform['type'] == gpu.GPU_DYNAMIC_LAMP_DYNVEC:
                     if uniform['datatype'] == gpu.GPU_DATA_3F:
                         value = '%.6g %.6g %.6g' % (mathutils.Vector((0.0, 0.0, 1.0)) * (global_matrix * bpy.data.objects[uniform['lamp']].matrix_world).to_quaternion()).normalized()[:]
@@ -964,11 +968,39 @@ def export(file,
                 elif uniform['type'] == gpu.GPU_DYNAMIC_SAMPLER_2DBUFFER:
                     if uniform['datatype'] == gpu.GPU_DATA_1I:
                         if 1:
-                            value = ' '.join(['%d' % f for f in uniform['texpixels']])
-                            # value = ' '.join(['%.6g' % (f / 256) for f in uniform['texpixels']])
+                            tex = uniform['texpixels']
+                            value = []
+                            for i in range(0, len(tex) - 1, 4):
+                                col = tex[i:i + 4]
+                                value.append('0x%.2x%.2x%.2x%.2x' % (col[0], col[1], col[2], col[3]))
 
-                            fw('%s<field name="%s" type="SFInt32" accessType="inputOutput" value="%s" />\n' % (ident, uniform['varname'], value))
-                            print('test', len(uniform['texpixels']))
+                            fw('%s<field name="%s" type="SFNode" accessType="inputOutput">\n' % (ident, uniform['varname']))
+
+                            ident += '\t'
+                            
+                            ident_step = ident + (' ' * (-len(ident) + \
+                            fw('%s<PixelTexture \n' % ident)))
+                            fw(ident_step + 'repeatS="false"\n')
+                            fw(ident_step + 'repeatT="false"\n')
+
+                            fw(ident_step + 'image="%s 1 4 %s"\n' % (len(value), " ".join(value)))
+
+                            fw(ident_step + '/>\n')
+                            
+                            ident = ident[:-1]
+
+                            fw('%s</field>\n' % ident)
+                            
+                            #for i in range(0, 10, 4)
+                            #value = ' '.join(['%d' % f for f in uniform['texpixels']])
+                            # value = ' '.join(['%.6g' % (f / 256) for f in uniform['texpixels']])
+                            
+
+                            #fw('%s<field name="%s" type="SFInt32" accessType="inputOutput" value="%s" />\n' % (ident, uniform['varname'], value))
+                            #print('test', len(uniform['texpixels']))
+                            
+                            
+                            
                     else:
                         assert(0)
 
