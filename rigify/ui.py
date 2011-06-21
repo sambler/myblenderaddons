@@ -81,6 +81,46 @@ class DATA_PT_rigify_buttons(bpy.types.Panel):
             op.metarig_type = id_store.rigify_types[id_store.rigify_active_type].name
 
 
+class DATA_PT_rigify_layer_names(bpy.types.Panel):
+    bl_label = "Rigify Layer Names"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "data"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        if not context.armature:
+            return False
+        return True
+
+    def draw(self, context):
+        C = context
+        layout = self.layout
+        obj = context.object
+
+        # Ensure that the layers exist
+        for i in range(1 + len(obj.data.rigify_layers), 29):
+            layer = obj.data.rigify_layers.add()
+
+        # UI
+        for i in range(28):
+            if (i % 16) == 0:
+                col = layout.column()
+                if i == 0:
+                    col.label(text="Top Row:")
+                else:
+                    col.label(text="Bottom Row:")
+            if (i % 8) == 0:
+                col = layout.column(align=True)
+            row = col.row()
+            row.prop(obj.data, "layers", index=i, text="", toggle=True)
+            split = row.split(percentage=0.8)
+            split.prop(obj.data.rigify_layers[i], "name", text="Layer %d" % (i + 1))
+            split.prop(obj.data.rigify_layers[i], "row", text="")
+            #split.prop(obj.data.rigify_layers[i], "column", text="")
+
+
 class BONE_PT_rigify_buttons(bpy.types.Panel):
     bl_label = "Rigify Type"
     bl_space_type = 'PROPERTIES'
@@ -243,6 +283,7 @@ class Sample(bpy.types.Operator):
 #from bl_ui import space_info  # ensure the menu is loaded first
 
 def register():
+    bpy.utils.register_class(DATA_PT_rigify_layer_names)
     bpy.utils.register_class(DATA_PT_rigify_buttons)
     bpy.utils.register_class(BONE_PT_rigify_buttons)
     bpy.utils.register_class(Generate)
@@ -252,6 +293,7 @@ def register():
 
 
 def unregister():
+    bpy.utils.unregister_class(DATA_PT_rigify_layer_names)
     bpy.utils.unregister_class(DATA_PT_rigify_buttons)
     bpy.utils.unregister_class(BONE_PT_rigify_buttons)
     bpy.utils.unregister_class(Generate)

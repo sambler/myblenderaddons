@@ -210,8 +210,6 @@ class Rig:
         # Main control doesn't use local location
         pb[main_control].bone.use_local_location = False
 
-        
-
         # Intermediate controls follow hips and spine
         for name, par_name, i in zip(controls[1:-1], control_parents, self.control_indices[1:-1]):
             bone = pb[par_name]
@@ -296,7 +294,7 @@ class Rig:
 
             # Position
             put_bone(self.obj, sub, bone_e.head)
-            sub_e.length /= 4
+            sub_e.length = bone_e.length / 4
             if prev_bone is not None:
                 sub_e.use_connect = True
 
@@ -507,6 +505,9 @@ class Rig:
         w = create_circle_widget(self.obj, controls[-1], radius=1.0, head_tail=0.5, with_line=True)
         if w != None:
             obj_to_bone(w, self.obj, self.org_bones[-1])
+
+        # Layers
+        pb[main_control].bone.layers = pb[self.org_bones[0]].bone.layers
 
         return [main_control] + controls
 

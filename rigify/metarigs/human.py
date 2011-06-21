@@ -24,6 +24,34 @@ def create(obj):
     bpy.ops.object.mode_set(mode='EDIT')
     arm = obj.data
 
+    for i in range(28):
+        arm.rigify_layers.add()
+
+    arm.rigify_layers[0].name = "Torso"
+    arm.rigify_layers[0].row = 2
+    arm.rigify_layers[2].name = "Head"
+    arm.rigify_layers[2].row = 1
+    arm.rigify_layers[4].name = "Fingers"
+    arm.rigify_layers[4].row = 3
+    arm.rigify_layers[5].name = "(Tweak)"
+    arm.rigify_layers[5].row = 3
+    arm.rigify_layers[6].name = "Arm.L (FK)"
+    arm.rigify_layers[6].row = 4
+    arm.rigify_layers[7].name = "Arm.L (IK)"
+    arm.rigify_layers[7].row = 5
+    arm.rigify_layers[8].name = "Arm.R (FK)"
+    arm.rigify_layers[8].row = 4
+    arm.rigify_layers[9].name = "Arm.R (IK)"
+    arm.rigify_layers[9].row = 5
+    arm.rigify_layers[10].name = "Leg.L (FK)"
+    arm.rigify_layers[10].row = 6
+    arm.rigify_layers[11].name = "Leg.L (IK)"
+    arm.rigify_layers[11].row = 7
+    arm.rigify_layers[12].name = "Leg.R (FK)"
+    arm.rigify_layers[12].row = 6
+    arm.rigify_layers[13].name = "Leg.R (IK)"
+    arm.rigify_layers[13].row = 7
+
     bones = {}
 
     bone = arm.edit_bones.new('hips')
