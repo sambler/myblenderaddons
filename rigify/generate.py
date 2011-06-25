@@ -17,6 +17,7 @@
 #======================= END GPL LICENSE BLOCK ========================
 
 import bpy
+import re
 import time
 import traceback
 import sys
@@ -26,6 +27,7 @@ from rigify.utils import ORG_PREFIX, MCH_PREFIX, DEF_PREFIX, WGT_PREFIX, ROOT_NA
 from rigify.utils import RIG_DIR
 from rigify.utils import create_root_widget
 from rigify.utils import random_id
+from rigify.utils import copy_attributes
 from rigify.rig_ui_template import UI_SLIDERS, layers_ui, UI_REGISTER
 from rigify import rigs
 
@@ -130,6 +132,15 @@ def generate_rig(context, metarig):
     obj.select = True
     scene.objects.active = obj
 
+    # Copy over bone properties
+    for bone in metarig.data.bones:
+        bone_gen = obj.data.bones[bone.name]
+
+        # B-bone stuff
+        bone_gen.bbone_segments = bone.bbone_segments
+        bone_gen.bbone_in = bone.bbone_in
+        bone_gen.bbone_out = bone.bbone_out
+
     # Copy over the pose_bone properties
     for bone in metarig.pose.bones:
         bone_gen = obj.pose.bones[bone.name]
@@ -146,14 +157,56 @@ def generate_rig(context, metarig):
         for prop in bone.keys():
             bone_gen[prop] = bone[prop]
 
-    # Copy over bone properties
-    for bone in metarig.data.bones:
-        bone_gen = obj.data.bones[bone.name]
+        # Constraints
+        for con1 in bone.constraints:
+            con2 = bone_gen.constraints.new(type=con1.type)
+            copy_attributes(con1, con2)
 
-        # B-bone stuff
-        bone_gen.bbone_segments = bone.bbone_segments
-        bone_gen.bbone_in = bone.bbone_in
-        bone_gen.bbone_out = bone.bbone_out
+            # Set metarig target to rig target
+            if "target" in dir(con2):
+                if con2.target == metarig:
+                    con2.target = obj
+
+    # Copy drivers
+    for d1 in metarig.animation_data.drivers:
+        d2 = obj.driver_add(d1.data_path)
+        copy_attributes(d1, d2)
+        copy_attributes(d1.driver, d2.driver)
+
+        # Remove default modifiers, variables, etc.
+        for m in d2.modifiers:
+            d2.modifiers.remove(m)
+        for v in d2.driver.variables:
+            d2.driver.variables.remove(v)
+
+        # Copy modifiers
+        for m1 in d1.modifiers:
+            m2 = d2.modifiers.new(type=m1.type)
+            copy_attributes(m1, m2)
+
+        # Copy variables
+        for v1 in d1.driver.variables:
+            v2 = d2.driver.variables.new()
+            copy_attributes(v1, v2)
+            for i in range(len(v1.targets)):
+                copy_attributes(v1.targets[i], v2.targets[i])
+                # Switch metarig targets to rig targets
+                if v2.targets[i].id == metarig:
+                    v2.targets[i].id = obj
+
+                # Mark targets that may need to be altered after rig generation
+                tar = v2.targets[i]
+                # If a custom property
+                if v2.type == 'SINGLE_PROP' \
+                and re.match('^pose.bones\["[^"\]]*"\]\["[^"\]]*"\]$', tar.data_path):
+                    tar.data_path = "RIGIFY-" + tar.data_path
+
+        # Copy key frames
+        for i in range(len(d1.keyframe_points)):
+            d2.keyframe_points.add()
+            k1 = d1.keyframe_points[i]
+            k2 = d2.keyframe_points[i]
+            copy_attributes(k1, k2)
 
     t.tick("Duplicate rig: ")
     #----------------------------------
@@ -243,6 +296,18 @@ def generate_rig(context, metarig):
             obj.data.bones[bone].use_deform = True
         else:
             obj.data.bones[bone].use_deform = False
+
+    # Alter marked driver targets
+    for d in obj.animation_data.drivers:
+        for v in d.driver.variables:
+            for tar in v.targets:
+                if tar.data_path.startswith("RIGIFY-"):
+                    temp, bone, prop = tuple([x.strip('"]') for x in tar.data_path.split('["')])
+                    if bone in obj.data.bones \
+                    and prop in obj.pose.bones[bone].keys():
+                        tar.data_path = tar.data_path[7:]
+                    else:
+                        tar.data_path = 'pose.bones["%s"]["%s"]' % (make_original_name(bone), prop)
 
     # Move all the original bones to their layer.
     for bone in original_bones:
