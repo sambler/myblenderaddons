@@ -78,7 +78,7 @@ def init_properties(obj, props, cache=True):
 			elif prop['type'] == 'collection':
 				t = bpy.props.CollectionProperty
 				a = {k: v for k,v in prop.items() if k in ["ptype","name",
-					"description","default","options","items"]}
+					"description","default","options"]}
 				a['type'] = a['ptype']
 				del a['ptype']
 			elif prop['type'] == 'enum':
