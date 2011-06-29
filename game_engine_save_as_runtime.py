@@ -17,11 +17,11 @@
 # ##### END GPL LICENSE BLOCK #####
 
 bl_info = {
-    'name': 'Save As Runtime',
+    'name': 'Save As Game Engine Runtime',
     'author': 'Mitchell Stokes (Moguri)',
-    'version': (0, 3, 0),
-    "blender": (2, 5, 7),
-    "api": 35622,
+    'version': (0, 3, 1),
+    "blender": (2, 5, 8),
+    "api": 37846,
     'location': 'File > Export',
     'description': 'Bundle a .blend file with the Blenderplayer',
     'warning': '',
@@ -35,6 +35,25 @@ import bpy
 import os
 import sys
 import shutil
+
+
+def CopyPythonLibs(dst, overwrite_lib):
+    import sysconfig
+    src = sysconfig.get_paths()['platstdlib']
+    # X.XX/python/lib --> X.XX/python/lib/pythonX.X
+    dst = os.path.join(dst, os.path.basename(src))
+    if os.path.exists(src):
+        write = False
+        if os.path.exists(dst):
+            if overwrite_lib:
+                shutil.rmtree(dst)
+                write = True
+        else:
+            write = True
+        if write:
+            shutil.copytree(src, dst, ignore=lambda dir, contents: [i for i in contents if i == '__pycache__'])
+    else:
+        print("Python not found in %r, skipping pythn copy." % src)
 
 
 def WriteAppleRuntime(player_path, output_path, copy_python, overwrite_lib):
@@ -52,16 +71,8 @@ def WriteAppleRuntime(player_path, output_path, copy_python, overwrite_lib):
     
     if copy_python:
         print("Copying Python files...", end=" ")
-        src = os.path.join(blender_dir, bpy.app.version_string.split()[0], "python", "lib")
         dst = os.path.join(output_path, "..")
-        
-        if os.path.exists(dst):
-            if overwrite_lib:
-                shutil.rmtree(dst)
-                shutil.copytree(src, dst, ignore=lambda dir, contents: [i for i in contents if i.endswith('.pyc')])
-        else:
-            shutil.copytree(src, dst, ignore=lambda dir, contents: [i for i in contents if i.endswith('.pyc')])
-        
+        CopyPythonLibs(dst, overwrite_lib)
         print("done")
 
 
@@ -131,22 +142,15 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
     
     if copy_python:
         print("Copying Python files...", end=" ")
-        src = os.path.join(blender_dir, bpy.app.version_string.split()[0], "python", "lib")
-        dst = os.path.join(runtime_dir, "lib")
-        
-        if os.path.exists(dst):
-            if overwrite_lib:
-                shutil.rmtree(dst)
-                shutil.copytree(src, dst, ignore=lambda dir, contents: [i for i in contents if i.endswith('.pyc')])
-        else:
-            shutil.copytree(src, dst, ignore=lambda dir, contents: [i for i in contents if i.endswith('.pyc')])
-        
+        py_folder = os.path.join(bpy.app.version_string.split()[0], "python", "lib")
+        dst = os.path.join(runtime_dir, py_folder)
+        CopyPythonLibs(dst, overwrite_lib)
         print("done")
 
     # And DLLs
     if copy_dlls:
         print("Copying DLLs...", end=" ")
-        for file in [i for i in os.listdir(blender_dir) if i.endswith('.dll')]:
+        for file in [i for i in os.listdir(blender_dir) if i.lower().endswith('.dll')]:
             src = os.path.join(blender_dir, file)
             dst = os.path.join(runtime_dir, file)
             shutil.copy2(src, dst)
@@ -158,7 +162,7 @@ from bpy.props import *
 
 class SaveAsRuntime(bpy.types.Operator):
     bl_idname = "wm.save_as_runtime"
-    bl_label = "Save As Runtime"
+    bl_label = "Save As Game Engine Runtime"
     bl_options = {'REGISTER'}
     
     if sys.platform == 'darwin':
@@ -167,7 +171,7 @@ class SaveAsRuntime(bpy.types.Operator):
     else:
         blender_bin_path = bpy.app.binary_path
         blender_bin_dir = os.path.dirname(blender_bin_path)
-        ext = os.path.splitext(blender_bin_path)[-1]
+        ext = os.path.splitext(blender_bin_path)[-1].lower()
     
     default_player_path = os.path.join(blender_bin_dir, 'blenderplayer' + ext)
     player_path = StringProperty(name="Player Path", description="The path to the player to use", default=default_player_path)
@@ -192,18 +196,19 @@ class SaveAsRuntime(bpy.types.Operator):
                     self.copy_dlls)
         print("Finished in %.4fs" % (time.clock()-start_time))
         return {'FINISHED'}
-                    
+
     def invoke(self, context, event):
+        if not self.filepath:
+            ext = '.app' if sys.platform == 'darwin' else os.path.splitext(bpy.app.binary_path)[-1]
+            self.filepath = bpy.path.ensure_ext(bpy.data.filepath, ext)
+
         wm = context.window_manager
         wm.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
 
 def menu_func(self, context):
-
-    ext = '.app' if sys.platform == 'darwin' else os.path.splitext(bpy.app.binary_path)[-1]
-    default_blend_path = bpy.data.filepath.replace(".blend", ext)
-    self.layout.operator(SaveAsRuntime.bl_idname, text=SaveAsRuntime.bl_label).filepath = default_blend_path
+    self.layout.operator(SaveAsRuntime.bl_idname)
 
 
 def register():
