@@ -18,9 +18,9 @@
 bl_info = {
     "name": "DirectX Model Format (.x)",
     "author": "Chris Foster (Kira Vakaan)",
-    "version": (2, 1, 1),
-    "blender": (2, 5, 7),
-    "api": 36339,
+    "version": (2, 1, 2),
+    "blender": (2, 5, 8),
+    "api": 37702,
     "location": "File > Export > DirectX (.x)",
     "description": "Export DirectX Model Format (.x)",
     "warning": "",
@@ -199,7 +199,7 @@ def GetMaterialTexture(Material):
         #Create a list of Textures that have type "IMAGE"
         ImageTextures = [Material.texture_slots[TextureSlot].texture for TextureSlot in Material.texture_slots.keys() if Material.texture_slots[TextureSlot].texture.type == "IMAGE"]
         #Refine a new list with only image textures that have a file source
-        ImageFiles = [os.path.basename(Texture.image.filepath) for Texture in ImageTextures if Texture.image.source == "FILE"]
+        ImageFiles = [os.path.basename(Texture.image.filepath[2:]) for Texture in ImageTextures if Texture.image.source == "FILE"]
         if ImageFiles:
             return ImageFiles[0]
     return None
@@ -1164,20 +1164,26 @@ def CloseFile(Config):
     if Config.Verbose:
         print("Done")
 
-CoordinateSystems = []
-CoordinateSystems.append(("1", "Left-Handed", ""))
-CoordinateSystems.append(("2", "Right-Handed", ""))
 
-AnimationModes = []
-AnimationModes.append(("0", "None", ""))
-AnimationModes.append(("1", "Keyframes Only", ""))
-AnimationModes.append(("2", "Full Animation", ""))
+CoordinateSystems = (
+    ("1", "Left-Handed", ""),
+    ("2", "Right-Handed", ""),
+    )
 
-ExportModes = []
-ExportModes.append(("1", "All Objects", ""))
-ExportModes.append(("2", "Selected Objects", ""))
 
-from bpy.props import *
+AnimationModes = (
+    ("0", "None", ""),
+    ("1", "Keyframes Only", ""),
+    ("2", "Full Animation", ""),
+    )
+
+ExportModes = (
+    ("1", "All Objects", ""),
+    ("2", "Selected Objects", ""),
+    )
+
+
+from bpy.props import StringProperty, EnumProperty, BoolProperty
 
 
 class DirectXExporter(bpy.types.Operator):
@@ -1207,7 +1213,7 @@ class DirectXExporter(bpy.types.Operator):
 
     def execute(self, context):
         #Append .x
-        FilePath = os.path.splitext(self.filepath)[0] + ".x"
+        FilePath = bpy.path.ensure_ext(self.filepath, ".x")
 
         Config = DirectXExporterSettings(context,
                                          FilePath,
@@ -1221,18 +1227,20 @@ class DirectXExporter(bpy.types.Operator):
                                          ExportAnimation=self.ExportAnimation,
                                          ExportMode=self.ExportMode,
                                          Verbose=self.Verbose)
+
         ExportDirectX(Config)
         return {"FINISHED"}
 
     def invoke(self, context, event):
+        if not self.filepath:
+            self.filepath = bpy.path.ensure_ext(bpy.data.filepath, ".x")
         WindowManager = context.window_manager
         WindowManager.fileselect_add(self)
         return {"RUNNING_MODAL"}
 
 
 def menu_func(self, context):
-    default_path = os.path.splitext(bpy.data.filepath)[0] + ".x"
-    self.layout.operator(DirectXExporter.bl_idname, text="DirectX (.x)").filepath = default_path
+    self.layout.operator(DirectXExporter.bl_idname, text="DirectX (.x)")
 
 
 def register():
