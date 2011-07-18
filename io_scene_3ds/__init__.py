@@ -43,7 +43,12 @@ if "bpy" in locals():
 
 import bpy
 from bpy.props import StringProperty, FloatProperty, BoolProperty, EnumProperty
-from bpy_extras.io_utils import ImportHelper, ExportHelper, axis_conversion
+
+from bpy_extras.io_utils import (ImportHelper,
+                                 ExportHelper,
+                                 axis_conversion,
+                                 axis_conversion_ensure,
+                                 )
 
 
 class Import3DS(bpy.types.Operator, ImportHelper):
