@@ -327,6 +327,10 @@ class AddTree(bpy.types.Operator):
         '(LeafScaleX)'),
         min=0.0,
         default=1.0)
+    leafShape = leafDist = EnumProperty(name='Leaf Shape',
+        description='The shape of the leaves, rectangular are UV mapped',
+        items=(('hex', 'Hexagonal', '0'), ('rect', 'Rectangular', '1')),
+        default='hex')
     bend = FloatProperty(name='Leaf Bend',
         description='The proportion of bending applied to the leaf (Bend)',
         min=0.0,
@@ -522,6 +526,8 @@ class AddTree(bpy.types.Operator):
             box.label('Leaves')
             row = box.row()
             row.prop(self, 'showLeaves')
+            row = box.row()
+            row.prop(self, 'leafShape')
             row = box.row()
             row.prop(self, 'leaves')
             row = box.row()
