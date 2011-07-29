@@ -68,6 +68,10 @@ x3d_names_reserved = {'Anchor', 'Appearance', 'Arc2D', 'ArcClose2D', 'AudioClip'
                       'TriangleFanSet', 'TriangleSet', 'TriangleSet2D', 'TriangleStripSet', 'Viewpoint', 'VisibilitySensor',
                       'WorldInfo', 'X3D', 'XvlShell', 'VertexShader', 'FragmentShader', 'MultiShaderAppearance', 'ShaderAppearance'}
 
+# h3d defines
+H3D_TOP_LEVEL = 'TOP_LEVEL_TI'
+H3D_VIEW_MATRIX = 'view_matrix'
+
 
 def clamp_color(col):
     return tuple([max(min(c, 1.0), 0.0) for c in col])
@@ -79,6 +83,10 @@ def matrix_direction_neg_z(matrix):
 
 def prefix_quoted_str(value, prefix):
     return value[0] + prefix + value[1:]
+
+
+def suffix_quoted_str(value, suffix):
+    return value[:-1] + suffix + value[-1:]
 
 
 def build_hierarchy(objects):
@@ -105,22 +113,22 @@ def build_hierarchy(objects):
 # -----------------------------------------------------------------------------
 # H3D Functions
 # -----------------------------------------------------------------------------
-def h3d_shader_glsl_frag_patch(filepath):
+def h3d_shader_glsl_frag_patch(filepath, global_vars):
     h3d_file = open(filepath, 'r')
     lines = []
     for l in h3d_file:
-        l = l.replace("uniform mat4 unfinvviewmat;", "")
-        l = l.replace("unfinvviewmat", "gl_ModelViewMatrixInverse")
+        if l.startswith("void main(void)"):
+            lines.append("\n")
+            lines.append("// h3d custom vars begin\n")
+            for v in global_vars:
+                lines.append("%s\n" % v)
+            lines.append("// h3d custom vars end\n")
+            lines.append("\n")
+        elif l.lstrip().startswith("lamp_visibility_other("):
+            w = l.split(', ')
+            w[1] = '(view_matrix * %s_transform * vec4(%s.x, %s.y, %s.z, 1.0)).xyz' % (w[1], w[1], w[1], w[1])
+            l = ", ".join(w)
 
-        '''
-        l = l.replace("varying vec3 varposition;", "")
-        l = l.replace("varposition", "gl_Vertex")  # not needed int H3D
-        '''
-
-        #l = l.replace("varying vec3 varnormal;", "")
-        #l = l.replace("varnormal", "gl_Normal")  # view normal
-        #l = l.replace("varnormal", "normalize(-(gl_ModelViewMatrix * gl_Vertex).xyz)")  # view normal
-        # l = l.replace("varnormal", "gl_NormalMatrix * gl_Normal")  # view normal
         lines.append(l)
 
     h3d_file.close()
@@ -174,6 +182,7 @@ def export(file,
         import gpu
         gpu_shader_dummy_mat = bpy.data.materials.new('X3D_DYMMY_MAT')
         gpu_shader_cache[None] = gpu.export_shader(scene, gpu_shader_dummy_mat)
+        h3d_material_route = []
 
     # -------------------------------------------------------------------------
     # File Writing Functions
@@ -201,9 +210,20 @@ def export(file,
         fw('%s</head>\n' % ident)
         fw('%s<Scene>\n' % ident)
         ident += '\t'
+
+        if use_h3d:
+            # outputs the view matrix in glModelViewMatrix field
+            fw('%s<TransformInfo DEF="%s" outputGLMatrices="true" />\n' % (ident, H3D_TOP_LEVEL))
+
         return ident
 
     def writeFooter(ident):
+        
+        if use_h3d:
+            # global
+            for route in h3d_material_route:
+                fw('%s%s\n' % (ident, route))
+
         ident = ident[:-1]
         fw('%s</Scene>\n' % ident)
         ident = ident[:-1]
@@ -220,7 +240,7 @@ def export(file,
         fw('DEF=%s\n' % view_id)
         fw(ident_step + 'centerOfRotation="0 0 0"\n')
         fw(ident_step + 'position="%3.2f %3.2f %3.2f"\n' % loc[:])
-        fw(ident_step + 'orientation="%3.2f %3.2f %3.2f %3.2f"\n' % (quat.axis[:] + (quat.angle, )))
+        fw(ident_step + 'orientation="%3.2f %3.2f %3.2f %3.2f"\n' % (quat.axis.normalized()[:] + (quat.angle, )))
         fw(ident_step + 'fieldOfView="%.3g"\n' % obj.data.angle)
         fw(ident_step + '/>\n')
 
@@ -263,7 +283,7 @@ def export(file,
         fw(ident_step + 'translation="%.6g %.6g %.6g"\n' % loc[:])
         # fw(ident_step + 'center="%.6g %.6g %.6g"\n' % (0, 0, 0))
         fw(ident_step + 'scale="%.6g %.6g %.6g"\n' % sca[:])
-        fw(ident_step + 'rotation="%.6g %.6g %.6g %.6g"\n' % (quat.axis[:] + (quat.angle, )))
+        fw(ident_step + 'rotation="%.6g %.6g %.6g %.6g"\n' % (quat.axis.normalized()[:] + (quat.angle, )))
         fw(ident_step + '>\n')
         ident += '\t'
         return ident
@@ -408,7 +428,7 @@ def export(file,
         del texface_use_collision
         # del texface_use_object_color
 
-        ident = writeTransform_begin(ident, matrix, None)
+        ident = writeTransform_begin(ident, matrix, suffix_quoted_str(obj_id, "_TRANSFORM"))
 
         if mesh.tag:
             fw('%s<Group USE=%s />\n' % (ident, mesh_id_group))
@@ -494,7 +514,10 @@ def export(file,
 
                     # UV's and VCols split verts off which effects smoothing
                     # force writing normals in this case.
-                    is_force_normals = use_triangulate and is_smooth and (is_uv or is_col)
+                    # Also, creaseAngle is not supported for IndexedTriangleSet,
+                    # so write normals when is_smooth (otherwise
+                    # IndexedTriangleSet can have only all smooth/all flat shading).
+                    is_force_normals = use_triangulate and (is_smooth or is_uv or is_col)
 
                     if use_h3d:
                         gpu_shader = gpu_shader_cache.get(material)  # material can be 'None', uses dummy cache
@@ -539,6 +562,7 @@ def export(file,
 
                             ident_step = ident + (' ' * (-len(ident) + \
                             fw('%s<TextureTransform ' % ident)))
+                            fw('\n')
                             # fw('center="%.6g %.6g" ' % (0.0, 0.0))
                             fw(ident_step + 'translation="%.6g %.6g"\n' % loc)
                             fw(ident_step + 'scale="%.6g %.6g"\n' % (sca_x, sca_y))
@@ -568,11 +592,11 @@ def export(file,
                         # --- Write IndexedTriangleSet Attributes (same as IndexedFaceSet)
                         fw('solid="%s"\n' % ('true' if mesh.show_double_sided else 'false'))
 
-                        # creaseAngle unsupported for IndexedTriangleSet's
-
                         if use_normals or is_force_normals:
-                            # currently not optional, could be made so:
                             fw(ident_step + 'normalPerVertex="true"\n')
+                        else:
+                            # Tell X3D browser to generate flat (per-face) normals
+                            fw(ident_step + 'normalPerVertex="false"\n')
 
                         slot_uv = None
                         slot_col = None
@@ -965,6 +989,16 @@ def export(file,
             if not os.path.isdir(shader_dir):
                 os.mkdir(shader_dir)
 
+            # ------------------------------------------------------
+            # shader-patch
+            fw('%s<field name="%s" type="SFMatrix4f" accessType="inputOutput" />\n' % (ident, H3D_VIEW_MATRIX))
+            frag_vars = ["uniform mat4 %s;" % H3D_VIEW_MATRIX]
+
+            h3d_material_route.append(
+                    '<ROUTE fromNode="%s" fromField="glModelViewMatrix" toNode=%s toField="%s" />' %
+                    (H3D_TOP_LEVEL, material_id, H3D_VIEW_MATRIX))
+            # ------------------------------------------------------
+
             for uniform in gpu_shader['uniforms']:
                 if uniform['type'] == gpu.GPU_DYNAMIC_SAMPLER_2DIMAGE:
                     fw('%s<field name="%s" type="SFNode" accessType="inputOutput">\n' % (ident, uniform['varname']))
@@ -973,8 +1007,27 @@ def export(file,
 
                 elif uniform['type'] == gpu.GPU_DYNAMIC_LAMP_DYNCO:
                     if uniform['datatype'] == gpu.GPU_DATA_3F:  # should always be true!
-                        value = '%.6g   %.6g   %.6g' % (global_matrix * bpy.data.objects[uniform['lamp']].matrix_world).to_translation()[:]
+                        lamp_obj = bpy.data.objects[uniform['lamp']]
+                        lamp_obj_id = quoteattr(unique_name(lamp_obj, 'LA_' + lamp_obj.name, uuid_cache_lamp))
+
+                        value = '%.6g %.6g %.6g' % (global_matrix * lamp_obj.matrix_world).to_translation()[:]
                         fw('%s<field name="%s" type="SFVec3f" accessType="inputOutput" value="%s" />\n' % (ident, uniform['varname'], value))
+                        
+                        # ------------------------------------------------------
+                        # shader-patch
+                        fw('%s<field name="%s_transform" type="SFMatrix4f" accessType="inputOutput" />\n' % (ident, uniform['varname']))
+
+                        # transform
+                        frag_vars.append("uniform mat4 %s_transform;" % uniform['varname'])
+                        h3d_material_route.append(
+                                '<ROUTE fromNode=%s fromField="accForwardMatrix" toNode=%s toField="%s_transform" />' %
+                                (suffix_quoted_str(lamp_obj_id, "_TRANSFORM"), material_id, uniform['varname']))
+                                
+                        h3d_material_route.append(
+                                '<ROUTE fromNode=%s fromField="location" toNode=%s toField="%s" />' %
+                                (suffix_quoted_str(lamp_obj_id, "_TRANSFORM"), material_id, uniform['varname']))
+                        # ------------------------------------------------------
+
                     else:
                         assert(0)
 
@@ -995,7 +1048,8 @@ def export(file,
 
                 elif uniform['type'] == gpu.GPU_DYNAMIC_LAMP_DYNVEC:
                     if uniform['datatype'] == gpu.GPU_DATA_3F:
-                        value = '%.6g %.6g %.6g' % (mathutils.Vector((0.0, 0.0, 1.0)) * (global_matrix * bpy.data.objects[uniform['lamp']].matrix_world).to_quaternion()).normalized()[:]
+                        lamp_obj = bpy.data.objects[uniform['lamp']]
+                        value = '%.6g %.6g %.6g' % ((global_matrix * lamp_obj.matrix_world).to_quaternion() * mathutils.Vector((0.0, 0.0, 1.0))).normalized()[:]
                         fw('%s<field name="%s" type="SFVec3f" accessType="inputOutput" value="%s" />\n' % (ident, uniform['varname'], value))
                     else:
                         assert(0)
@@ -1060,7 +1114,7 @@ def export(file,
             file_frag.write(gpu_shader['fragment'])
             file_frag.close()
             # patch it
-            h3d_shader_glsl_frag_patch(os.path.join(base_dst, shader_url_frag))
+            h3d_shader_glsl_frag_patch(os.path.join(base_dst, shader_url_frag), frag_vars)
 
             file_vert = open(os.path.join(base_dst, shader_url_vert), 'w')
             file_vert.write(gpu_shader['vertex'])
@@ -1092,8 +1146,8 @@ def export(file,
             filepath_base = os.path.basename(filepath_full)
 
             images = [
-                filepath_base,
                 filepath_ref,
+                filepath_base,
                 filepath_full,
             ]
 
@@ -1179,9 +1233,6 @@ def export(file,
         world = scene.world
         free, derived = create_derived_objects(scene, obj_main)
 
-        if derived is None:
-            return
-
         if use_hierarchy:
             obj_main_matrix_world = obj_main.matrix_world
             if obj_main_parent:
@@ -1192,9 +1243,9 @@ def export(file,
 
             obj_main_id = quoteattr(unique_name(obj_main, obj_main.name, uuid_cache_object))
 
-            ident = writeTransform_begin(ident, obj_main_matrix if obj_main_parent else global_matrix * obj_main_matrix, obj_main_id)
+            ident = writeTransform_begin(ident, obj_main_matrix if obj_main_parent else global_matrix * obj_main_matrix, suffix_quoted_str(obj_main_id, "_TRANSFORM"))
 
-        for obj, obj_matrix in derived:
+        for obj, obj_matrix in (() if derived is None else derived):
             obj_type = obj.type
 
             if use_hierarchy:
