@@ -27,13 +27,13 @@ bl_info = {
     "blender": (2, 5, 8),
     "api": 36079,
     "location": "3D View, Add Mesh",
-    "description": ("Scatter a group of objects onto the active mesh using "
-                    "the grease pencil lines"),
+    "description": "Scatter a group of objects onto the active mesh using "
+                   "the grease pencil lines",
     "warning": "",
-    "wiki_url": ("http://wiki.blender.org/index.php/Extensions:2.5/Py/"
-                 "Scripts/Object/Grease_Scatter"),
-    "tracker_url": ("https://projects.blender.org/tracker/index.php?"
-                    "func=detail&aid=TODO"),
+    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"
+                "Scripts/Object/Grease_Scatter",
+    "tracker_url": "https://projects.blender.org/tracker/index.php?"
+                   "func=detail&aid=TODO",
     "support": 'OFFICIAL',
     "category": "Object"}
 
@@ -375,7 +375,7 @@ class Scatter(bpy.types.Operator):
             )
     # XXX, should not be a string - TODO, add a way for scritps to select ID's
     group = StringProperty(
-            name="Group", 
+            name="Group",
             description=("Group name to use for object placement, "
                          "defaults to object name when that matches a group"))
 
