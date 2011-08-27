@@ -41,7 +41,6 @@ from math import *
 from bpy.props import IntProperty, FloatProperty ,EnumProperty
 from itertools import * 
 
-NARROW_UI = 180
 MAX_INPUT_NUMBER = 50
 
 #Global_Scale = 0.001    #1 blender unit = X mm
@@ -2548,7 +2547,6 @@ class ObjectButtonsPanel(bpy.types.Panel):
  
         ob = context.object
         sc = context.scene
-        wide_ui = context.region.width > NARROW_UI
         
         layout.prop(sc, "bf_Model_Type", expand=True)
         
@@ -2560,9 +2558,8 @@ class ObjectButtonsPanel(bpy.types.Panel):
             
         Dispaly_Thread_Tab(layout,sc)
         Dispaly_Preset_Tab(layout,sc)
-        row = layout.row()
         
-        row.operator("custom.Create_Button")
+        layout.operator("custom.Create_Button")
 
 
        
