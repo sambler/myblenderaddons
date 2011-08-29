@@ -37,14 +37,16 @@ class NdVector:
         return len(self.vec)
 
     def __mul__(self, otherMember):
-        if (isinstance(otherMember, int) or
-            isinstance(otherMember, float)):
-            return NdVector([otherMember * x for x in self.vec])
-        else:
+        # assume anything with list access is a vector
+        if isinstance(otherMember, NdVector):
             a = self.vec
             b = otherMember.vec
             n = len(self)
             return sum([a[i] * b[i] for i in range(n)])
+        else:
+            # int/float
+            return NdVector([otherMember * x for x in self.vec])
+
 
     def __sub__(self, otherVec):
         a = self.vec
@@ -61,10 +63,12 @@ class NdVector:
     def __div__(self, scalar):
         return NdVector([x / scalar for x in self.vec])
 
-    def vecLength(self):
+    @property
+    def length(self):
         return sqrt(self * self)
 
-    def vecLengthSq(self):
+    @property
+    def lengthSq(self):
         return (self * self)
 
     def normalize(self):
@@ -77,19 +81,16 @@ class NdVector:
     def __getitem__(self, i):
         return self.vec[i]
 
+    @property
     def x(self):
         return self.vec[0]
 
+    @property
     def y(self):
         return self.vec[1]
 
     def resize_2d(self):
         return Vector((self.x, self.y))
-
-    length = property(vecLength)
-    lengthSq = property(vecLengthSq)
-    x = property(x)
-    y = property(y)
 
 
 #Sampled Data Point class for Simplify Curves
@@ -116,8 +117,8 @@ class dataPoint:
 def crossCorrelationMatch(curvesA, curvesB, margin):
     dataA = []
     dataB = []
-    start = int(max(curvesA[0].range()[0],curvesB[0].range()[0]))
-    end = int(min(curvesA[0].range()[1],curvesB[0].range()[1]))
+    start = int(max(curvesA[0].range()[0], curvesB[0].range()[0]))
+    end = int(min(curvesA[0].range()[1], curvesB[0].range()[1]))
 
     #transfer all fcurves data on each frame to a single NdVector.
     for i in range(1, end):
@@ -131,6 +132,7 @@ def crossCorrelationMatch(curvesA, curvesB, margin):
             if fcurve.data_path in [otherFcurve.data_path for otherFcurve in curvesA]:
                 vec.append(fcurve.evaluate(i))
         dataB.append(NdVector(vec))
+
     #Comparator for Cross Correlation. "Classic" implementation uses dot product, as do we.
     def comp(a, b):
         return a * b
@@ -265,12 +267,13 @@ def simplifyCurves(curveGroup, error, reparaError, maxIterations, group_mode):
     # get binomial coefficient lookup table, this function/table is only called with args
     # (3,0),(3,1),(3,2),(3,3),(2,0),(2,1),(2,2)!
     binomDict = {(3, 0): 1,
-    (3, 1): 3,
-    (3, 2): 3,
-    (3, 3): 1,
-    (2, 0): 1,
-    (2, 1): 2,
-    (2, 2): 1}
+                 (3, 1): 3,
+                 (3, 2): 3,
+                 (3, 3): 1,
+                 (2, 0): 1,
+                 (2, 1): 2,
+                 (2, 2): 1,
+                 }
 
     #value at pt t of a single bernstein Polynomial
     def bernsteinPoly(n, i, t):
@@ -877,7 +880,7 @@ def anim_stitch(context, enduser_obj):
             scene.frame_set(stitch_settings.blend_frame - 1)
             desired_pos = (enduser_obj.matrix_world * selected_bone.matrix.to_translation())
             scene.frame_set(stitch_settings.blend_frame)
-            actual_pos = (enduser_obj.matrix_world * selected_bone.matrix.to_translation() )
+            actual_pos = (enduser_obj.matrix_world * selected_bone.matrix.to_translation())
             print(desired_pos, actual_pos)
             offset = Vector(actual_pos) - Vector(desired_pos)
 
@@ -887,7 +890,7 @@ def anim_stitch(context, enduser_obj):
                     pt.co.y -= offset[i]
                     pt.handle_left.y -= offset[i]
                     pt.handle_right.y -= offset[i]
-            
+
             #actionBStrip.blend_in = stitch_settings.blend_amount
 
 
