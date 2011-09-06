@@ -15,13 +15,14 @@
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
 # ##### END GPL LICENSE BLOCK #####
+# Contributed to by Pontiac, Fourmadmen, varkenvarken, tuga3d, meta-androcto, metalliandy #
 
 bl_info = {
     "name": "Extra Objects",
-    "author": "Pontiac, Fourmadmen, varkenvarken, tuga3d, meta-androcto",
-    "version": (0, 1),
+    "author": "Multiple Authors",
+    "version": (0, 2),
     "blender": (2, 5, 9),
-    "api": 39685,
+    "api": 39933,
     "location": "View3D > Add > Mesh > Extra Objects",
     "description": "Adds More Object Types.",
     "warning": "",
@@ -39,12 +40,14 @@ if "bpy" in locals():
     imp.reload(add_mesh_gemstones)
     imp.reload(add_mesh_gears)
     imp.reload(add_mesh_3d_function_surface)
+    imp.reload(add_mesh_polysphere)
 else:
     from . import add_mesh_extra_objects
     from . import add_mesh_twisted_torus
     from . import add_mesh_gemstones
     from . import add_mesh_gears
     from . import add_mesh_3d_function_surface
+    from . import add_mesh_polysphere
 
 import bpy
 
@@ -60,15 +63,12 @@ class INFO_MT_mesh_extras_add(bpy.types.Menu):
         layout.menu("INFO_MT_mesh_gemstones_add", text="Gemstones")
         layout.menu("INFO_MT_mesh_gears_add", text="Gears")
         layout.menu("INFO_MT_mesh_math_add", text="Math Function")
+        layout.menu("INFO_MT_mesh_basic_add", text="Basic Objects")
         layout.operator("mesh.primitive_twisted_torus_add",
             text="Twisted Torus")
-        layout.operator("mesh.primitive_sqorus_add",
-            text="Sqorus")
-        layout.operator("mesh.primitive_wedge_add")
-        layout.operator("mesh.primitive_star_add",
-            text="Star")
-        layout.operator("mesh.primitive_trapezohedron_add",
-            text="Trapezohedron")
+        layout.operator("mesh.primitive_polysphere_add",
+            text="Polysphere")
+
 
 class INFO_MT_mesh_gemstones_add(bpy.types.Menu):
     # Define the "Gemstones" menu
@@ -109,6 +109,22 @@ class INFO_MT_mesh_math_add(bpy.types.Menu):
             text="Z Math Surface")
         layout.operator("mesh.primitive_xyz_function_surface",
             text="XYZ Math Surface")
+
+class INFO_MT_mesh_basic_add(bpy.types.Menu):
+    # Define the "Simple Objects" menu
+    bl_idname = "INFO_MT_mesh_basic_add"
+    bl_label = "Simple Objects"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'INVOKE_REGION_WIN'
+        layout.operator("mesh.primitive_sqorus_add",
+            text="Sqorus")
+        layout.operator("mesh.primitive_wedge_add")
+        layout.operator("mesh.primitive_star_add",
+            text="Star")
+        layout.operator("mesh.primitive_trapezohedron_add",
+            text="Trapezohedron")
 
 # Register all operators and panels
 
