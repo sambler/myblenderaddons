@@ -19,7 +19,8 @@
 # #####
 #
 # Modification history:
-# 07-sep-2011 (Gaia Clary):
+# - Version 1,4
+# - 07-sep-2011 (Gaia Clary):
 # - settings now stored in blend file  
 # - grouping mouse&text 
 # - mouse_size and font_size separated 
@@ -34,7 +35,7 @@
 bl_info = {
     'name': 'Screencast Keys',
     'author': 'Paulo Gomes, Bart Crouch, John E. Herrenyo',
-    'version': (1, 3),
+    'version': (1, 4),
     'blender': (2, 5, 9),
     'api': 39933,
     'location': 'View3D > Properties panel > Screencast Keys',
@@ -405,7 +406,7 @@ class ScreencastKeysStatus(bpy.types.Operator):
         #if (event.value != "NOTHING" and event.value != "PRESS"):
         #    print (event.value, event.type, "Previous activity was: ", self.last_activity)
 
-        if event.value == 'PRESS' or (event.value == 'RELEASE' and self.last_activity == 'KEYBOARD') :
+        if event.value == 'PRESS' or (event.value == 'RELEASE' and self.last_activity == 'KEYBOARD' and  event.type in mouse_keys ) :
             # add key-press to display-list
             sc_keys = []
 
