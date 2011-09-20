@@ -2378,7 +2378,7 @@ def pushOnTodoList(var, expr, glbals, lcals):
     global todo
     print("Tdo", var)
     print(dir(eval(var, glbals, lcals)))
-    MyError("Todo", expr)
+    MyError("Todo %s" % expr)
     todo.append((expr, glbals, lcals))
     return
 
@@ -2682,10 +2682,9 @@ def rigifyMhx(context, name):
     except:
         success = False
     if not success:
-        MyError(
-"Unable to create advanced human. \n" +
-"Make sure that the Rigify add-on is enabled. \n" +
-"It is found under Rigging.")
+        MyError("Unable to create advanced human. \n" \
+                "Make sure that the Rigify add-on is enabled. \n" \
+                "It is found under Rigging.")
         return
 
     meta = context.object
