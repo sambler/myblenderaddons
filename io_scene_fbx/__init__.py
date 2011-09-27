@@ -41,7 +41,11 @@ if "bpy" in locals():
 
 
 import bpy
-from bpy.props import StringProperty, BoolProperty, FloatProperty, EnumProperty
+from bpy.props import (StringProperty,
+                       BoolProperty,
+                       FloatProperty,
+                       EnumProperty,
+                       )
 
 from bpy_extras.io_utils import (ExportHelper,
                                  path_reference_mode,
@@ -80,7 +84,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ('Y', "Y Forward", ""),
                    ('Z', "Z Forward", ""),
                    ('-X', "-X Forward", ""),
-                   ('-Y', "-Y Forward (Blender)", ""),
+                   ('-Y', "-Y Forward", ""),
                    ('-Z', "-Z Forward", ""),
                    ),
             default='-Z',
@@ -89,7 +93,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             name="Up",
             items=(('X', "X Up", ""),
                    ('Y', "Y Up", ""),
-                   ('Z', "Z Up (Blender)", ""),
+                   ('Z', "Z Up", ""),
                    ('-X', "-X Up", ""),
                    ('-Y', "-Y Up", ""),
                    ('-Z', "-Z Up", ""),
@@ -162,7 +166,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             )
     path_mode = path_reference_mode
     use_rotate_workaround = BoolProperty(
-            name="Rotate Animation Fix",
+            name="XNA Rotate Animation Hack",
             description="Disable global rotation, for XNA compatibility",
             default=False,
             )
@@ -179,7 +183,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                    ),
             )
     use_batch_own_dir = BoolProperty(
-            name="Own Dir",
+            name="Batch Own Dir",
             description="Create a dir for each exported file",
             default=True,
             )
