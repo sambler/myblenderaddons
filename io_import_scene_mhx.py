@@ -26,7 +26,7 @@
 """
 Abstract
 MHX (MakeHuman eXchange format) importer for Blender 2.5x.
-Version 1.8.0
+Version 1.8.1
 
 This script should be distributed with Blender.
 If not, place it in the .blender/scripts/addons dir
@@ -39,7 +39,7 @@ Alternatively, run the script in the script editor (Alt-P), and access from the 
 bl_info = {
     'name': 'Import: MakeHuman (.mhx)',
     'author': 'Thomas Larsson',
-    'version': (1, 8, 0),
+    'version': (1, 8, 1),
     "blender": (2, 5, 9),
     "api": 40335,
     'location': "File > Import > MakeHuman (.mhx)",
@@ -52,7 +52,7 @@ bl_info = {
 
 MAJOR_VERSION = 1
 MINOR_VERSION = 8
-SUB_VERSION = 0
+SUB_VERSION = 1
 BLENDER_VERSION = (2, 59, 2)
 
 #
@@ -98,7 +98,6 @@ todo = []
 T_EnforceVersion = 0x01
 T_Clothes = 0x02
 T_Stretch = 0x04
-T_Limit = 0x08
 
 T_Diamond = 0x10
 T_Replace = 0x20
@@ -115,7 +114,7 @@ T_Opcns = 0x2000
 T_Symm = 0x4000
 
 toggle = (T_EnforceVersion + T_Replace + T_Mesh + T_Armature + 
-        T_Face + T_Shape + T_Proxy + T_Clothes + T_Rigify + T_Limit)
+        T_Face + T_Shape + T_Proxy + T_Clothes + T_Rigify)
 
 #
 #    Blender versions
@@ -2034,9 +2033,6 @@ def correctRig(args):
             if cns.type == 'CHILD_OF':
                 cnslist.append((pb, cns, cns.influence))
                 cns.influence = 0
-            elif ((toggle & T_Limit == 0) and 
-                  (cns.type in ['LIMIT_DISTANCE', 'LIMIT_ROTATION'])):                
-                cns.influence = 0
 
     for (pb, cns, inf) in cnslist:
         amt.bones.active = pb.bone
@@ -2871,7 +2867,6 @@ MhxBoolProps = [
     ("symm", "Symmetric shapes", "Keep shapekeys symmetric", T_Symm),
     ("diamond", "Diamonds", "Keep joint diamonds", T_Diamond),
     ("rigify", "Rigify", "Create rigify control rig", T_Rigify),
-    ("limit", "Limit constraints", "Keep limit constraints", T_Limit),
 ]
 
 class ImportMhx(bpy.types.Operator, ImportHelper):
@@ -3487,18 +3482,20 @@ class MhxDriversPanel(bpy.types.Panel):
         plist = list(context.object.keys())
         plist.sort()
         for prop in plist:
-            if prop[-2:] == '_L':
-                lProps.append((prop, prop[:-2]))
-            elif prop[-2:] == '_R':
-                rProps.append((prop, prop[:-2]))
-            elif prop[:3] == 'Mhx' or prop[0] == '_' or prop[0] == '*':
-                pass
+            if prop[0] == '&':
+                prop1 = prop[1:]
             else:
-                props.append(prop)
+                continue
+            if prop[-2:] == '_L':
+                lProps.append((prop, prop1[:-2]))
+            elif prop[-2:] == '_R':
+                rProps.append((prop, prop1[:-2]))
+            else:
+                props.append((prop, prop1))
         ob = context.object
         layout = self.layout
-        for prop in props:
-            layout.prop(ob, '["%s"]' % prop, text=prop)
+        for (prop, pname) in props:
+            layout.prop(ob, '["%s"]' % prop, text=pname)
         layout.label("Left")
         for (prop, pname) in lProps:
             layout.prop(ob, '["%s"]' % prop, text=pname)
