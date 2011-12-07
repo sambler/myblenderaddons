@@ -16,22 +16,20 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+# <pep8-80 compliant>
+
 """ This script is an importer for the nuke's .chan files"""
 
 from mathutils import Vector, Matrix, Euler
 from math import radians, tan
 
 
-def read_chan(context, filepath, z_up, rot_ord):
+def read_chan(context, filepath, z_up, rot_ord, sensor_width, sensor_height):
 
     # get the active object
     scene = context.scene
     obj = context.active_object
-
-    # get the resolution (needed to calculate the camera lens)
-    res_x = scene.render.resolution_x
-    res_y = scene.render.resolution_y
-    res_ratio = res_y / res_x
+    camera = obj.data if obj.type == 'CAMERA' else None
 
     # prepare the correcting matrix
     rot_mat = Matrix.Rotation(radians(90.0), 4, 'X').to_4x4()
@@ -104,13 +102,13 @@ def read_chan(context, filepath, z_up, rot_ord):
 
 
             # check if the object is camera and fov data is present
-            if obj.type == 'CAMERA' and len(data) > 7:
+            if camera and len(data) > 7:
                 v_fov = float(data[7])
-                sensor_v = 32.0
-                sensor_h = sensor_v * res_ratio
-                lenslen = ((sensor_h / 2.0) / tan(radians(v_fov / 2.0)))
-                obj.data.lens = lenslen
-                obj.data.keyframe_insert("lens")
+                camera.sensor_fit = 'HORIZONTAL'
+                camera.sensor_width = sensor_width
+                camera.sensor_height = sensor_height
+                camera.lens = (sensor_height / 2.0) / tan(radians(v_fov / 2.0))
+                camera.keyframe_insert("lens")
     filehandle.close()
 
     return {'FINISHED'}

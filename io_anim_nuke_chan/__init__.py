@@ -16,11 +16,13 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+# <pep8-80 compliant>
+
 bl_info = {
     "name": "Nuke Animation Format (.chan)",
     "author": "Michael Krupa",
     "version": (1, 0),
-    "blender": (2, 6, 0),
+    "blender": (2, 6, 1),
     "api": 36079,
     "location": "File > Import/Export > Nuke (.chan)",
     "description": "Import/Export object's animation with nuke",
@@ -47,10 +49,11 @@ from bpy.types import Operator
 from bpy_extras.io_utils import ImportHelper, ExportHelper
 from bpy.props import (StringProperty,
                        BoolProperty,
-                       EnumProperty)
+                       EnumProperty,
+                       FloatProperty)
 
 # property shared by both operators
-rot_ord = EnumProperty(
+rotation_order = EnumProperty(
         name="Rotation order",
         description="Choose the export rotation order",
         items=(('XYZ', "XYZ", "XYZ"),
@@ -73,11 +76,21 @@ class ImportChan(Operator, ImportHelper):
 
     filter_glob = StringProperty(default="*.chan", options={'HIDDEN'})
 
-    rot_ord = rot_ord
+    rotation_order = rotation_order
     z_up = BoolProperty(
             name="Make Z up",
             description="Switch the Y and Z axis",
             default=True)
+
+    sensor_width = FloatProperty(
+            name="Camera sensor width",
+            description="Imported camera sensor width",
+            default=32.0)
+
+    sensor_height = FloatProperty(
+            name="Camera sensor height",
+            description="Imported camera sensor height",
+            default=18.0)
 
     @classmethod
     def poll(cls, context):
@@ -88,7 +101,9 @@ class ImportChan(Operator, ImportHelper):
         return import_nuke_chan.read_chan(context,
                                           self.filepath,
                                           self.z_up,
-                                          self.rot_ord)
+                                          self.rotation_order,
+                                          self.sensor_width,
+                                          self.sensor_height)
 
 
 class ExportChan(Operator, ExportHelper):
@@ -103,7 +118,7 @@ class ExportChan(Operator, ExportHelper):
             name="Make Y up",
             description="Switch the Y and Z axis",
             default=True)
-    rot_ord = rot_ord
+    rotation_order = rotation_order
 
     @classmethod
     def poll(cls, context):
@@ -114,7 +129,7 @@ class ExportChan(Operator, ExportHelper):
         return export_nuke_chan.save_chan(context,
                                           self.filepath,
                                           self.y_up,
-                                          self.rot_ord)
+                                          self.rotation_order)
 
 
 def menu_func_import(self, context):
