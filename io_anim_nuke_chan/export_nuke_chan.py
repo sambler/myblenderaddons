@@ -44,7 +44,7 @@ def save_chan(context, filepath, y_up, rot_ord):
     fw = filehandle.write
 
     # iterate the frames
-    for frame in range(f_start, f_end, 1):
+    for frame in range(f_start, f_end + 1, 1):
 
         # set the current frame
         scene.frame_set(frame)
