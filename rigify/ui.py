@@ -16,6 +16,8 @@
 #
 #======================= END GPL LICENSE BLOCK ========================
 
+# <pep8 compliant>
+
 import bpy
 from bpy.props import *
 import rigify
@@ -36,7 +38,7 @@ class DATA_PT_rigify_buttons(bpy.types.Panel):
             return False
         #obj = context.object
         #if obj:
-        #    return (obj.mode in ('POSE', 'OBJECT', 'EDIT'))
+        #    return (obj.mode in {'POSE', 'OBJECT', 'EDIT'})
         #return False
         return True
 
@@ -131,7 +133,7 @@ class BONE_PT_rigify_buttons(bpy.types.Panel):
             return False
         obj = context.object
         if obj:
-            return (obj.mode in ('POSE'))
+            return obj.mode == 'POSE'
         return False
 
     def draw(self, context):
