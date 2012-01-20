@@ -27,7 +27,6 @@ bl_info = {
     "author": "michaelw",
     "version": (1, 3),
     "blender": (2, 5, 6),
-    "api": 35324,
     "location": "View3D > Q key",
     "description": "Menu of material tools (assign, select..)  in the 3D View",
     "warning": "",
@@ -693,21 +692,23 @@ def register():
     bpy.utils.register_module(__name__)
 
     kc = bpy.context.window_manager.keyconfigs.addon
-    km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
-    kmi = km.keymap_items.new('wm.call_menu', 'Q', 'PRESS')
-    kmi.properties.name = "VIEW3D_MT_master_material"
+    if kc:
+        km = kc.keymaps.new(name="3D View", space_type="VIEW_3D")
+        kmi = km.keymap_items.new('wm.call_menu', 'Q', 'PRESS')
+        kmi.properties.name = "VIEW3D_MT_master_material"
 
 
 def unregister():
     bpy.utils.unregister_module(__name__)
 
     kc = bpy.context.window_manager.keyconfigs.addon
-    km = kc.keymaps["3D View"]
-    for kmi in km.keymap_items:
-        if kmi.idname == 'wm.call_menu':
-            if kmi.properties.name == "VIEW3D_MT_master_material":
-                km.keymap_items.remove(kmi)
-                break
+    if kc:
+        km = kc.keymaps["3D View"]
+        for kmi in km.keymap_items:
+            if kmi.idname == 'wm.call_menu':
+                if kmi.properties.name == "VIEW3D_MT_master_material":
+                    km.keymap_items.remove(kmi)
+                    break
 
 if __name__ == "__main__":
     register()

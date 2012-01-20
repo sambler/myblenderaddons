@@ -20,7 +20,6 @@ bl_info = {
     "author": "Darknet/Optimus_P-Fat/Active_Trash/Sinsoft/VendorX",
     "version": (2, 4),
     "blender": (2, 6, 0),
-    "api": 36079,
     "location": "File > Export > Skeletal Mesh/Animation Data (.psk/.psa)",
     "description": "Export Skeleletal Mesh/Animation Data",
     "warning": "",
@@ -1809,7 +1808,7 @@ bpy.types.Scene.unrealfpsrate = IntProperty(
     
 bpy.types.Scene.unrealexport_settings = EnumProperty(
     name="Export:",
-    description="Select a export settings (psk/psa/all)...",
+    description="Select a export settings (psk/psa/all)",
     items = [("0","PSK","Export PSK"),
              ("1","PSA","Export PSA"),
              ("2","ALL","Export ALL")],
@@ -1825,7 +1824,7 @@ bpy.types.Scene.UEActionSetSettings = EnumProperty(
 
 bpy.types.Scene.unrealtriangulatebool = BoolProperty(
     name="Triangulate Mesh",
-    description="Convert Quad to Tri Mesh Boolean...",
+    description="Convert Quad to Tri Mesh Boolean",
     default=False)
 
 bpy.types.Scene.unrealignoreactionmatchcount = BoolProperty(
@@ -1873,7 +1872,7 @@ bpy.types.Object.myCollectionUEA_index = bpy.props.IntProperty(min = -1, default
 class OBJECT_OT_add_remove_Collection_Items_UE(bpy.types.Operator):
     bl_label = "Add or Remove"
     bl_idname = "collection.add_remove_ueactions"
-    __doc__ = """Button for Add, Remove, Refresh Action Set(s) list."""
+    __doc__ = """Button for Add, Remove, Refresh Action Set(s) list"""
     set = bpy.props.StringProperty()
  
     def invoke(self, context, event):
@@ -1932,7 +1931,7 @@ class ExportUDKAnimData(bpy.types.Operator):
     '''Export Skeleton Mesh / Animation Data file(s)'''
     bl_idname = "export_anim.udk" # this is important since its how bpy.ops.export.udk_anim_data is constructed
     bl_label = "Export PSK/PSA"
-    __doc__ = """One mesh and one armature else select one mesh or armature to be exported."""
+    __doc__ = """One mesh and one armature else select one mesh or armature to be exported"""
 
     # List of operator properties, the attributes will be assigned
     # to the class instance from the operator settings before calling.
@@ -2068,7 +2067,7 @@ class OBJECT_OT_UnrealExport(bpy.types.Operator):
     global exportmessage
     bl_idname = "export_mesh.udk"  # XXX, name???
     bl_label = "Unreal Export"
-    __doc__ = """Select export setting for .psk/.psa or both."""
+    __doc__ = """Select export setting for .psk/.psa or both"""
     
     def invoke(self, context, event):
         print("Init Export Script:")
@@ -2095,7 +2094,7 @@ class OBJECT_OT_ToggleConsle(bpy.types.Operator):
     global exportmessage
     bl_idname = "object.toggleconsle"  # XXX, name???
     bl_label = "Toggle Console"
-    __doc__ = "Show or Hide Console."
+    __doc__ = "Show or Hide Console"
     
     def invoke(self, context, event):
         bpy.ops.wm.console_toggle()
@@ -2104,7 +2103,7 @@ class OBJECT_OT_ToggleConsle(bpy.types.Operator):
 class OBJECT_OT_UTSelectedFaceSmooth(bpy.types.Operator):
     bl_idname = "object.utselectfacesmooth"  # XXX, name???
     bl_label = "Select Smooth faces"
-    __doc__ = """It will only select smooth faces that is select mesh."""
+    __doc__ = """It will only select smooth faces that is select mesh"""
     
     def invoke(self, context, event):
         print("----------------------------------------")
@@ -2159,7 +2158,7 @@ class OBJECT_OT_DeleteActionSet(bpy.types.Operator):
 class OBJECT_OT_MeshClearWeights(bpy.types.Operator):
     bl_idname = "object.meshclearweights"  # XXX, name???
     bl_label = "Mesh Clear Weights"
-    __doc__ = """Clear selected mesh vertex group weights for the bones. Be sure you unparent the armature."""
+    __doc__ = """Clear selected mesh vertex group weights for the bones. Be sure you unparent the armature"""
     
     def invoke(self, context, event):
         for obj in bpy.data.objects:
@@ -2172,7 +2171,7 @@ class OBJECT_OT_MeshClearWeights(bpy.types.Operator):
 class OBJECT_OT_UTRebuildArmature(bpy.types.Operator):
     bl_idname = "object.utrebuildarmature"  # XXX, name???
     bl_label = "Rebuild Armature"
-    __doc__ = """If mesh is deform when importing to unreal engine try this. It rebuild the bones one at the time by select one armature object scrape to raw setup build. Note the scale will be 1:1 for object mode. To keep from deforming."""
+    __doc__ = """If mesh is deform when importing to unreal engine try this. It rebuild the bones one at the time by select one armature object scrape to raw setup build. Note the scale will be 1:1 for object mode. To keep from deforming"""
     
     def invoke(self, context, event):
         print("----------------------------------------")
@@ -2243,7 +2242,7 @@ def unpack_list(list_of_tuples):
 class OBJECT_OT_UTRebuildMesh(bpy.types.Operator):
     bl_idname = "object.utrebuildmesh"  # XXX, name???
     bl_label = "Rebuild Mesh"
-    __doc__ = """It rebuild the mesh from scrape from the selected mesh object. Note the scale will be 1:1 for object mode. To keep from deforming."""
+    __doc__ = """It rebuild the mesh from scrape from the selected mesh object. Note the scale will be 1:1 for object mode. To keep from deforming"""
     
     def invoke(self, context, event):
         print("----------------------------------------")

@@ -22,7 +22,6 @@ bl_info = {
     "name": "Web3D X3D/VRML format",
     "author": "Campbell Barton, Bart",
     "blender": (2, 5, 7),
-    "api": 35622,
     "location": "File > Import-Export",
     "description": "Import-Export X3D, Import VRML",
     "warning": "",
@@ -135,11 +134,17 @@ class ExportX3D(bpy.types.Operator, ExportHelper):
             description="Export parent child relationships",
             default=True,
             )
+    name_decorations = BoolProperty(
+            name="Name decorations",
+            description="Add prefixes to the names of exported nodes to indicate their type.",
+            default=True,
+            )
     use_h3d = BoolProperty(
             name="H3D Extensions",
             description="Export shaders for H3D",
             default=False,
             )
+            
     axis_forward = EnumProperty(
             name="Forward",
             items=(('X', "X Forward", ""),
@@ -148,10 +153,10 @@ class ExportX3D(bpy.types.Operator, ExportHelper):
                    ('-X', "-X Forward", ""),
                    ('-Y', "-Y Forward", ""),
                    ('-Z', "-Z Forward", ""),
-                   ),
-            default='Z',
-            )
-
+               ),
+        default='Z',
+        )
+        
     axis_up = EnumProperty(
             name="Up",
             items=(('X', "X Up", ""),
