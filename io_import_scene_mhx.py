@@ -26,7 +26,7 @@
 """
 Abstract
 MHX (MakeHuman eXchange format) importer for Blender 2.5x.
-Version 1.10.0
+Version 1.10.1
 
 This script should be distributed with Blender.
 If not, place it in the .blender/scripts/addons dir
@@ -39,7 +39,7 @@ Alternatively, run the script in the script editor (Alt-P), and access from the 
 bl_info = {
     'name': 'Import: MakeHuman (.mhx)',
     'author': 'Thomas Larsson',
-    'version': (1, 10, 0),
+    'version': (1, 10, 1),
     "blender": (2, 5, 9),
     'location': "File > Import > MakeHuman (.mhx)",
     'description': 'Import files in the MakeHuman eXchange format (.mhx)',
@@ -51,7 +51,7 @@ bl_info = {
 
 MAJOR_VERSION = 1
 MINOR_VERSION = 10
-SUB_VERSION = 0
+SUB_VERSION = 1
 BLENDER_VERSION = (2, 59, 2)
 
 #
@@ -210,6 +210,14 @@ def initLoadedData():
     'ObjectModifiers' : {},
     'MaterialSlot' : {},
     }
+    return
+    
+def reinitGlobalData():
+    global loadedData
+    for key in [
+        'MeshTextureFaceLayer', 'MeshColorLayer', 'VertexGroup', 'ShapeKey',
+        'ParticleSystem', 'ObjectConstraints', 'ObjectModifiers', 'MaterialSlot']:
+        loadedData[key] = {}
     return
 
 Plural = {
@@ -451,6 +459,7 @@ def parse(tokens):
         elif key == "Object":
             parseObject(val, sub)
         elif key == "Mesh":
+            reinitGlobalData()
             data = parseMesh(val, sub)
         elif key == "Armature":
             data = parseArmature(val, sub)
