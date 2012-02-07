@@ -256,8 +256,6 @@ def export(file,
     from bpy_extras.io_utils import unique_name
     from xml.sax.saxutils import quoteattr, escape
 
-    
-    
     if name_decorations:
         # If names are decorated, the uuid map can be split up
         # by type for efficiency of collision testing
@@ -280,7 +278,7 @@ def export(file,
         group_ = 'group_'
     else:
         # If names are not decorated, it may be possible for two objects to
-        # have the same name, so there has to be a unified dictionary to 
+        # have the same name, so there has to be a unified dictionary to
         # prevent uuid collisions.
         uuid_cache = {}
         uuid_cache_object = uuid_cache           # object
@@ -299,7 +297,7 @@ def export(file,
         MA_ = ''
         LA_ = ''
         group_ = ''
-    
+
     _TRANSFORM = '_TRANSFORM'
 
     # store files to copy
@@ -1536,6 +1534,23 @@ def export(file,
 ##########################################################
 
 
+def gzip_open_utf8(filepath, mode):
+    """Workaround for py3k only allowing binary gzip writing"""
+
+    import gzip
+
+    # need to investigate encoding
+    file = gzip.open(filepath, mode)
+    write_real = file.write
+
+    def write_wrap(data):
+        return write_real(data.encode("utf-8"))
+
+    file.write = write_wrap
+
+    return file
+
+
 def save(operator, context, filepath="",
          use_selection=True,
          use_apply_modifiers=False,
@@ -1555,9 +1570,7 @@ def save(operator, context, filepath="",
         bpy.ops.object.mode_set(mode='OBJECT')
 
     if use_compress:
-        import gzip
-        # need to investigate encoding
-        file = gzip.open(filepath, 'w')
+        file = gzip_open_utf8(filepath, 'w')
     else:
         file = open(filepath, 'w', encoding='utf-8')
 
