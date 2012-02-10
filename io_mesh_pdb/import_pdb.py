@@ -25,7 +25,7 @@
 #
 #  Start of project              : 2011-08-31 by Clemens Barth
 #  First publication in Blender  : 2011-11-11
-#  Last modified                 : 2011-12-30
+#  Last modified                 : 2012-02-07
 #
 #  Acknowledgements: Thanks to ideasman, meta_androcto, truman, kilon,
 #  dairin0d, PKHG, Valter, etc
@@ -1238,7 +1238,8 @@ def DEF_atom_pdb_main(use_mesh,Ball_azimuth,Ball_zenith,
                             material = all_atoms[stick.atom2-1].material
                             sticks_list.append([name, location, dv, material])
                               
-                sticks_all_lists.append(sticks_list)
+                if sticks_list != []:       
+                    sticks_all_lists.append(sticks_list)
         else:
             sticks_list = []
             for stick in all_sticks:
