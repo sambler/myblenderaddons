@@ -25,7 +25,7 @@
 #
 #  Start of project              : 2011-08-31 by Clemens Barth
 #  First publication in Blender  : 2011-11-11
-#  Last modified                 : 2012-02-07
+#  Last modified                 : 2012-02-27
 #
 #  Acknowledgements: Thanks to ideasman, meta_androcto, truman, kilon,
 #  dairin0d, PKHG, Valter, etc
@@ -70,7 +70,7 @@ def DEF_atom_pdb_export():
             continue
             
         if obj.type != "SURFACE" and obj.type != "MESH":
-            continue
+            continue 
         
         for element in import_pdb.ATOM_PDB_ELEMENTS:
             if element.name in obj.name:
@@ -86,7 +86,8 @@ def DEF_atom_pdb_export():
                                                        obj.location+vertex.co))
                         
                 else:
-                    list_atoms.append(CLASS_atom_pdb_atoms_export(
+                    if not obj.parent:
+                        list_atoms.append(CLASS_atom_pdb_atoms_export(
                                                        name,
                                                        obj.location))
                                                        
