@@ -465,9 +465,9 @@ def write_pov(filename, scene=None, info_callback=None):
                 if material.subsurface_scattering.use:
                     subsurface_scattering = material.subsurface_scattering
                     tabWrite("subsurface { translucency <%.3g, %.3g, %.3g> }\n" % (
-                             (subsurface_scattering.radius[0]) * subsurface_scattering.color[0],
-                             (subsurface_scattering.radius[1]) * subsurface_scattering.color[1],
-                             (subsurface_scattering.radius[2]) * subsurface_scattering.color[2],                   
+                             (subsurface_scattering.radius[0]),
+                             (subsurface_scattering.radius[1]),
+                             (subsurface_scattering.radius[2])                   
                              )
                             )
 
