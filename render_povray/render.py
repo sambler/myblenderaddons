@@ -1435,6 +1435,10 @@ def write_pov(filename, scene=None, info_callback=None):
                             ci3 = vertCols[col3[0], col3[1], col3[2], material_index][0]
                         else:
                             # Colour per material - flat material colour
+                            if material.subsurface_scattering.use:
+                                diffuse_color = [i*j for i,j in zip(material.subsurface_scattering.color[:], material.diffuse_color[:])]
+                            else:
+                                diffuse_color = material.diffuse_color[:]
                             ci1 = ci2 = ci3 = vertCols[diffuse_color[0], diffuse_color[1], \
                                               diffuse_color[2], f.material_index][0]
 
