@@ -110,12 +110,10 @@ class Inset(bpy.types.Operator):
     def action(self, context):
         save_global_undo = bpy.context.user_preferences.edit.use_global_undo
         bpy.context.user_preferences.edit.use_global_undo = False
-        bpy.ops.object.mode_set(mode='OBJECT')
         obj = bpy.context.active_object
         mesh = obj.data
         do_inset(mesh, self.inset_amount, self.inset_height, self.region,
             self.scale == 'PERCENT')
-        bpy.ops.object.mode_set(mode='EDIT')
         bpy.context.user_preferences.edit.use_global_undo = save_global_undo
 
 
