@@ -22,6 +22,7 @@ bl_info = {
     "author": "Clemens Barth",
     "version": (1,2),
     "blender": (2,6),
+    "api": 31236,
     "location": "File -> Import -> PDB (.pdb), Panel: View 3D - Tools",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/Scripts/Import-Export/PDB",
@@ -32,7 +33,7 @@ bl_info = {
 
 import bpy
 from bpy.types import Operator, Panel
-from bpy_extras.io_utils import ImportHelper
+from bpy_extras.io_utils import ImportHelper, ExportHelper
 from bpy.props import (StringProperty,
                        BoolProperty,
                        EnumProperty,
@@ -42,6 +43,8 @@ from bpy.props import (StringProperty,
 
 # TODO, allow reload
 from . import import_pdb
+from . import export_pdb
+
 
 ATOM_PDB_ERROR = ""
 
@@ -110,6 +113,7 @@ class CLASS_atom_pdb_panel(Panel):
         col = row.column(align=True)
         col.prop(scn, "atom_pdb_sticks_sectors")
         col.prop(scn, "atom_pdb_sticks_radius")
+        col.prop(scn, "atom_pdb_sticks_unit_length")
         col = row.column(align=True)        
         col.prop(scn, "use_atom_pdb_sticks_color")        
         col.prop(scn, "use_atom_pdb_sticks_smooth")
@@ -191,7 +195,7 @@ class CLASS_atom_pdb_IO(bpy.types.PropertyGroup):
                 scnn.atom_pdb_radius_how,
                 )
 
-    # In the file dialog window
+    # In the file dialog window - Import
     scn = bpy.types.Scene
     scn.use_atom_pdb_cam = BoolProperty(
         name="Camera", default=False,
@@ -226,6 +230,9 @@ class CLASS_atom_pdb_IO(bpy.types.PropertyGroup):
     scn.atom_pdb_sticks_radius = FloatProperty(
         name = "Radius", default=0.1, min=0.0,
         description ="Radius of a stick")
+    scn.atom_pdb_sticks_unit_length = FloatProperty(
+        name = "Unit", default=0.2, min=0,
+        description = "Length of the unit of a stick in Angstrom")        
     scn.use_atom_pdb_sticks_color = BoolProperty(
         name="Color", default=True,
         description="The sticks appear in the color of the atoms")
@@ -234,7 +241,7 @@ class CLASS_atom_pdb_IO(bpy.types.PropertyGroup):
         description="The sticks are round (sectors are not visible)")     
     scn.use_atom_pdb_sticks_bonds = BoolProperty(
         name="Bonds", default=False,
-        description="Show double and tripple bonds")
+        description="Show double and tripple bonds.")
     scn.atom_pdb_sticks_dist = FloatProperty(
         name="Distance", default = 1.1, min=1.0, max=3.0,
         description="Distance between sticks measured in stick diameter")        
@@ -246,6 +253,14 @@ class CLASS_atom_pdb_IO(bpy.types.PropertyGroup):
                ('2', "van der Waals", "Use van der Waals radius")),
                default='0',)
 
+    # In the file dialog window - Export
+    scn.atom_pdb_export_type = EnumProperty(
+        name="Type of Objects",
+        description="Choose type of objects",
+        items=(('0', "All", "Export all active objects"),
+               ('1', "Elements", "Export only those active objects which have a proper element name")),
+               default='1',)    
+    
     # In the panel
     scn.atom_pdb_datafile = StringProperty(
         name = "", description="Path to your custom data file",
@@ -488,6 +503,7 @@ class CLASS_atom_pdb_load_button(Operator):
         sradius    = scn.atom_pdb_sticks_radius
         stick_bond = scn.use_atom_pdb_sticks_bonds
         stick_dist = scn.atom_pdb_sticks_dist
+        stick_unit = scn.atom_pdb_sticks_unit_length
         
         cam        = scn.use_atom_pdb_cam
         lamp       = scn.use_atom_pdb_lamp
@@ -497,7 +513,7 @@ class CLASS_atom_pdb_load_button(Operator):
         # Execute main routine an other time ... from the panel
         atom_number = import_pdb.DEF_atom_pdb_main(
                 mesh, azimuth, zenith, bradius, radiustype, bdistance, 
-                sticks, sticks_col, sticks_sm, stick_bond,
+                sticks, sticks_col, sticks_sm, stick_bond, stick_unit,
                 stick_dist, ssector, sradius, center, cam, lamp, datafile)
         scn.atom_pdb_number_atoms = str(atom_number) + " atoms"
 
@@ -538,9 +554,10 @@ class ImportPDB(Operator, ImportHelper):
         col.prop(scn, "use_atom_pdb_sticks")
         row = layout.row()        
         row.active = scn.use_atom_pdb_sticks
-        col = row.column(align=True)
+        col = row.column()
         col.prop(scn, "atom_pdb_sticks_sectors")
         col.prop(scn, "atom_pdb_sticks_radius")
+        col.prop(scn, "atom_pdb_sticks_unit_length")
         col = row.column(align=True)        
         col.prop(scn, "use_atom_pdb_sticks_color")        
         col.prop(scn, "use_atom_pdb_sticks_smooth")
@@ -579,6 +596,7 @@ class ImportPDB(Operator, ImportHelper):
         sradius    = scn.atom_pdb_sticks_radius
         stick_bond = scn.use_atom_pdb_sticks_bonds
         stick_dist = scn.atom_pdb_sticks_dist
+        stick_unit = scn.atom_pdb_sticks_unit_length
                 
         cam        = scn.use_atom_pdb_cam
         lamp       = scn.use_atom_pdb_lamp
@@ -588,12 +606,39 @@ class ImportPDB(Operator, ImportHelper):
         # Execute main routine
         atom_number = import_pdb.DEF_atom_pdb_main(
                 mesh, azimuth, zenith, bradius, radiustype, bdistance, 
-                sticks, sticks_col, sticks_sm, stick_bond,
+                sticks, sticks_col, sticks_sm, stick_bond, stick_unit,
                 stick_dist, ssector, sradius, center, cam, lamp, datafile)
 
         scn.atom_pdb_number_atoms = str(atom_number) + " atoms"
 
         return {'FINISHED'}
+
+
+
+# This is the class for the file dialog.
+class ExportPDB(Operator, ExportHelper):
+    bl_idname = "export_mesh.pdb"
+    bl_label  = "Export Protein Data Bank(*.pdb)"
+
+    filename_ext = ".pdb"
+    filter_glob  = StringProperty(default="*.pdb", options={'HIDDEN'},)
+
+    def draw(self, context):
+        layout = self.layout
+        scn = bpy.context.scene
+
+        row = layout.row()
+        row.prop(scn, "atom_pdb_export_type")
+
+    def execute(self, context):
+        scn = bpy.context.scene
+
+        # This is in order to solve this strange 'relative path' thing.
+        export_pdb.ATOM_PDB_FILEPATH = bpy.path.abspath(self.filepath)
+        export_pdb.DEF_atom_pdb_export(scn.atom_pdb_export_type)
+
+        return {'FINISHED'}
+
 
 
 class CLASS_atom_pdb_error_dialog(bpy.types.Operator):
@@ -612,17 +657,23 @@ class CLASS_atom_pdb_error_dialog(bpy.types.Operator):
 
 
 # The entry into the menu 'file -> import'
-def menu_func(self, context):
+def menu_func_import(self, context):
     self.layout.operator(ImportPDB.bl_idname, text="Protein Data Bank (.pdb)")
+
+# The entry into the menu 'file -> export'
+def menu_func_export(self, context):
+    self.layout.operator(ExportPDB.bl_idname, text="Protein Data Bank (.pdb)")
 
 
 def register():
     bpy.utils.register_module(__name__)
-    bpy.types.INFO_MT_file_import.append(menu_func)
+    bpy.types.INFO_MT_file_import.append(menu_func_import)
+    bpy.types.INFO_MT_file_export.append(menu_func_export)
 
 def unregister():
     bpy.utils.unregister_module(__name__)
-    bpy.types.INFO_MT_file_import.remove(menu_func)
+    bpy.types.INFO_MT_file_import.remove(menu_func_import)
+    bpy.types.INFO_MT_file_export.remove(menu_func_export)
 
 if __name__ == "__main__":
 

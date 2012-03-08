@@ -25,7 +25,7 @@
 #
 #  Start of project              : 2011-08-31 by Clemens Barth
 #  First publication in Blender  : 2011-11-11
-#  Last modified                 : 2012-02-07
+#  Last modified                 : 2012-02-29
 #
 #  Acknowledgements: Thanks to ideasman, meta_androcto, truman, kilon,
 #  dairin0d, PKHG, Valter, etc
@@ -567,7 +567,7 @@ def DEF_atom_pdb_custom_datafile(path_datafile):
 def DEF_atom_pdb_main(use_mesh,Ball_azimuth,Ball_zenith,
                Ball_radius_factor,radiustype,Ball_distance_factor,
                use_sticks,use_sticks_color,use_sticks_smooth,
-               use_sticks_bonds,Stick_dist,
+               use_sticks_bonds, Stick_unit, Stick_dist,
                Stick_sectors,Stick_diameter,put_to_center,
                use_camera,use_lamp,path_datafile):
 
@@ -1170,7 +1170,7 @@ def DEF_atom_pdb_main(use_mesh,Ball_azimuth,Ball_zenith,
         if atom[0] == "Vacancy":
             ball.name = "Cube_"+atom[0]
         else:
-            ball.name = "Ball (NURBS)_"+atom[0]
+            ball.name = "Ball_"+atom[0]
         ball.active_material = atom[1]
         ball.parent = new_atom_mesh
         new_atom_mesh.dupli_type = 'VERTS'
@@ -1186,7 +1186,7 @@ def DEF_atom_pdb_main(use_mesh,Ball_azimuth,Ball_zenith,
 
     if use_sticks == True and all_sticks != []:
             
-        dl = 0.05
+        dl = Stick_unit
          
         if use_sticks_color == False:   
             bpy.ops.object.material_slot_add()

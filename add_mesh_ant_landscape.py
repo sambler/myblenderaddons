@@ -775,11 +775,13 @@ class landscape_add(bpy.types.Operator):
 
             # create mesh object
             obj = create_mesh_object(context, verts, [], faces, "Landscape")
-
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.normals_make_consistent(inside=False)
+            bpy.ops.object.mode_set(mode='OBJECT')
             # sphere, remove doubles
             if self.SphereMesh !=0:
                 bpy.ops.object.mode_set(mode='EDIT')
-                bpy.ops.mesh.remove_doubles(limit=0.0001)
+                bpy.ops.mesh.remove_doubles(mergedist=0.0001)
                 bpy.ops.object.mode_set(mode='OBJECT')
 
             # Shade smooth
