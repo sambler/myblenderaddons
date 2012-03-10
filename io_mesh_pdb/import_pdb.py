@@ -25,7 +25,7 @@
 #
 #  Start of project              : 2011-08-31 by Clemens Barth
 #  First publication in Blender  : 2011-11-11
-#  Last modified                 : 2012-02-29
+#  Last modified                 : 2012-03-09
 #
 #  Acknowledgements: Thanks to ideasman, meta_androcto, truman, kilon,
 #  dairin0d, PKHG, Valter, etc
@@ -876,7 +876,10 @@ def DEF_atom_pdb_main(use_mesh,Ball_azimuth,Ball_zenith,
                         dist_n = dist_n.cross(plane_n)
                         dist_n = dist_n / dist_n.length  
                     else:
-                        dist_n = Vector((0,0,0))                               
+                        dist_n = (all_atoms[atom1-1].location 
+                                - all_atoms[atom2-1].location)
+                        dist_n = Vector((dist_n[1],-dist_n[0],0))    
+                        dist_n = dist_n / dist_n.length                             
                 elif number > 3:
                     number = 1
                     dist_n = None
