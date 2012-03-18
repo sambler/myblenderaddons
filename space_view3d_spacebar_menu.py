@@ -23,7 +23,6 @@ bl_info = {
     "author": "JayDez, sim88, meta-androcto, sam",
     "version": (1, 7, 3),
     "blender": (2, 6, 0),
-    "api": 41287,
     "location": "View3D > Spacebar Key",
     "description": "Context Sensitive Spacebar Menu",
     "warning": "",
@@ -805,7 +804,7 @@ class VIEW3D_MT_SelectMenu(bpy.types.Menu):
         layout.operator("view3d.select_circle")
         layout.separator()
 
-        layout.operator("object.select_all", text="Select/Deselect All").action = 'TOGGLE'
+        layout.operator("object.select_all").action = 'TOGGLE'
         layout.operator("object.select_all", text="Inverse").action = 'INVERT'
         layout.operator("object.select_random", text="Random")
         layout.operator("object.select_mirror", text="Mirror")
@@ -831,7 +830,7 @@ class VIEW3D_MT_SelectEditMenu(bpy.types.Menu):
         layout.operator("view3d.select_circle")
         layout.separator()
 
-        layout.operator("mesh.select_all", text="Select/Deselect All").action = 'TOGGLE'
+        layout.operator("mesh.select_all").action = 'TOGGLE'
         layout.operator("mesh.select_all", text="Inverse").action = 'INVERT'
         layout.separator()
 
@@ -881,7 +880,7 @@ class VIEW3D_MT_SelectCurveMenu(bpy.types.Menu):
         layout.operator("view3d.select_circle")
         layout.separator()
 
-        layout.operator("curve.select_all", text="Select/Deselect All").action = 'TOGGLE'
+        layout.operator("curve.select_all").action = 'TOGGLE'
         layout.operator("curve.select_all").action = 'INVERT'
         layout.operator("curve.select_random")
         layout.operator("curve.select_nth")
@@ -905,7 +904,7 @@ class VIEW3D_MT_SelectArmatureMenu(bpy.types.Menu):
         layout.operator("view3d.select_border")
         layout.separator()
 
-        layout.operator("armature.select_all", text="Select/Deselect All")
+        layout.operator("armature.select_all")
         layout.operator("armature.select_inverse", text="Inverse")
         layout.separator()
 
@@ -937,7 +936,7 @@ class VIEW3D_MT_SelectPoseMenu(bpy.types.Menu):
         layout.operator("view3d.select_border")
         layout.separator()
 
-        layout.operator("pose.select_all", text="Select/Deselect All").action = 'TOGGLE'
+        layout.operator("pose.select_all").action = 'TOGGLE'
         layout.operator("pose.select_all", text="Inverse").action = 'INVERT'
         layout.operator("pose.select_constraint_target",
                         text="Constraint Target")
@@ -1003,7 +1002,7 @@ class VIEW3D_MT_SelectSurface(bpy.types.Menu):
 
         layout.separator()
 
-        layout.operator("curve.select_all", text="Select/Deselect All").action = 'TOGGLE'
+        layout.operator("curve.select_all").action = 'TOGGLE'
         layout.operator("curve.select_all").action = 'INVERT'
         layout.operator("curve.select_random")
         layout.operator("curve.select_nth")
