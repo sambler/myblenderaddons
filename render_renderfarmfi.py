@@ -21,7 +21,7 @@ DEV = False
 bl_info = {
     "name": "Renderfarm.fi",
     "author": "Nathan Letwory <nathan@letworyinteractive.com>, Jesse Kaukonen <jesse.kaukonen@gmail.com>",
-    "version": (16,),
+    "version": (18,),
     "blender": (2, 6, 2),
     "location": "Render > Engine > Renderfarm.fi",
     "description": "Send .blend as session to http://www.renderfarm.fi to render",
@@ -88,10 +88,10 @@ bpy.simulationWarning = False
 bpy.file_format_warning = False
 bpy.ready = False
 
-if False and DEV:
-    rffi_xmlrpc_secure = r'http://192.168.0.109/burp/xmlrpc'
-    rffi_xmlrpc = r'http://192.168.0.109/burp/xmlrpc'
-    rffi_xmlrpc_upload = '192.168.0.109'
+if DEV:
+    rffi_xmlrpc_secure = r'http://renderfarm.local/burp/xmlrpc'
+    rffi_xmlrpc = r'http://renderfarm.local/burp/xmlrpc'
+    rffi_xmlrpc_upload = 'renderfarm.local'
 else:
     rffi_xmlrpc_secure = r'https://xmlrpc.renderfarm.fi/burp/xmlrpc'
     rffi_xmlrpc = r'http://xmlrpc.renderfarm.fi/burp/xmlrpc'
@@ -126,6 +126,7 @@ class ORESettings(bpy.types.PropertyGroup):
     url = StringProperty(name='Project URL', description='Project URL. Leave empty if not applicable', maxlen=256, default='')
     engine = StringProperty(name='Engine', description='The rendering engine that is used for rendering', maxlen=64, default='blender')
     samples = IntProperty(name='Samples', description='Number of samples that is used (Cycles only)', min=1, max=1000000, soft_min=1, soft_max=100000, default=100)
+    subsamples = IntProperty(name='Subsample Frames', description='Number of subsample frames that is used (Cycles only)', min=1, max=1000000, soft_min=1, soft_max=1000, default=10)
     file_format = StringProperty(name='File format', description='File format used for the rendering', maxlen=20, default='PNG_FORMAT')
     
     parts = IntProperty(name='Parts/Frame', description='', min=1, max=1000, soft_min=1, soft_max=64, default=1)
@@ -240,13 +241,13 @@ def changeSettings():
     sce = bpy.context.scene
     rd = sce.render
     ore = sce.ore_render
-    
+
     # Necessary settings for BURP
-    ore.resox = rd.resolution_x
-    ore.resoy = rd.resolution_y
-    ore.start = sce.frame_start
-    ore.end = sce.frame_end
-    ore.fps = rd.fps
+    rd.resolution_x = ore.resox
+    rd.resolution_y = ore.resoy
+    sce.frame_start = ore.start
+    sce.frame_end = ore.end
+    rd.fps = ore.fps
     
     bpy.file_format_warning = False
     bpy.simulationWarning = False
@@ -271,7 +272,13 @@ def changeSettings():
         ore.file_format = 'PNG_FORMAT'
         
     if (ore.engine == 'cycles'):
-        ore.samples = bpy.context.scene.cycles.samples
+        bpy.context.scene.cycles.samples = ore.samples
+        
+    if (ore.subsamples <= 0):
+        ore.subsamples = 1
+    
+    if (ore.samples / ore.subsamples < 100.0):
+        ore.subsamples = float(ore.samples) / 100.0
         
     # Multipart support doesn' work if SSS is used
     if ((rd.use_sss == True and hasSSSMaterial()) and ore.parts > 1):
@@ -294,13 +301,7 @@ def prepareScene():
     ore = sce.ore_render
     
     changeSettings()
-    
-    ore.resox = rd.resolution_x
-    ore.resoy = rd.resolution_y
-    ore.fps = rd.fps
-    ore.start = sce.frame_start
-    ore.end = sce.frame_end
-    
+
     print("Packing external textures...")
     try:
         bpy.ops.file.pack_all()
@@ -348,11 +349,19 @@ class OpSwitchRenderfarm(bpy.types.Operator):
     bl_idname = "ore.switch_to_renderfarm_render"
     
     def execute(self, context):
-        changeSettings()
-        if (bpy.context.scene.render.engine == 'CYCLES'):
-            bpy.context.scene.ore_render.engine = 'cycles'
+        ore = bpy.context.scene.ore_render
+        rd = bpy.context.scene.render
+        
+        ore.resox = rd.resolution_x
+        ore.resoy = rd.resolution_y
+        ore.fps = rd.fps
+        ore.start = bpy.context.scene.frame_start
+        ore.end = bpy.context.scene.frame_end
+        if (rd.engine == 'CYCLES'):
+            ore.samples = bpy.context.scene.cycles.samples
+            ore.engine = 'cycles'
         else:
-            bpy.context.scene.ore_render.engine = 'blender'
+            ore.engine = 'blender'
         bpy.context.scene.render.engine = 'RENDERFARMFI_RENDER'
         return {'FINISHED'}
 
@@ -369,7 +378,8 @@ class OpSwitchBlenderRender(bpy.types.Operator):
         bpy.context.scene.frame_start = ore.start
         bpy.context.scene.frame_end = ore.end
         if (bpy.context.scene.ore_render.engine == 'cycles'):
-            bpy.context.scene.render.engine = 'CYCLES'
+            rd.engine = 'CYCLES'
+            bpy.context.scene.cycles.samples = ore.samples
         else:
             bpy.context.scene.render.engine = 'BLENDER_RENDER'
         return {'FINISHED'}
@@ -544,6 +554,7 @@ class RENDER_PT_RenderfarmFi(RenderButtonsPanel, bpy.types.Panel):
             row = layout.row()
             if (ore.engine == 'cycles'):
                 row.prop(ore, 'samples')
+                row.prop(ore, 'subsamples')
             row = layout.row()
             row.prop(ore, 'memusage')
             #row.prop(ore, 'parts')
@@ -765,8 +776,11 @@ def ore_upload(op, context):
         res = proxy.session.setFrameFormat(userid, res['key'], sessionid, ore.file_format)
         res = proxy.session.setRenderer(userid, res['key'], sessionid, ore.engine)
         res = proxy.session.setSamples(userid, res['key'], sessionid, ore.samples)
+        res = proxy.session.setSubSamples(userid, res['key'], sessionid, ore.subsamples)
         if (ore.engine == 'cycles'):
             res = proxy.session.setReplication(userid, res['key'], sessionid, 1)
+            if ore.subsamples > 1:
+                res = proxy.session.setStitcher(userid, res['key'], sessionid, 'AVERAGE')
         else:
             res = proxy.session.setReplication(userid, res['key'], sessionid, 3)
         res = proxy.session.setOutputLicense(userid, res['key'], sessionid, int(ore.outlicense))
@@ -1056,6 +1070,9 @@ class ORE_LoginOp(bpy.types.Operator):
     def execute(self, context):
         sce = context.scene
         ore = sce.ore_render
+
+        ore.password = ore.password.strip()
+        ore.username = ore.username.strip().lower()
         
         if ore.hash=='':
             if ore.password != '' and ore.username != '':

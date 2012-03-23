@@ -428,7 +428,7 @@ def create_mesh(new_objects,
     Takes all the data gathered and generates a mesh, adding the new object to new_objects
     deals with fgons, sharp edges and assigning materials
     '''
-    from bpy_extras.mesh_utils import ngon_tesselate
+    from bpy_extras.mesh_utils import ngon_tessellate
 
     if not has_ngons:
         use_ngons = False
@@ -490,7 +490,7 @@ def create_mesh(new_objects,
             # FGons into triangles
             if has_ngons and len_face_vert_loc_indices > 4:
 
-                ngon_face_indices = ngon_tesselate(verts_loc, face_vert_loc_indices)
+                ngon_face_indices = ngon_tessellate(verts_loc, face_vert_loc_indices)
                 faces.extend([([face_vert_loc_indices[ngon[0]],
                                 face_vert_loc_indices[ngon[1]],
                                 face_vert_loc_indices[ngon[2]],
@@ -550,7 +550,7 @@ def create_mesh(new_objects,
         me.materials.append(material)
 
     me.vertices.add(len(verts_loc))
-    me.faces.add(len(faces))
+    me.tessfaces.add(len(faces))
 
     # verts_loc is a list of (x, y, z) tuples
     me.vertices.foreach_set("co", unpack_list(verts_loc))
@@ -558,14 +558,14 @@ def create_mesh(new_objects,
     # faces is a list of (vert_indices, texco_indices, ...) tuples
     # XXX faces should contain either 3 or 4 verts
     # XXX no check for valid face indices
-    me.faces.foreach_set("vertices_raw", unpack_face_list([f[0] for f in faces]))
+    me.tessfaces.foreach_set("vertices_raw", unpack_face_list([f[0] for f in faces]))
 
-    if verts_tex and me.faces:
+    if verts_tex and me.tessfaces:
         me.tessface_uv_textures.new()
 
     context_material_old = -1  # avoid a dict lookup
     mat = 0  # rare case it may be un-initialized.
-    me_faces = me.faces
+    me_faces = me.tessfaces
 
     for i, face in enumerate(faces):
         if len(face[0]) < 2:
@@ -575,7 +575,7 @@ def create_mesh(new_objects,
                 edges.append(face[0])
         else:
 
-            blender_face = me.faces[i]
+            blender_face = me.tessfaces[i]
 
             (face_vert_loc_indices,
              face_vert_tex_indices,

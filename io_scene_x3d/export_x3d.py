@@ -525,11 +525,11 @@ def export(file,
         mesh_id_coords = prefix_quoted_str(mesh_id, 'coords_')
         mesh_id_normals = prefix_quoted_str(mesh_id, 'normals_')
 
-        # tesselation faces may not exist
-        if not mesh.faces and mesh.polygons:
+        # tessellation faces may not exist
+        if not mesh.tessfaces and mesh.polygons:
             mesh.update(calc_tessface=True)
 
-        if not mesh.faces:
+        if not mesh.tessfaces:
             return
 
         use_collnode = bool([mod for mod in obj.modifiers
@@ -582,7 +582,7 @@ def export(file,
 
             # fast access!
             mesh_vertices = mesh.vertices[:]
-            mesh_faces = mesh.faces[:]
+            mesh_faces = mesh.tessfaces[:]
             mesh_faces_materials = [f.material_index for f in mesh_faces]
             mesh_faces_vertices = [f.vertices[:] for f in mesh_faces]
 
@@ -708,7 +708,7 @@ def export(file,
                         fw('%s<IndexedTriangleSet ' % ident)))
 
                         # --- Write IndexedTriangleSet Attributes (same as IndexedFaceSet)
-                        fw('solid="%s"\n' % ('true' if mesh.show_double_sided else 'false'))
+                        fw('solid="%s"\n' % ('true' if material and material.game_settings.use_backface_culling else 'false'))
 
                         if use_normals or is_force_normals:
                             fw(ident_step + 'normalPerVertex="true"\n')
@@ -750,7 +750,7 @@ def export(file,
                         # build a mesh mapping dict
                         vertex_hash = [{} for i in range(len(mesh.vertices))]
                         # worst case every face is a quad
-                        face_tri_list = [[None, None, None] for i in range(len(mesh.faces) * 2)]
+                        face_tri_list = [[None, None, None] for i in range(len(mesh.tessfaces) * 2)]
                         vert_tri_list = []
                         totvert = 0
                         totface = 0
@@ -851,7 +851,7 @@ def export(file,
                         fw('%s<IndexedFaceSet ' % ident)))
 
                         # --- Write IndexedFaceSet Attributes (same as IndexedTriangleSet)
-                        fw('solid="%s"\n' % ('true' if mesh.show_double_sided else 'false'))
+                        fw('solid="%s"\n' % ('true' if material and material.game_settings.use_backface_culling else 'false'))
                         if is_smooth:
                             fw(ident_step + 'creaseAngle="%.4f"\n' % mesh.auto_smooth_angle)
 
