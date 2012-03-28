@@ -50,9 +50,9 @@ bl_info = {
     'category': 'Import-Export'}
 
 MAJOR_VERSION = 1
-MINOR_VERSION = 10
-SUB_VERSION = 3
-BLENDER_VERSION = (2, 59, 2)
+MINOR_VERSION = 11
+SUB_VERSION = 0
+BLENDER_VERSION = (2, 6, 2)
 
 #
 #
@@ -61,7 +61,9 @@ BLENDER_VERSION = (2, 59, 2)
 import bpy
 import os
 import time
+import math
 import mathutils
+from mathutils import Vector, Matrix
 from bpy.props import *
 
 MHX249 = False
@@ -96,7 +98,7 @@ todo = []
 
 T_EnforceVersion = 0x01
 T_Clothes = 0x02
-T_Stretch = 0x04
+T_HardParents = 0x04
 
 T_Diamond = 0x10
 T_Replace = 0x20
@@ -1342,11 +1344,10 @@ def parseFaces2(tokens, me):
 
 def parseUvTexture(args, tokens, me):
     name = args[0]
-    uvtex = me.uv_textures.new(name = name)
-    uvtex.active = True
+    bpy.ops.mesh.uv_texture_add()
+    uvtex = me.uv_textures[-1]
+    uvtex.name = name
     uvloop = me.uv_loop_layers[-1]
-    #print("UV", name, uvtex)
-    #print("  ", uvloop, uvloop.data)
     loadedData['MeshTextureFaceLayer'][name] = uvloop    
     for (key, val, sub) in tokens:
         if key == 'Data':
@@ -2045,8 +2046,12 @@ def deleteDiamonds(ob):
                 for vn in f.vertices:
                     me.vertices[vn].select = True
     bpy.ops.object.mode_set(mode='EDIT')
-    bpy.ops.mesh.delete(type='VERT')
+    print("Do delete")
+    #bpy.ops.mesh.delete(type='VERT')
+    print("Verts deleted")
     bpy.ops.object.mode_set(mode='OBJECT')
+    print("Back to object mode")
+    print("\n  *** WARNING ***\nHelper deletion turned off due to Blender crash.\nHelpers can be deleted by deleting all selected vertices in Edit mode\n     **********\n")
     return
   
 #
@@ -2825,7 +2830,7 @@ MhxBoolProps = [
     #("replace", "Replace scene", "Replace scene", T_Replace),
     ("cage", "Cage", "Load mesh deform cage", T_Cage),
     ("clothes", "Clothes", "Include clothes", T_Clothes),
-    #("stretch", "Stretchy limbs", "Stretchy limbs", T_Stretch),
+    ("hardpar", "Hard parents", "Actual parenting rather than Childof constraints", T_HardParents),
     ("face", "Face shapes", "Include facial shapekeys", T_Face),
     ("shape", "Body shapes", "Include body shapekeys", T_Shape),
     #("symm", "Symmetric shapes", "Keep shapekeys symmetric", T_Symm),
@@ -3255,7 +3260,7 @@ def setViseme(context, vis, setKey, frame):
         else:
             setBoneLocation(context, pbones[b+'_L'], scale, loc, False, setKey, frame)
             setBoneLocation(context, pbones[b+'_R'], scale, loc, True, setKey, frame)
-    updatePose(context.scene)
+    updatePose(context)
     return
 
 def setBoneLocation(context, pb, scale, loc, mirror, setKey, frame):
@@ -3304,7 +3309,7 @@ def readMoho(context, filepath, offs):
             setViseme(context, vis, True, int(words[0])+offs)
     fp.close()
     setInterpolation(rig)
-    updatePose(context.scene)
+    updatePose(context)
     print("Moho file %s loaded" % filepath)
     return
 
@@ -3322,7 +3327,7 @@ def readMagpie(context, filepath, offs):
             setViseme(context, vis, True, int(words[0])+offs)
     fp.close()
     setInterpolation(rig)
-    updatePose(context.scene)
+    updatePose(context)
     print("Magpie file %s loaded" % filepath)
     return
 
@@ -3404,14 +3409,15 @@ class MhxLipsyncPanel(bpy.types.Panel):
         return
         
 #
-#   updatePose(scn):
+#   updatePose(context):
 #   class VIEW3D_OT_MhxUpdateButton(bpy.types.Operator):
 #
 
-def updatePose(scn):
-    scn = bpy.context.scene
+def updatePose(context):
+    scn = context.scene
     scn.frame_current = scn.frame_current
-    #scn.frame_current -= 1
+    bpy.ops.object.posemode_toggle()
+    bpy.ops.object.posemode_toggle()
     return
 
 class VIEW3D_OT_MhxUpdateButton(bpy.types.Operator):
@@ -3419,7 +3425,7 @@ class VIEW3D_OT_MhxUpdateButton(bpy.types.Operator):
     bl_label = "Update"
 
     def execute(self, context):
-        updatePose(context.scene)
+        updatePose(context)
         return{'FINISHED'}    
         
 
@@ -3441,7 +3447,7 @@ class VIEW3D_OT_MhxResetExpressionsButton(bpy.types.Operator):
         props = getShapeProps(rig)
         for (prop, name) in props:
             rig[prop] = 0.0
-        updatePose(context.scene)
+        updatePose(context)
         return{'FINISHED'}    
 
 #
@@ -3458,7 +3464,7 @@ class VIEW3D_OT_MhxKeyExpressionsButton(bpy.types.Operator):
         frame = context.scene.frame_current
         for (prop, name) in props:
             rig.keyframe_insert('["%s"]' % prop, frame=frame)
-        updatePose(context.scene)
+        updatePose(context)
         return{'FINISHED'}    
 #
 #    class VIEW3D_OT_MhxPinExpressionButton(bpy.types.Operator):
@@ -3488,7 +3494,7 @@ class VIEW3D_OT_MhxPinExpressionButton(bpy.types.Operator):
                     rig[prop] = 1.0
                 else:
                     rig[prop] = 0.0
-        updatePose(context.scene)
+        updatePose(context)
         return{'FINISHED'}    
 
 #
@@ -3536,6 +3542,465 @@ class MhxExpressionsPanel(bpy.types.Panel):
             row.prop(rig, '["%s"]' % prop, text=name)
             row.operator("mhx.pose_pin_expression", text="", icon='UNPINNED').expression = prop
         return
+
+#########################################
+#
+#   FK-IK snapping panel. 
+#   The bulk of this code was shamelessly stolen from Rigify.
+#
+#########################################
+
+def getParent(pb):
+    if pb.parent:
+        return pb.parent
+    #return None
+    for cns in pb.constraints:
+        if cns.type == 'CHILD_OF' and cns.influence > 0.5:
+            ob = cns.target
+            parent = ob.pose.bones[cns.subtarget]
+            return parent
+    return None            
+    
+def getPoseMatrixInOtherSpace(mat, pb):
+    rest = pb.bone.matrix_local.copy()
+    restInv = rest.inverted()
+    parent = getParent(pb)
+    if parent:
+        parMat = parent.matrix.copy()
+        parInv = parMat.inverted()
+        parRest = parent.bone.matrix_local.copy()
+    else:
+        parMat = Matrix()
+        parInv = Matrix()
+        parRest = Matrix()
+
+    # Get matrix in bone's current transform space
+    smat = restInv * (parRest * (parInv * mat))
+    return smat
+
+
+def getLocalPoseMatrix(pb):
+    return getPoseMatrixInOtherSpace(pb.matrix, pb)
+
+
+def setPoseTranslation(pb, mat):
+    if pb.bone.use_local_location == True:
+        pb.location = mat.to_translation()
+    else:
+        loc = mat.to_translation()
+
+        rest = pb.bone.matrix_local.copy()
+        parent = getParent(pb)
+        if parent:
+            parRest = parent.bone.matrix_local.copy()
+        else:
+            parRest = Matrix()
+
+        q = (parRest.inverted() * rest).to_quaternion()
+        pb.location = q * loc
+
+
+def setPoseRotation(pb, mat):
+    q = mat.to_quaternion()
+
+    if pb.rotation_mode == 'QUATERNION':
+        pb.rotation_quaternion = q
+    elif pb.rotation_mode == 'AXIS_ANGLE':
+        pb.rotation_axis_angle[0] = q.angle
+        pb.rotation_axis_angle[1] = q.axis[0]
+        pb.rotation_axis_angle[2] = q.axis[1]
+        pb.rotation_axis_angle[3] = q.axis[2]
+    else:
+        pb.rotation_euler = q.to_euler(pb.rotation_mode)
+
+
+def setPoseScale(pb, mat):
+    pb.scale = mat.to_scale()
+
+def matchPoseTranslation(pb, tarPb):
+    mat = getPoseMatrixInOtherSpace(tarPb.matrix, pb)
+    setPoseTranslation(pb, mat)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode='POSE')
+
+def matchPoseRotation(pb, tarPb):
+    mat = getPoseMatrixInOtherSpace(tarPb.matrix, pb)
+    setPoseRotation(pb, mat)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode='POSE')
+
+def matchPoseScale(pb, tarPb):
+    mat = getPoseMatrixInOtherSpace(tarPb.matrix, pb)
+    setPoseScale(pb, mat)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode='POSE')
+
+def matchPoleTarget(ik_first, ik_last, pole, match_bone, length):
+    """ Places an IK chain's pole target to match ik_first's
+        transforms to match_bone.  All bones should be given as pose bones.
+        You need to be in pose mode on the relevant armature object.
+        ik_first: first bone in the IK chain
+        ik_last:  last bone in the IK chain
+        pole:  pole target bone for the IK chain
+        match_bone:  bone to match ik_first to (probably first bone in a matching FK chain)
+        length:  distance pole target should be placed from the chain center
+    """
+    a = ik_first.matrix.to_translation()
+    b = ik_last.matrix.to_translation() + ik_last.vector
+
+    # Vector from the head of ik_first to the
+    # tip of ik_last
+    ikv = b - a
+
+    # Create a vector that is not aligned with ikv.
+    # It doesn't matter what vector.  Just any vector
+    # that's guaranteed to not be pointing in the same
+    # direction.  In this case, we create a unit vector
+    # on the axis of the smallest component of ikv.
+    if abs(ikv[0]) < abs(ikv[1]) and abs(ikv[0]) < abs(ikv[2]):
+        v = Vector((1,0,0))
+    elif abs(ikv[1]) < abs(ikv[2]):
+        v = Vector((0,1,0))
+    else:
+        v = Vector((0,0,1))
+
+    # Get a vector perpendicular to ikv
+    pv = v.cross(ikv).normalized() * length
+
+    def set_pole(pvi):
+        """ Set pole target's position based on a vector
+            from the arm center line.
+        """
+        # Translate pvi into armature space
+        ploc = a + (ikv/2) + pvi
+
+        # Set pole target to location
+        mat = getPoseMatrixInOtherSpace(Matrix.Translation(ploc), pole)
+        setPoseTranslation(pole, mat)
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.mode_set(mode='POSE')
+
+    set_pole(pv)
+
+    # Get the rotation difference between ik_first and match_bone
+    q1 = ik_first.matrix.to_quaternion()
+    q2 = match_bone.matrix.to_quaternion()
+    angle = math.acos(min(1,max(-1,q1.dot(q2)))) * 2
+
+    # Compensate for the rotation difference
+    if angle > 0.0001:
+        pv = Matrix.Rotation(angle, 4, ikv).to_quaternion() * pv
+        set_pole(pv)
+
+        # Get rotation difference again, to see if we
+        # compensated in the right direction
+        q1 = ik_first.matrix.to_quaternion()
+        q2 = match_bone.matrix.to_quaternion()
+        angle2 = math.acos(min(1,max(-1,q1.dot(q2)))) * 2
+        if angle2 > 0.0001:
+            # Compensate in the other direction
+            pv = Matrix.Rotation((angle*(-2)), 4, ikv).to_quaternion() * pv
+            set_pole(pv)
+
+
+def fk2ikArm(context, suffix):
+    rig = context.object
+    print("Snap FK Arm")
+    (uparmIk, loarmIk, elbowPt, wrist) = getSnapBones(rig, "ArmIK", suffix)
+    (uparmFk, loarmFk, handFk) = getSnapBones(rig, "ArmFK", suffix)
+
+    matchPoseRotation(uparmFk, uparmIk)
+    matchPoseScale(uparmFk, uparmIk)
+
+    matchPoseRotation(loarmFk, loarmIk)
+    matchPoseScale(loarmFk, loarmIk)
+
+    if rig["&HandFollowsWrist" + suffix]:
+        matchPoseRotation(handFk, wrist)
+        matchPoseScale(handFk, wrist)
+    return
+
+
+def ik2fkArm(context, suffix):
+    rig = context.object
+    print("Snap IK Arm")
+    (uparmIk, loarmIk, elbowPt, wrist) = getSnapBones(rig, "ArmIK", suffix)
+    (uparmFk, loarmFk, handFk) = getSnapBones(rig, "ArmFK", suffix)
+
+    matchPoseTranslation(wrist, handFk)
+    matchPoseRotation(wrist, handFk)  
+    matchPoseScale(wrist, handFk)
+
+    matchPoleTarget(uparmIk, loarmIk, elbowPt, uparmFk, (uparmIk.length + loarmIk.length))
+    return
+
+
+def fk2ikLeg(context, suffix):
+    rig = context.object
+    print("Snap FK Leg%s" % suffix)
+    (uplegIk, lolegIk, kneePt, ankleIk, legIk, legFk) = getSnapBones(rig, "LegIK", suffix)
+    (uplegFk, lolegFk, footFk) = getSnapBones(rig, "LegFK", suffix)
+
+    matchPoseRotation(uplegFk, uplegIk)
+    matchPoseScale(uplegFk, uplegIk)
+
+    matchPoseRotation(lolegFk, lolegIk)
+    matchPoseScale(lolegFk, lolegIk)
+
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode='POSE')
+    return
+
+def ik2fkLeg(context, suffix):
+    rig = context.object
+    print("Snap IK Leg%s" % suffix)
+    (uplegIk, lolegIk, kneePt, ankleIk, legIk, legFk) = getSnapBones(rig, "LegIK", suffix)
+    (uplegFk, lolegFk, footFk) = getSnapBones(rig, "LegFK", suffix)
+
+    legIkToAnkle = "&LegIkToAnkle" + suffix
+    try:
+        oldLegIkToAnkle = rig[legIkToAnkle]
+        isHard = False
+    except:
+        oldLegIkToAnkle = 1.0
+        isHard = True
+    oldActive = rig.data.bones.active
+    rig.data.bones.active = ankleIk.bone
+    rig[legIkToAnkle] = 1.0
+    matchPoseTranslation(ankleIk, footFk)
+    if oldLegIkToAnkle > 0.5:
+        matchPoseTranslation(legIk, legFk)
+        matchPoseRotation(legIk, legFk)  
+        matchPoseScale(legIk, legFk)
+    matchPoleTarget(uplegIk, lolegIk, kneePt, uplegFk, (uplegIk.length + lolegIk.length))        
+    rig.data.bones.active = ankleIk.bone
+    if not isHard:
+        rig[legIkToAnkle] = oldLegIkToAnkle
+
+    return
+
+#
+#
+#
+
+SnapBones = {
+    "ArmFK" : ["UpArm", "LoArm", "Hand"],
+    "ArmIK" : ["UpArmIK", "LoArmIK", "ElbowPT", "Wrist"],
+    "LegFK" : ["UpLeg", "LoLeg", "Foot"],
+    "LegIK" : ["UpLegIK", "LoLegIK", "KneePT", "Ankle", "LegIK", "LegFK"],
+}
+
+def getSnapBones(rig, key, suffix):
+    names = SnapBones[key]
+    pbones = []
+    for name in names:
+        pb = rig.pose.bones[name+suffix]
+        pbones.append(pb)
+    return tuple(pbones)
+
+class VIEW3D_OT_MhxSnapFk2IkButton(bpy.types.Operator):
+    bl_idname = "mhx.snap_fk_ik"
+    bl_label = "Snap FK"
+    data = StringProperty()    
+
+    def execute(self, context):
+        bpy.ops.object.mode_set(mode='POSE')
+        rig = context.object
+        (prop, old) = setSnapProp(rig, self.data, 1.0, context, False)
+        if prop[:4] == "&Arm":
+            fk2ikArm(context, prop[-2:])
+        elif prop[:4] == "&Leg":
+            fk2ikLeg(context, prop[-2:])
+        restoreSnapProp(rig, prop, old, context)
+        return{'FINISHED'}    
+
+class VIEW3D_OT_MhxSnapIk2FkButton(bpy.types.Operator):
+    bl_idname = "mhx.snap_ik_fk"
+    bl_label = "Snap IK"
+    data = StringProperty()    
+
+    def execute(self, context):
+        bpy.ops.object.mode_set(mode='POSE')
+        rig = context.object
+        (prop, old) = setSnapProp(rig, self.data, 0.0, context, True)
+        if prop[:4] == "&Arm":
+            ik2fkArm(context, prop[-2:])
+        elif prop[:4] == "&Leg":
+            ik2fkLeg(context, prop[-2:])
+        restoreSnapProp(rig, prop, old, context)
+        return{'FINISHED'}    
+
+def setSnapProp(rig, data, value, context, isIk):
+    words = data.split()
+    prop = words[0]
+    oldValue = rig[prop]
+    rig[prop] = value
+    ik = int(words[1])
+    fk = int(words[2])
+    extra = int(words[3])
+    oldIk = rig.data.layers[ik]
+    oldFk = rig.data.layers[fk]
+    oldExtra = rig.data.layers[extra]
+    rig.data.layers[ik] = True
+    rig.data.layers[fk] = True
+    rig.data.layers[extra] = True
+    updatePose(context)
+    if isIk:
+        oldValue = 1.0
+        oldIk = True
+        oldFk = False
+    else:
+        oldValue = 0.0
+        oldIk = False
+        oldFk = True
+        oldExtra = False
+    return (prop, (oldValue, ik, fk, extra, oldIk, oldFk, oldExtra))
+    
+def restoreSnapProp(rig, prop, old, context):
+    updatePose(context)
+    (oldValue, ik, fk, extra, oldIk, oldFk, oldExtra) = old
+    rig[prop] = oldValue
+    rig.data.layers[ik] = oldIk
+    rig.data.layers[fk] = oldFk
+    rig.data.layers[extra] = oldExtra
+    return
+
+class VIEW3D_OT_MhxToggleFkIkButton(bpy.types.Operator):
+    bl_idname = "mhx.toggle_fk_ik"
+    bl_label = "FK - IK"
+    toggle = StringProperty()    
+
+    def execute(self, context):
+        words = self.toggle.split()
+        rig = context.object
+        prop = words[0]
+        value = float(words[1]) 
+        onLayer = int(words[2])
+        offLayer = int(words[3])
+        rig.data.layers[onLayer] = True
+        rig.data.layers[offLayer] = False
+        rig[prop] = value
+        # Don't do autokey - confusing.
+        #if context.tool_settings.use_keyframe_insert_auto:
+        #    rig.keyframe_insert('["%s"]' % prop, frame=scn.frame_current)        
+        updatePose(context)
+        return{'FINISHED'}    
+
+#
+#   Set Inverse and Clear Inverse
+#
+
+def prepareInverse(context):
+    rig = context.object
+    b = rig.data.bones.active
+    pb = rig.pose.bones[b.name]
+    cns = getChildofConstraint(pb)
+    for layer in range(32):
+        if b.layers[layer]:
+            oldVis = rig.data.layers[layer]
+            rig.data.layers[layer] = True
+            break
+    #print(rig, b, pb, cns, cns.name)
+    return (cns.name, layer, oldVis)
+
+def getChildofConstraint(pb):    
+    for cns in pb.constraints:
+        if cns.type == 'CHILD_OF':
+            print("Found Childof constraint", cns.name)  
+            return cns
+    raise NameError("Something is wrong. Cannot find Child-of constraint for bone %s" % pb.name)
+
+class VIEW3D_OT_MhxSetInverseButton(bpy.types.Operator):
+    bl_idname = "mhx.set_inverse"
+    bl_label = "Set Inverse"
+
+    def execute(self, context):
+        (name, layer, oldVis) = prepareInverse(context)
+        bpy.ops.constraint.childof_set_inverse(constraint=name, owner='BONE')
+        context.object.data.layers[layer] = oldVis
+        updatePose(context)
+        return{'FINISHED'}    
+
+class VIEW3D_OT_MhxClearInverseButton(bpy.types.Operator):
+    bl_idname = "mhx.clear_inverse"
+    bl_label = "Clear Inverse"
+
+    def execute(self, context):
+        (name, layer, oldVis) = prepareInverse(context)
+        bpy.ops.constraint.childof_clear_inverse(constraint=name, owner='BONE')
+        context.object.data.layers[layer] = oldVis
+        updatePose(context)
+        return{'FINISHED'}    
+
+#
+#   MHX FK/IK Switch panel
+#
+
+class MhxFKIKPanel(bpy.types.Panel):
+    bl_label = "MHX FK/IK Switch"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    #bl_options = {'DEFAULT_CLOSED'}
+    
+    @classmethod
+    def poll(cls, context):
+        return pollMhxRig(context.object)
+
+    def draw(self, context):
+        rig = context.object
+        layout = self.layout        
+
+        row = layout.row()
+        row.label("")
+        row.label("Left")
+        row.label("Right")
+
+        layout.label("FK/IK switch")
+        row = layout.row()
+        row.label("Arm")
+        self.toggleButton(row, rig, "&ArmIk_L", " 3", " 2")
+        self.toggleButton(row, rig, "&ArmIk_R", " 19", " 18")
+        row = layout.row()
+        row.label("Leg")
+        self.toggleButton(row, rig, "&LegIk_L", " 5", " 4")
+        self.toggleButton(row, rig, "&LegIk_R", " 21", " 20")
+        
+        layout.label("Snap Arm bones")
+        row = layout.row()
+        row.label("FK Arm")
+        row.operator("mhx.snap_fk_ik", text="Snap L FK Arm").data = "&ArmIk_L 2 3 12"
+        row.operator("mhx.snap_fk_ik", text="Snap R FK Arm").data = "&ArmIk_R 18 19 28"
+        row = layout.row()
+        row.label("IK Arm")
+        row.operator("mhx.snap_ik_fk", text="Snap L IK Arm").data = "&ArmIk_L 2 3 12"
+        row.operator("mhx.snap_ik_fk", text="Snap R IK Arm").data = "&ArmIk_R 18 19 28"
+
+        layout.label("Snap Leg bones")
+        row = layout.row()
+        row.label("FK Leg")
+        row.operator("mhx.snap_fk_ik", text="Snap L FK Leg").data = "&LegIk_L 4 5 12"
+        row.operator("mhx.snap_fk_ik", text="Snap R FK Leg").data = "&LegIk_R 20 21 28"
+        row = layout.row()
+        row.label("IK Leg")
+        row.operator("mhx.snap_ik_fk", text="Snap L IK Leg").data = "&LegIk_L 4 5 12"
+        row.operator("mhx.snap_ik_fk", text="Snap R IK Leg").data = "&LegIk_R 20 21 28"
+        row = layout.row()
+        row.label("Show")
+        row.prop(rig.data, "layers", index=12, toggle=True, text="L Ankle")
+        row.prop(rig.data, "layers", index=28, toggle=True, text="R Ankle")
+
+        layout.separator()                
+        row = layout.row()
+        row.operator("mhx.set_inverse")
+        row.operator("mhx.clear_inverse")
+
+    def toggleButton(self, row, rig, prop, fk, ik):
+        if rig[prop] > 0.5:
+            row.operator("mhx.toggle_fk_ik", text="IK").toggle = prop + " 0" + fk + ik
+        else:
+            row.operator("mhx.toggle_fk_ik", text="FK").toggle = prop + " 1" + ik + fk
+            
 
 ###################################################################################    
 #
@@ -3614,6 +4079,9 @@ class MhxVisibilityPanel(bpy.types.Panel):
                 layout.prop(ob, '["%s"]' % prop)
         layout.separator()
         layout.operator("mhx.update_textures")
+        layout.separator()
+        layout.operator("mhx.add_hiders")
+        layout.operator("mhx.remove_hiders")
         return
 
 class VIEW3D_OT_MhxUpdateTexturesButton(bpy.types.Operator):
@@ -3634,7 +4102,47 @@ class VIEW3D_OT_MhxUpdateTexturesButton(bpy.types.Operator):
                     #print("Update %s[%d] = %s" % (driver.data_path, driver.array_index, value))
                     prop[driver.array_index] = value
         return{'FINISHED'}    
+        
+class VIEW3D_OT_MhxAddHidersButton(bpy.types.Operator):
+    bl_idname = "mhx.add_hiders"
+    bl_label = "Add Hide Property"
 
+    def execute(self, context):
+        rig = context.object
+        for ob in context.scene.objects:
+            if ob.select and ob != rig:
+                prop = "Hide%s" % ob.name        
+                rig[prop] = False        
+                addHider(ob, "hide", rig, prop)
+                addHider(ob, "hide_render", rig, prop)
+        return{'FINISHED'}    
+                
+def addHider(ob, attr, rig, prop):
+    fcu = ob.driver_add(attr)
+    drv = fcu.driver
+    drv.type = 'SCRIPTED'
+    drv.expression = "x"
+    drv.show_debug_info = True
+    var = drv.variables.new()
+    var.name = "x"
+    targ = var.targets[0]
+    targ.id = rig
+    targ.data_path = '["%s"]' % prop
+    return
+
+class VIEW3D_OT_MhxRemoveHidersButton(bpy.types.Operator):
+    bl_idname = "mhx.remove_hiders"
+    bl_label = "Remove Hide Property"
+
+    def execute(self, context):
+        rig = context.object
+        for ob in context.scene.objects:
+            if ob.select and ob != rig:
+                ob.driver_remove("hide")
+                ob.driver_remove("hide_render")
+                del rig["Hide%s" % ob.name]
+        return{'FINISHED'}    
+        
 ###################################################################################    
 #
 #    Layers panel
@@ -3677,7 +4185,7 @@ class MhxLayersPanel(bpy.types.Panel):
     bl_label = "MHX Layers"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_options = {'DEFAULT_CLOSED'}
+    #bl_options = {'DEFAULT_CLOSED'}
     
     @classmethod
     def poll(cls, context):
