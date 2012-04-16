@@ -513,6 +513,67 @@ def pskimport(filename,importmesh,importbone,bDebugLogPSK,importmultiuvtextures)
     print ("IMPORTER PSK Blender 2.6 completed")
 #End of def pskimport#########################
 
+def psaimport(filename):
+    global plik,bonesdata,animdata,anim_offset,animation_names
+    bonesdata = {}
+    animation_names = []
+    animation_num_bones = []
+    animation_num_keys = []
+    animation_loc_keys = []
+    animation_rot_keys = []
+    animdata = {}
+    plik = open(filename,'rb')
+    print (word(20),i(3))
+
+    #-------BONES------
+    #check_armature_for_psa()
+    print (word(20))
+    data = i(3)
+    #print data
+    num_bones = data[2]
+    for m in range(num_bones):
+        bonesdata[str(m)] = []
+        name = word(64)
+        bonesdata[str(m)].append(name)
+        bonesdata[str(m)].append(i(3))
+        bonesdata[str(m)].append(f(11))
+
+
+    #--------ANIMATIONS-INFO
+    print (word(20))
+    data = i(3)
+    #print data
+    for m in range(data[2]):
+        name_animation = word(64)#name animation
+        print("NAME:",name_animation)
+        animation_names.append(name_animation)
+        word(64)#name of owner of animation ?
+        data = i(4)#num bones - 0 - 0 - num keys for all bones for this animation
+        num_bones = data[0] 
+        animation_num_bones.append(num_bones)
+        f(3)
+        data = i(3) 
+        num_keys = data[2]
+        animation_num_keys.append(num_keys)
+    print (plik.tell())
+
+    #--------ANIMATIONS-KEYS
+    print (word(20))
+    data = i(3)
+    #print data
+    anim_offset = {}
+    seek = plik.tell()
+    for m in range(len(animation_names)):
+        anim_name = animation_names[m]
+        anim_bones = animation_num_bones[m]
+        anim_keys = animation_num_keys[m]
+        anim_offset[anim_name] = []
+        anim_offset[anim_name].append(seek)
+        anim_offset[anim_name].append(anim_keys)
+        anim_offset[anim_name].append(anim_bones)
+        seek+=anim_keys*anim_bones*32
+    
+    
 def getInputFilename(self,filename,importmesh,importbone,bDebugLogPSK,importmultiuvtextures):
     checktype = filename.split('\\')[-1].split('.')[1]
     print ("------------",filename)
@@ -643,7 +704,8 @@ class OBJECT_OT_PSAPath(bpy.types.Operator):
             options={'HIDDEN'},
             )
     def execute(self, context):
-        context.scene.importpsapath = self.properties.filepath
+        #context.scene.importpsapath = self.properties.filepath
+        psaimport(self.filepath)
         return {'FINISHED'}
         
     def invoke(self, context, event):

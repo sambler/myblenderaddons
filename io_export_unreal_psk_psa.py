@@ -114,7 +114,7 @@ MaterialName = []
 # TODO: remove this 1am hack
 nbone = 0
 exportmessage = "Export Finish" 
-
+exportfile = True
 ########################################################################
 # Generic Object->Integer mapping
 # the object must be usable as a dictionary key
@@ -631,36 +631,33 @@ def meshmerge(selectedobjects):
 # http://en.wikibooks.org/wiki/Blender_3D:_Blending_Into_Python/Cookbook#Triangulate_NMesh
 #blender 2.63 format using the Operators/Commands to convert the mesh to tri mesh
 def triangulateNMesh(object):
-    print("Converting quad to tri mesh...")
+    print("Converting quad to tri mesh...",object.name)
     scene = bpy.context.scene
     bpy.ops.object.mode_set(mode='OBJECT')
     for i in scene.objects: i.select = False #deselect all objects
     object.select = True
     scene.objects.active = object #set the mesh object to current
-    bpy.ops.object.mode_set(mode='OBJECT')
-    me_da = object.data.copy() #copy data
-    me_ob = object.copy() #copy object
-    #note two copy two types else it will use the current data or mesh
-    me_ob.data = me_da
-    scene = bpy.context.scene
-    bpy.context.scene.objects.link(me_ob)#link the object to the scene #current object location
-    for i in scene.objects: i.select = False #deselect all objects
-    me_ob.select = True
-    scene.objects.active = me_ob #set the mesh object to current
     bpy.ops.object.mode_set(mode='EDIT') #Operators
     bpy.ops.mesh.select_all(action='SELECT')#select all the face/vertex/edge
     bpy.ops.mesh.quads_convert_to_tris() #Operators
     bpy.context.scene.update()
     bpy.ops.object.mode_set(mode='OBJECT') # set it in object
     print("Triangulate Mesh Done!")
-    return me_ob
+    return object
 
 #Texture not working still find a way to get it work
 # Actual object parsing functions
 def parse_meshes(blender_meshes, psk_file):	
-    global exportmessage
+    global exportmessage, exportfile
     print("Number of Object Meshes:",len(blender_meshes))
     for current_obj in blender_meshes: #number of mesh that should be one mesh here
+        if current_obj.parent != None:
+            print("Armature Found!")
+        else:
+            exportmessage = "Mesh is not parent to Armature!"
+            bpy.context.scene.objects.unlink(current_obj)
+            exportfile = False
+            return
         #material
         if len(current_obj.material_slots) > 0:
             counter = 0
@@ -681,8 +678,6 @@ def parse_meshes(blender_meshes, psk_file):
                 counter += 1
                 print("PSK INDEX:",matdata.TextureIndex)
                 
-                
-                
         points = ObjMap()
         wedges = ObjMap()
         discarded_face_count = 0
@@ -690,19 +685,13 @@ def parse_meshes(blender_meshes, psk_file):
         faceUV = None
         scene = bpy.context.scene #get current scene
         EXPORT_APPLY_MODIFIERS = True
-        currentmeshobject = current_obj;
-        
-        current_obj = triangulateNMesh(currentmeshobject) #convert tri incase
-        bpy.context.scene.objects.unlink(currentmeshobject)
+        current_obj = triangulateNMesh(current_obj) #convert tri incase
         me = current_obj.to_mesh(scene, EXPORT_APPLY_MODIFIERS, 'PREVIEW') #apply modified mesh and write mesh
-        
-        #print(dir(me))
-        
         faceuv = len(me.uv_textures) > 0 #check if has uv texture
         if faceuv:
             uv_layer = me.tessface_uv_textures.active.data[:]
         else:
-            
+            print("No UV Texture is added and will be ignore!")
             has_UV = False
         
         for face in me.tessfaces:
@@ -715,12 +704,12 @@ def parse_meshes(blender_meshes, psk_file):
             if len(face.vertices) != 3:
                 #raise RuntimeError("Non-triangular face (%i)" % len(face.vertices))
                 exportmessage = "MESH IS NOT TRIANGLE (Alt + T)"
+                exportfile = False
                 return
             
             if not is_1d_face(face,me):#face , Mesh
                 wedge_list = []
                 vect_list = []
-                
                 
                 for i in range(3): #UV TEXTURE, VERTICES
                     vert_index = face.vertices[i]
@@ -807,25 +796,19 @@ def parse_meshes(blender_meshes, psk_file):
                     me.vertices[dindex0].select = True
                     me.vertices[dindex1].select = True
                     me.vertices[dindex2].select = True
-                    
-                    #raise RuntimeError("normal vector coplanar with face! points:", me.vertices[dindex0].co, current_mesh.vertices[dindex1].co, current_mesh.vertices[dindex2].co)
+                    print("normal vector coplanar with face! points:", me.vertices[dindex0].co, current_mesh.vertices[dindex1].co, current_mesh.vertices[dindex2].co)
                     exportmessage = "One of the face is dot or period or line, coplanar with the face"
+                    exportfile = False
+                    bpy.context.scene.objects.unlink(current_obj)
                     return 
                 #print(dir(current_face))
-                face.select = True
-                #print("smooth:",(current_face.use_smooth))
-                #not sure if this right
-                #tri.SmoothingGroups
-                print(face.use_smooth)
+                #face.select = True
+                
                 if face.use_smooth == True:
                     tri.SmoothingGroups = 0
                 else:
                     tri.SmoothingGroups = 1
-                #tri.SmoothingGroups = face.use_smooth
-                #tri.SmoothingGroups = hex(face.use_smooth)
-                #print(hex(True))
-                print(hex(face.use_smooth))
-                #tri.SmoothingGroups = 1
+                
                 tri.MatIndex = object_material_index
                 #print(tri)
                 psk_file.AddFace(tri)                
@@ -835,8 +818,14 @@ def parse_meshes(blender_meshes, psk_file):
         print (" -- Dumping Mesh Points -- LEN:",len(points.dict))
         for point in points.items():
             psk_file.AddPoint(point)
-        #if len(points.dict) > 32767:
+        if len(points.dict) > 32767:
             #raise RuntimeError("Vertex point reach max limited 32767 in pack data. Your",len(points.dict))
+            print("Vertex point reach max limited 32767 in pack data. Your",len(points.dict))
+            exportmessage = "You have went over the limit on your Vectices/Vertex points. Limit is 32767."
+            exportfile = False
+            bpy.context.scene.objects.unlink(current_obj)
+            return
+            
         print (" -- Dumping Mesh Wedge -- LEN:",len(wedges.dict))
         
         for wedge in wedges.items():
@@ -989,6 +978,7 @@ def parse_bone(blender_bone, psk_file, psa_file, parent_id, is_root_bone, parent
         parse_bone(current_child_bone, psk_file, psa_file, my_id, 0, mainparent, parent_root)
 
 def parse_armature(blender_armature, psk_file, psa_file):
+    global exportmessage, exportfile
     print ("----- parsing armature -----")
     print ('blender_armature length: %i' % (len(blender_armature)))
     
@@ -1014,9 +1004,15 @@ def parse_armature(blender_armature, psk_file, psa_file):
         #will ingore this part of the ocde
         """
         if len(current_armature.bones) == 0:
-            raise RuntimeError("Warning add two bones else it will crash the unreal editor.")
+            #raise RuntimeError("Warning add two bones else it will crash the unreal editor.")
+            exportmessage = "Warning add two bones else it will crash the unreal editor."
+            exportfile = False
+            return
         if len(current_armature.bones) == 1:
-            raise RuntimeError("Warning add one more bone else it will crash the unreal editor.")
+            #raise RuntimeError("Warning add one more bone else it will crash the unreal editor.")
+            exportmessage = "Warning add one more bone else it will crash the unreal editor."
+            exportfile = False
+            return
 
         mainbonecount = 0;
         for current_bone in current_armature.bones: #list the bone. #note this will list all the bones.
@@ -1024,8 +1020,11 @@ def parse_armature(blender_armature, psk_file, psa_file):
                 mainbonecount += 1
         print("Main Bone",mainbonecount)
         if mainbonecount > 1:
-            #print("Warning there no main bone.")
-            raise RuntimeError("There too many Main bones. Number main bones:",mainbonecount)
+            print("Warning there no main bone.")
+            #raise RuntimeError("There too many Main bones. Number main bones:",mainbonecount)
+            exportmessage = "There no Main Bone!"
+            exportfile = False
+            return
         for current_bone in current_armature.bones: #list the bone. #note this will list all the bones.
             if(current_bone.parent is None):
                 parse_bone(current_bone, psk_file, psa_file, 0, 0, current_obj.matrix_local, None)
@@ -1468,7 +1467,7 @@ def parse_animation(blender_scene, blender_armatures, psa_file):
     
 def fs_callback(filename, context):
     #this deal with repeat export and the reset settings
-    global nbone, exportmessage
+    global nbone, exportmessage, exportfile
     nbone = 0
     
     start_time = time.clock()
@@ -1520,8 +1519,11 @@ def fs_callback(filename, context):
     #if there 1 mesh in scene add to the array
     if len(blender_meshes) == 1:
         mesh = blender_meshes[0]
+        print("MESH NAME",blender_meshes[0].name)
         blender_meshes = []
-        blender_meshes.append(mesh.copy())
+        copymesh = mesh.copy()
+        bpy.context.scene.objects.link(copymesh)
+        blender_meshes.append(copymesh)
         print(" - One Mesh Scene")
     #if there more than one mesh and one mesh select add to array
     elif (len(blender_meshes) > 1) and (len(selectmesh) == 1):
@@ -1529,6 +1531,7 @@ def fs_callback(filename, context):
             exportmessage = "Error, Mesh Object not Center right should be (0,0,0)."
             for mesh in selectmesh:#remove object
                 bpy.context.scene.objects.unlink(mesh)
+            exportfile = False
             return
         blender_meshes = []
         copymesh = selectmesh[0]
@@ -1562,6 +1565,7 @@ def fs_callback(filename, context):
     else:
         print(" - Too Many Meshes!")
         exportmessage = " - Select Mesh(s) For Export!"
+        exportfile = False
         print(" - Select One Mesh Object!")
         bmesh = False
         return
@@ -1586,6 +1590,7 @@ def fs_callback(filename, context):
         elif blender_meshes[0].scale.x != 1 and blender_meshes[0].scale.y != 1 and blender_meshes[0].scale.z != 1:
             print("Error, Mesh Object not scale right should be (1,1,1).")
             exportmessage = "Error, Mesh Object not scale right should be (1,1,1)."
+            exportfile = False
             return
         elif blender_meshes[0].location.x == 0 and blender_meshes[0].location.y == 0 and blender_meshes[0].location.z == 0:
             #print("Okay")
@@ -1595,10 +1600,12 @@ def fs_callback(filename, context):
             print("Error, Mesh Object not center.",blender_meshes[0].location)
             #exportmessage = "Error, Mesh Object not center."
             exportmessage = "Error, Mesh Object not center."
+            exportfile = False
             bMeshCenter = False
             return
         else:
             exportmessage = "Please Select your Meshes that matches that Armature for Export."
+            exportfile = False
             return
     else:
         bmesh = False
@@ -1612,6 +1619,8 @@ def fs_callback(filename, context):
             print("Error, Armature Object not scale right should be (1,1,1).")
             exportmessage = "Error, Armature Object not scale right should be (1,1,1)."
             bArmatureScale = False
+            exportfile = False
+            return
         if blender_armature[0].location.x == 0 and blender_armature[0].location.y == 0 and blender_armature[0].location.z == 0:
             #print("Okay")
             bArmatureCenter = True
@@ -1619,6 +1628,8 @@ def fs_callback(filename, context):
             print("Error, Armature Object not center.",blender_armature[0].location)
             exportmessage = "Error, Armature Object not center."
             bArmatureCenter = False
+            exportfile = False
+            return
 			
 		
 			
@@ -1629,6 +1640,7 @@ def fs_callback(filename, context):
         print("=================================")
         print("= Export Fail!                  =")
         print("=================================")
+        return
     else:
         exportmessage = "Export Finish!"
         #print("blender_armature:",dir(blender_armature[0]))
@@ -1678,7 +1690,9 @@ def fs_callback(filename, context):
             raise
 
         # reset current frame
-        
+        if exportfile == False:
+            print("EXPORT STOP!")
+            return
         context.scene.frame_set(cur_frame) #set frame back to original frame
         
         ##########################
@@ -1831,14 +1845,10 @@ class OBJECT_OT_add_remove_Collection_Items_UE(bpy.types.Operator):
                     if (len(ActionNLA.groups) == len(BoneNames)) and (nobone == len(ActionNLA.groups)):
                         actionsetmatchcount += 1
                         ActionNames.append(ActionNLA.name)
-            #print(dir(collection))
-            #print("collection:",len(collection))
             print("action list check")
             for action in ActionNames:
                 BfoundAction = False
-                #print("action:",action)
                 for c in collection:
-                    #print(c.name)
                     if c.name == action:
                         BfoundAction = True
                         break
@@ -1978,12 +1988,15 @@ class VIEW3D_PT_unrealtools_objectmode(bpy.types.Panel):
                 entry = obj.myCollectionUEA[obj.myCollectionUEA_index]
                 layout.prop(entry, "name")
                 layout.prop(entry, "mybool")
-        #layout.operator(OBJECT_OT_UTSelectedFaceSmooth.bl_idname)        
-        layout.operator(OBJECT_OT_UTRebuildArmature.bl_idname)
-        #layout.operator(OBJECT_OT_UTRebuildMesh.bl_idname)
-        layout.operator(OBJECT_OT_ToggleConsle.bl_idname)
-        layout.operator(OBJECT_OT_DeleteActionSet.bl_idname)
+        
+        layout.operator(OBJECT_OT_UTSelectedFaceSmooth.bl_idname)        
+        layout.operator(OBJECT_OT_UTRebuildMesh.bl_idname)
         layout.operator(OBJECT_OT_MeshClearWeights.bl_idname)
+        layout.operator(OBJECT_OT_UTRebuildArmature.bl_idname)
+        layout.operator(OBJECT_OT_DeleteActionSet.bl_idname)
+        layout.operator(OBJECT_OT_ToggleConsle.bl_idname)
+        
+        
         
 class OBJECT_OT_UnrealExport(bpy.types.Operator):
     global exportmessage
@@ -2008,10 +2021,6 @@ class OBJECT_OT_UnrealExport(bpy.types.Operator):
 
         default_path = os.path.splitext(bpy.data.filepath)[0] + ".psk"
         fs_callback(default_path, bpy.context)        
-        #self.report({'WARNING', 'INFO'}, exportmessage)
-        #self.report({'INFO'}, exportmessage)
-        #self.report({'DEBUG'}, exportmessage)
-        #self.report({'WARNING'}, exportmessage)
         self.report({'ERROR'}, exportmessage)
         return{'FINISHED'}   
 
@@ -2042,15 +2051,17 @@ class OBJECT_OT_UTSelectedFaceSmooth(bpy.types.Operator):
                 for i in bpy.context.scene.objects: i.select = False #deselect all objects
                 obj.select = True #set current object select
                 bpy.context.scene.objects.active = obj #set active object
-                for face in obj.data.faces:
-                    if face.use_smooth == True:
+                mesh = bmesh.new();
+                mesh.from_mesh(obj.data)
+                for face in mesh.faces:
+                    print(dir(face))
+                    if face.smooth == True:
                         face.select = True
                         smoothcount += 1
                     else:
                         flatcount += 1
                         face.select = False
-                    #print("selected:",face.select)
-                    #print(("smooth:",face.use_smooth))
+                mesh.to_mesh(obj.data)
                 bpy.context.scene.update()
                 bpy.ops.object.mode_set(mode='EDIT')
                 print("Select Smooth Count(s):",smoothcount," Flat Count(s):",flatcount)
@@ -2082,7 +2093,7 @@ class OBJECT_OT_DeleteActionSet(bpy.types.Operator):
 			
 class OBJECT_OT_MeshClearWeights(bpy.types.Operator):
     bl_idname = "object.meshclearweights"  # XXX, name???
-    bl_label = "Mesh Clear Weights"
+    bl_label = "Mesh Clear Vertex Weights"
     __doc__ = """Clear selected mesh vertex group weights for the bones. Be sure you unparent the armature"""
     
     def invoke(self, context, event):
@@ -2185,69 +2196,45 @@ class OBJECT_OT_UTRebuildMesh(bpy.types.Operator):
                 verts = []
                 smoothings = []
                 uvfaces = []
-                #print(dir(mesh))
                 print("creating array build mesh...")
-                uv_layer = mesh.uv_textures.active
-                for face in mesh.faces:
+                mmesh = obj.to_mesh(bpy.context.scene,True,'PREVIEW')
+                uv_layer = mmesh.tessface_uv_textures.active
+                for face in mmesh.tessfaces:
                     smoothings.append(face.use_smooth)#smooth or flat in boolean
                     if uv_layer != None:#check if there texture data exist
                         faceUV = uv_layer.data[face.index]
-                        #print(len(faceUV.uv))
                         uvs = []
                         for uv in faceUV.uv:
-                            #vert = mesh.vertices[videx]
-                            #print("UV:",uv[0],":",uv[1])
                             uvs.append((uv[0],uv[1]))
-                        #print(uvs)
                         uvfaces.append(uvs)
-                    faces.append(face.vertices[:])           
+                    print((face.vertices[:]))
+                    faces.extend([(face.vertices[0],face.vertices[1],face.vertices[2],face.vertices[3])])
                 #vertex positions
                 for vertex in mesh.vertices:
                     verts.append(vertex.co.to_tuple())				
                 #vertices weight groups into array
                 vertGroups = {} #array in strings
                 for vgroup in obj.vertex_groups:
-                    #print(dir(vgroup))
-                    #print("name:",(vgroup.name),"index:",vgroup.index)
-                    #vertex in index and weight
                     vlist = []
                     for v in mesh.vertices:
                         for vg in v.groups:
                             if vg.group == vgroup.index:
                                 vlist.append((v.index,vg.weight))
                                 #print((v.index,vg.weight))
-                    vertGroups[vgroup.name] = vlist					
-                '''
-				#Fail for this method
-				#can't covert the tri face plogyon
-                for face in mesh.faces:
-                    x = [f for f in face.vertices]
-                    faces.extend(x)
-                    smoothings.append(face.use_smooth)
-                for vertex in mesh.vertices:
-                    verts.append(vertex.co.to_tuple())
-                me_ob.vertices.add(len(verts))
-                me_ob.faces.add(len(faces)//4)
-                me_ob.vertices.foreach_set("co", unpack_list(verts))
-                me_ob.faces.foreach_set("vertices_raw", faces)
-                me_ob.faces.foreach_set("use_smooth", smoothings)
-                '''
-                #test dummy mesh
-                #verts = [(-1,1,0),(1,1,0),(1,-1,0),(-1,-1,0),(0,1,1),(0,-1,1)]
-                #faces = [(0,1,2,3),(1,2,5,4),(0,3,5,4),(0,1,4),(2,3,5)]
-                #for f in faces:
-                    #print("face",f)
-                #for v in verts:
-                    #print("vertex",v)
-                #me_ob = bpy.data.objects.new("ReBuildMesh",me_ob)
+                    vertGroups[vgroup.name] = vlist
+                
                 print("creating mesh object...")
-                me_ob.from_pydata(verts, [], faces)
-                me_ob.faces.foreach_set("use_smooth", smoothings)#smooth array from face
-                me_ob.update()
+                #me_ob.from_pydata(verts, [], faces)
+                me_ob.vertices.add(len(verts))
+                me_ob.tessfaces.add(len(faces))
+                me_ob.vertices.foreach_set("co", unpack_list(verts)) 
+                me_ob.tessfaces.foreach_set("vertices_raw",unpack_list( faces))
+                me_ob.tessfaces.foreach_set("use_smooth", smoothings)#smooth array from face
+                
                 #check if there is uv faces
                 if len(uvfaces) > 0:
-                    uvtex = me_ob.uv_textures.new(name="retex")
-                    for i, face in enumerate(me_ob.faces):
+                    uvtex = me_ob.tessface_uv_textures.new(name="retex")
+                    for i, face in enumerate(me_ob.tessfaces):
                         blender_tface = uvtex.data[i] #face
                         mfaceuv = uvfaces[i]
                         if len(mfaceuv) == 3:
@@ -2260,6 +2247,7 @@ class OBJECT_OT_UTRebuildMesh(bpy.types.Operator):
                             blender_tface.uv3 = mfaceuv[2];
                             blender_tface.uv4 = mfaceuv[3];
                 
+                me_ob.update()#need to update the information to able to see into the secne
                 obmesh = bpy.data.objects.new(("Re_"+obj.name),me_ob)
                 bpy.context.scene.update()
                 #Build tmp materials
@@ -2268,20 +2256,13 @@ class OBJECT_OT_UTRebuildMesh(bpy.types.Operator):
                     matdata = bpy.data.materials.new(materialname)
                     me_ob.materials.append(matdata)
                 #assign face to material id
-                for face in mesh.faces:
-                    #print(dir(face))
+                for face in mesh.tessfaces:
                     me_ob.faces[face.index].material_index = face.material_index
                 #vertices weight groups
                 for vgroup in vertGroups:
-                    #print("vgroup",vgroup)#name of group
-                    #print(dir(vgroup))
-                    #print(vertGroups[vgroup])
                     group = obmesh.vertex_groups.new(vgroup)
-                    #print("group index",group.index)
                     for v in vertGroups[vgroup]:
                         group.add([v[0]], v[1], 'ADD')# group.add(array[vertex id],weight,add)
-                        #print("[vertex id, weight]",v) #array (0,0)
-                        #print("[vertex id, weight]",v[0],":",v[1]) #array (0,0)
                 bpy.context.scene.objects.link(obmesh)
                 print("Mesh Material Count:",len(me_ob.materials))
                 matcount = 0
@@ -2289,10 +2270,8 @@ class OBJECT_OT_UTRebuildMesh(bpy.types.Operator):
                 for mat in me_ob.materials:
                     print("-Material:",mat.name,"INDEX:",matcount)
                     matcount += 1
-                print("")
                 print("Object Name:",obmesh.name)
                 bpy.context.scene.update()
-                #bpy.ops.wm.console_toggle()
                 bselected = True
                 break
         if bselected:
