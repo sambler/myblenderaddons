@@ -95,11 +95,13 @@ def main(context, **kw):
     for obj_cell in objects:
         obj_cell.select = True
     
-    print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t)
+    print("Done! %d objects in %.4f sec" % (len(objects), time.time() - t))
+
 
 class FractureCell(Operator):
     bl_idname = "object.add_fracture_cell_objects"
     bl_label = "Cell Fracture Helper Objects"
+    bl_options = {'PRESET'}
 
     # -------------------------------------------------------------------------
     # Source Options

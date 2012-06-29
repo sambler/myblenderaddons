@@ -130,7 +130,11 @@ def cell_fracture_objects(scene, obj,
     # -------------------------------------------------------------------------
     # GET POINTS
 
-    points = _points_from_object(obj, source)    
+    points = _points_from_object(obj, source)
+
+    if not points:
+        # print using fallback
+        points = _points_from_object(obj, source | {'VERT_OWN'})
 
     if not points:
         print("no points found")
@@ -247,8 +251,15 @@ def cell_fracture_objects(scene, obj,
 
         objects.append(obj_cell)
 
-    
     scene.update()
+
+
+    # move this elsewhere...
+    for obj_cell in objects:
+        game = obj_cell.game
+        game.physics_type = 'RIGID_BODY'
+        game.use_collision_bounds = True
+        game.collision_bounds_type = 'TRIANGLE_MESH'
 
     return objects
 
