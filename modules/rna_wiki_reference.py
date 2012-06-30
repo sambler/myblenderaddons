@@ -104,7 +104,7 @@ url_manual_mapping = (
     ("bpy.types.Action.*", "Animation/Actions"),
     #("bpy.types.Brush.*", ""),  # TODO - manual has no place for this! XXX
     ("bpy.types.Curve.*", "Modeling/Curves"),
-    #("bpy.types.GreasePencil.*", ""), # TODO - manual has no place for this! XXX
+    ("bpy.types.GreasePencil.*", "3D_interaction/Sketching/Drawing"),
     ("bpy.types.Group.*", "Modeling/Objects/Groups_and_Parenting#Grouping_objects"),
     ("bpy.types.Image.*", "Textures/Types/Image"),
     ("bpy.types.ShapeKey.*", "Animation/Basic/Deformation/Shape_Keys"), # not an ID but include because of Key
@@ -114,7 +114,7 @@ url_manual_mapping = (
     #("bpy.types.Mask.*", ""), # TODO - manual has no place for this! XXX
     # *** Materials (blender internal) ***
     ("bpy.types.Material.diffuse*", "Materials/Properties/Diffuse_Shaders"),
-    ("bpy.types.Material.*", "Materials/Properties/Diffuse_Shaders"),  # catchall, until the section is filled in
+    ("bpy.types.Material.*", "Materials"),  # catchall, until the section is filled in
     # ... todo, many more options
     ("bpy.types.MovieClip.*", "Motion_Tracking#Movie_Clip_Editor"),
     #("bpy.types.NodeTree.*", ""),  # dont document
@@ -146,7 +146,7 @@ url_manual_mapping = (
 
     # --- Animation ---
     ("bpy.types.Keyframe.*", "Animation/Keyframes"),
-    ("bpy.types.FCurve.*", "Animation/FCurves"),
+    ("bpy.types.FCurve.*", "Animation/Editors/Graph/FCurves"),
     
     # --- Rigging ---
     ("bpy.types.Bone.*",      "Armatures/Bones"),
@@ -159,14 +159,74 @@ url_manual_mapping = (
     ("bpy.types.Texture.*",  "Textures"),
 
     # === Operators ===
-
+    # Catch all only for now!
     # *** Window/Screen ***
+    
+    ("bpy.ops.action.*",  "Animation/Actions"),
+    ("bpy.ops.anim.*",  "Animation"),
+    ("bpy.ops.armature.*",  "Rigging/Armatures"),
+    ("bpy.ops.boid.*",  "Physics/Particles/Physics/Boids"),
+    # ("bpy.ops.brush.*",  ""),  # TODO
+    ("bpy.ops.buttons.*",  "Interface/Buttons_and_Controls"),
+    ("bpy.ops.camera.*",  "Render/Camera"),
+    ("bpy.ops.clip.*",  "Motion_Tracking#Movie_Clip_Editor"),
+    ("bpy.ops.cloth.*",  "Physics/Cloth"),
+    ("bpy.ops.console.*",  "Python/Console"),
+    ("bpy.ops.constraint.*",  "Constraints"),
+    ("bpy.ops.curve.*",  "Modeling/Curves"),
+    ("bpy.ops.dpaint.*",  "Physics/Dynamic_Paint"),
+    # ("bpy.ops.ed.*",  ""),  # TODO, this is for internal use only?
+    # ("bpy.ops.export_anim.*",  ""),  # TODO
+    # ("bpy.ops.export_mesh.*",  ""),  # TODO
+    # ("bpy.ops.export_scene.*",  ""),  # TODO
+    ("bpy.ops.file.*",  ""),
+    ("bpy.ops.fluid.*",  "Physics/Fluid"),
+    ("bpy.ops.font.*",  "Modeling/Texts"),
+    ("bpy.ops.gpencil.*",  "3D_interaction/Sketching/Drawing"),
+    ("bpy.ops.graph.*",  "Animation/Editors/Graph/FCurves"),
+    ("bpy.ops.group.*",  "Modeling/Objects/Groups_and_Parenting#Grouping_objects"),
+    ("bpy.ops.image.*",  "Textures/Types/Image"),
+    # ("bpy.ops.import_anim.*",  ""),  # TODO
+    # ("bpy.ops.import_curve.*",  ""),  # TODO
+    # ("bpy.ops.import_mesh.*",  ""),  # TODO
+    # ("bpy.ops.import_scene.*",  ""),  # TODO
+    # ("bpy.ops.info.*",  ""),  # TODO
+    ("bpy.ops.lamp.*",  "Lighting"),  # --- TODO ... all below ---
+    # ("bpy.ops.lattice.*",  ""),  # TODO
+    ("bpy.ops.logic.*",  "Game_Engine/Logic"),
+    ("bpy.ops.marker.*",  "Animation/Markers"),
+    # ("bpy.ops.mask.*",  ""),  # TODO
+    ("bpy.ops.material.*",  "Materials"),
+    ("bpy.ops.mball.*",  "Modeling/Metas"),
+    ("bpy.ops.mesh.*",  "Modeling/Meshes"),
+    ("bpy.ops.nla.*",  "Animation/Editors/NLA"),
+    # ("bpy.ops.node.*",  ""),  # TODO
+    ("bpy.ops.object.*",  "Modeling/Objects"),
+    ("bpy.ops.outliner.*",  "Data_System/The_Outliner"),
+    # ("bpy.ops.paint.*",  ""),  # TODO
+    ("bpy.ops.particle.*",  "Physics/Particles"),
+    ("bpy.ops.pose.*",  "Rigging/Posing"),
+    ("bpy.ops.poselib.*",  "Rigging/Posing/Pose_Library"),
+    # ("bpy.ops.ptcache.*",  ""),  # TODO
+    ("bpy.ops.render.*",  "Render"),
+    ("bpy.ops.scene.*",  "Interface/Scenes"),
     ("bpy.ops.screen.*",  "Interface/Window_system"),
+    ("bpy.ops.script.*",  "Extensions/Python"),
+    ("bpy.ops.sculpt.*",  "Modeling/Meshes/Editing/Sculpt_Mode"),
+    ("bpy.ops.sequencer.*",  "Sequencer/Usage"),
+    # ("bpy.ops.sketch.*",  ""),  # TODO
+    # ("bpy.ops.sound.*",  ""),  # TODO
+    ("bpy.ops.surface.*",  "Modeling/Surfaces"),
+    ("bpy.ops.text.*",  "Extensions/Python/Text_editor"),
+    ("bpy.ops.texture.*",  "Textures"),
+    ("bpy.ops.time.*",  "Animation/Timeline"),
+    ("bpy.ops.transform.*",  "3D_interaction/Transform_Control"),
+    ("bpy.ops.ui.*",  "Interface"),
+    ("bpy.ops.uv.*",  "Textures/Mapping/UV/Layout_Editing"),
+    # ("bpy.ops.view2d.*",  ""),  # TODO
+    ("bpy.ops.view3d.*",  "3D_interaction/Navigating/3D_View"),  # this link is a bit arbitrary
     ("bpy.ops.wm.*",      "Interface/Window_system"),
-    ("bpy.ops.render.*",  "Render"),  # catchall, TODO - refine
+    ("bpy.ops.world.*",  "World"),
 )
 
 # may have 'url_reference_mapping'... etc later
-"""
-
-"""
