@@ -54,7 +54,7 @@ from bpy_extras.io_utils import (ExportHelper,
 
 
 class ImportOBJ(bpy.types.Operator, ImportHelper):
-    '''Load a Wavefront OBJ File'''
+    """Load a Wavefront OBJ File"""
     bl_idname = "import_scene.obj"
     bl_label = "Import OBJ"
     bl_options = {'PRESET', 'UNDO'}
@@ -67,7 +67,7 @@ class ImportOBJ(bpy.types.Operator, ImportHelper):
 
     use_ngons = BoolProperty(
             name="NGons",
-            description="Import faces with more than 4 verts as fgons",
+            description="Import faces with more than 4 verts as ngons",
             default=True,
             )
     use_edges = BoolProperty(
@@ -100,7 +100,7 @@ class ImportOBJ(bpy.types.Operator, ImportHelper):
 
     use_image_search = BoolProperty(
             name="Image Search",
-            description="Search subdirs for any assosiated images " \
+            description="Search subdirs for any associated images "
                         "(Warning, may be slow)",
             default=True,
             )
@@ -196,7 +196,7 @@ class ImportOBJ(bpy.types.Operator, ImportHelper):
 
 
 class ExportOBJ(bpy.types.Operator, ExportHelper):
-    '''Save a Wavefront OBJ File'''
+    """Save a Wavefront OBJ File"""
 
     bl_idname = "export_scene.obj"
     bl_label = 'Export OBJ'

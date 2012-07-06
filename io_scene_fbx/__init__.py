@@ -53,7 +53,7 @@ from bpy_extras.io_utils import (ExportHelper,
 
 
 class ExportFBX(bpy.types.Operator, ExportHelper):
-    '''Selection to an ASCII Autodesk FBX'''
+    """Selection to an ASCII Autodesk FBX"""
     bl_idname = "export_scene.fbx"
     bl_label = "Export FBX"
     bl_options = {'PRESET'}
@@ -162,7 +162,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             )
     anim_optimize_precision = FloatProperty(
             name="Precision",
-            description=("Tolerence for comparing double keyframes "
+            description=("Tolerance for comparing double keyframes "
                         "(higher for greater accuracy)"),
             min=1, max=16,
             soft_min=1, soft_max=16,

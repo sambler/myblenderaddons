@@ -23,12 +23,20 @@
 import bpy
 import bmesh
 
+
+def _redraw_yasiamevil():
+    _redraw_yasiamevil.opr(**_redraw_yasiamevil.arg)
+_redraw_yasiamevil.opr = bpy.ops.wm.redraw_timer
+_redraw_yasiamevil.arg = dict(type='DRAW_WIN_SWAP', iterations=1)
+
+    
+
 def _points_from_object(obj, source):
 
     _source_all = {
         'PARTICLE', 'PENCIL',
-        'VERT_OWN', 'EDGE_OWN', 'FACE_OWN',
-        'VERT_CHILD', 'EDGE_CHILD', 'FACE_CHILD'}
+        'VERT_OWN', 'VERT_CHILD',
+        }
 
     print(source - _source_all)
     print(source)
@@ -51,41 +59,32 @@ def _points_from_object(obj, source):
         return co / tot
 
     def points_from_verts(obj):
+        """Takes points from _any_ object with geometry"""
         if obj.type == 'MESH':
             mesh = obj.data
             matrix = obj.matrix_world.copy()
             points.extend([matrix * v.co for v in mesh.vertices])
+        else:
+            try:
+                mesh = ob.to_mesh(scene=bpy.context.scene,
+                                  apply_modifiers=True,
+                                  settings='PREVIEW')
+            except:
+                mesh = None
 
-    def points_from_edges(obj):
-        if obj.type == 'MESH':
-            mesh = obj.data
-            matrix = obj.matrix_world.copy()
-            points.extend([matrix * edge_center(mesh, e) for e in mesh.edges])
-
-    def points_from_faces(obj):
-        if obj.type == 'MESH':
-            mesh = obj.data
-            matrix = obj.matrix_world.copy()
-            points.extend([matrix * poly_center(mesh, p) for p in mesh.polygons])
+            if mesh is not None:
+                matrix = obj.matrix_world.copy()
+                points.extend([matrix * v.co for v in mesh.vertices])
+                bpy.data.meshes.remove(mesh)
 
     # geom own
     if 'VERT_OWN' in source:
         points_from_verts(obj)
-    if 'EDGE_OWN' in source:
-        points_from_edges(obj)
-    if 'FACE_OWN' in source:
-        points_from_faces(obj)
 
     # geom children
     if 'VERT_CHILD' in source:
         for obj_child in obj.children:
             points_from_verts(obj_child)
-    if 'EDGE_CHILD' in source:
-        for obj_child in obj.children:
-            points_from_edges(obj_child)
-    if 'FACE_CHILD' in source:
-        for obj_child in obj.children:
-            points_from_faces(obj_child)
 
     # geom particles
     if 'PARTICLE' in source:
@@ -122,8 +121,11 @@ def cell_fracture_objects(scene, obj,
                           use_smooth_faces=False,
                           use_smooth_edges=True,
                           use_data_match=False,
-                          use_island_split=False,
+                          use_debug_points=False,
                           margin=0.0,
+                          material_index=0,
+                          use_debug_redraw=False,
+                          cell_scale=(1.0, 1.0, 1.0),
                           ):
     
     from . import fracture_cell_calc
@@ -135,7 +137,7 @@ def cell_fracture_objects(scene, obj,
 
     if not points:
         # print using fallback
-        points = _points_from_object(obj, source | {'VERT_OWN'})
+        points = _points_from_object(obj, {'VERT_OWN'})
 
     if not points:
         print("no points found")
@@ -157,26 +159,40 @@ def cell_fracture_objects(scene, obj,
 
 
     if source_noise > 0.0:
+        from random import random
         # boundbox approx of overall scale
         from mathutils import Vector
         matrix = obj.matrix_world.copy()
         bb_world = [matrix * Vector(v) for v in obj.bound_box]
-        scalar = (bb_world[0] - bb_world[6]).length / 2.0
+        scalar = source_noise * ((bb_world[0] - bb_world[6]).length / 2.0)
 
-        from mathutils.noise import noise_vector
+        from mathutils.noise import random_unit_vector
         
-        points[:] = [p + (noise_vector(p) * scalar) for p in points]
+        points[:] = [p + (random_unit_vector() * (scalar * random())) for p in points]
     
     # end remove doubles
     # ------------------
+
+    if use_debug_points:
+        bm = bmesh.new()
+        for p in points:
+            bm.verts.new(p)
+        mesh_tmp = bpy.data.meshes.new(name="DebugPoints")
+        bm.to_mesh(mesh_tmp)
+        bm.free()
+        obj_tmp = bpy.data.objects.new(name=mesh_tmp.name, object_data=mesh_tmp)
+        scene.objects.link(obj_tmp)
+        del obj_tmp, mesh_tmp
 
     mesh = obj.data
     matrix = obj.matrix_world.copy()
     verts = [matrix * v.co for v in mesh.vertices]
 
-    cells = fracture_cell_calc.points_as_bmesh_cells(verts, points,
+    cells = fracture_cell_calc.points_as_bmesh_cells(verts,
+                                                     points,
+                                                     cell_scale,
                                                      margin_cell=margin)
-    
+
     # some hacks here :S
     cell_name = obj.name + "_cell"
     
@@ -189,14 +205,28 @@ def cell_fracture_objects(scene, obj,
 
         # create the convex hulls
         bm = bmesh.new()
+        
+        # WORKAROUND FOR CONVEX HULL BUG/LIMIT
+        # XXX small noise
+        import random
+        def R(): return (random.random() - 0.5) * 0.01
+        # XXX small noise
+
         for i, co in enumerate(cell_points):
+            
+            # XXX small noise
+            co.x += R()
+            co.y += R()
+            co.z += R()
+            # XXX small noise
+            
             bm_vert = bm.verts.new(co)
             bm_vert.tag = True
 
         import mathutils
-        bmesh.ops.remove_doubles(bm, {'TAG'}, 0.0001)
+        bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.005)
         try:
-            bmesh.ops.convex_hull(bm, {'TAG'})
+            bmesh.ops.convex_hull(bm, input=bm.verts)
         except RuntimeError:
             import traceback
             traceback.print_exc()
@@ -208,7 +238,7 @@ def cell_fracture_objects(scene, obj,
                 bm_edge.tag = True
             bm.normal_update()
             try:
-                bmesh.ops.dissolve_limit(bm, {'TAG'}, {'TAG'}, 0.001)
+                bmesh.ops.dissolve_limit(bm, verts=bm.verts, angle_limit=0.001)
             except RuntimeError:
                 import traceback
                 traceback.print_exc()
@@ -220,6 +250,10 @@ def cell_fracture_objects(scene, obj,
         if use_smooth_edges:
             for bm_edge in bm.edges:
                 bm_edge.smooth = True
+
+        if material_index != 0:
+            for bm_face in bm.faces:
+                bm_face.material_index = material_index
 
 
         # ---------------------------------------------------------------------
@@ -237,7 +271,7 @@ def cell_fracture_objects(scene, obj,
             mesh_src = obj.data
             for mat in mesh_src.materials:
                 mesh_dst.materials.append(mat)
-            for lay_attr in ("vertex_colors", "uv_layers"):
+            for lay_attr in ("vertex_colors", "uv_textures"):
                 lay_src = getattr(mesh_src, lay_attr)
                 lay_dst = getattr(mesh_dst, lay_attr)
                 for key in lay_src.keys():
@@ -253,6 +287,10 @@ def cell_fracture_objects(scene, obj,
 
         objects.append(obj_cell)
 
+        if use_debug_redraw:
+            scene.update()
+            _redraw_yasiamevil()
+
     scene.update()
 
 
@@ -266,7 +304,12 @@ def cell_fracture_objects(scene, obj,
     return objects
 
 
-def cell_fracture_boolean(scene, obj, objects, apply=True, clean=True):
+def cell_fracture_boolean(scene, obj, objects,
+                          use_debug_bool=False,
+                          clean=True,
+                          use_island_split=False,
+                          use_debug_redraw=False,
+                          ):
 
     objects_boolean = []
     
@@ -275,7 +318,7 @@ def cell_fracture_boolean(scene, obj, objects, apply=True, clean=True):
         mod.object = obj
         mod.operation = 'INTERSECT'
 
-        if apply:
+        if not use_debug_bool:
             mesh_new = obj_cell.to_mesh(scene,
                                         apply_modifiers=True,
                                         settings='PREVIEW')
@@ -304,7 +347,7 @@ def cell_fracture_boolean(scene, obj, objects, apply=True, clean=True):
                     bm_edge.tag = True
                 bm.normal_update()
                 try:
-                    bmesh.ops.dissolve_limit(bm, {'TAG'}, {'TAG'}, 0.001)
+                    bmesh.ops.dissolve_limit(bm, verts=bm.verts, edges=bm.edges, angle_limit=0.001)
                 except RuntimeError:
                     import traceback
                     traceback.print_exc()
@@ -313,4 +356,33 @@ def cell_fracture_boolean(scene, obj, objects, apply=True, clean=True):
 
         if obj_cell is not None:
             objects_boolean.append(obj_cell)
+            
+            if use_debug_redraw:
+                _redraw_yasiamevil()
+
+    if (not use_debug_bool) and use_island_split:
+        # this is ugly and Im not proud of this - campbell
+        objects_islands = []
+        for obj_cell in objects_boolean:
+
+            scene.objects.active = obj_cell
+
+            group_island = bpy.data.groups.new(name="Islands")
+            group_island.objects.link(obj_cell)
+
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.separate(type='LOOSE')
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+            objects_islands.extend(group_island.objects[:])
+
+            bpy.data.groups.remove(group_island)
+
+            scene.objects.active = None
+
+        objects_boolean = objects_islands
+
+    scene.update()
+
     return objects_boolean

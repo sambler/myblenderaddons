@@ -24,10 +24,10 @@ bl_info = {
     "location": "Search > Fracture Object & Add -> Fracture Helper Objects",
     "description": "Fractured Object, Bomb, Projectile, Recorder",
     "warning": "",
-    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"\
-        "Scripts/Object/Fracture",
-    "tracker_url": "https://projects.blender.org/tracker/index.php?"\
-        "func=detail&aid=21793",
+    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"
+                "Scripts/Object/Fracture",
+    "tracker_url": "https://projects.blender.org/tracker/index.php?"
+                   "func=detail&aid=21793",
     "category": "Object"}
 
 
@@ -40,6 +40,7 @@ from bpy.props import (StringProperty,
                        BoolProperty,
                        IntProperty,
                        FloatProperty,
+                       FloatVectorProperty,
                        EnumProperty)
 
 from bpy.types import Operator
@@ -54,11 +55,26 @@ def main_object(scene, obj, level, **kw):
     recursion = kw_copy.pop("recursion")
     recursion_chance = kw_copy.pop("recursion_chance")
     recursion_chance_select = kw_copy.pop("recursion_chance_select")
+    use_layer_next = kw_copy.pop("use_layer_next")
+    use_layer_index = kw_copy.pop("use_layer_index")
+    group_name = kw_copy.pop("group_name")
+    use_island_split = kw_copy.pop("use_island_split")
+    use_debug_bool = kw_copy.pop("use_debug_bool")
 
     from . import fracture_cell_setup
+
+    # not essential but selection is visual distraction.
+    obj.select = False
+
+    if kw_copy["use_debug_redraw"]:
+        obj_draw_type_prev = obj.draw_type
+        obj.draw_type = 'WIRE'
     
     objects = fracture_cell_setup.cell_fracture_objects(scene, obj, **kw_copy)
-    objects = fracture_cell_setup.cell_fracture_boolean(scene, obj, objects)
+    objects = fracture_cell_setup.cell_fracture_boolean(scene, obj, objects,
+                                                        use_island_split=use_island_split,
+                                                        use_debug_bool=use_debug_bool,
+                                                        use_debug_redraw=kw_copy["use_debug_redraw"])
 
     # todo, split islands.
 
@@ -107,10 +123,36 @@ def main_object(scene, obj, level, **kw):
                 scene.objects.unlink(obj_cell)
                 del objects[i]
         objects.extend(objects_recursive)
-                
+
+    #--------------
+    # Scene Options
+
+    # layer
+    layers_new = None
+    if use_layer_index != 0:
+        layers_new = [False] * 20
+        layers_new[use_layer_index - 1] = True
+    elif use_layer_next:
+        layers_new = [False] * 20
+        layers_new[(obj.layers[:].index(True) + 1) % 20] = True
+
+    if layers_new is not None:
+        for obj_cell in objects:
+            obj_cell.layers = layers_new
+
+    # group
+    if group_name:
+        group = bpy.data.groups.get(group_name)
+        if group is None:
+            group = bpy.data.groups.new(group_name)
+        for obj_cell in objects:
+            group.objects.link(obj_cell)
+
+    if kw_copy["use_debug_redraw"]:
+        obj.draw_type = obj_draw_type_prev
 
     # testing only!
-    obj.hide = True
+    # obj.hide = True
     return objects
 
 
@@ -118,8 +160,12 @@ def main(context, **kw):
     import time
     t = time.time()
     scene = context.scene
-    obj = context.active_object
-    objects = main_object(scene, obj, 0, **kw)
+    objects_context = context.selected_editable_objects
+
+    objects = []
+    for obj in objects_context:
+        if obj.type == 'MESH':
+            objects += main_object(scene, obj, 0, **kw)
 
     bpy.ops.object.select_all(action='DESELECT')
     for obj_cell in objects:
@@ -130,7 +176,7 @@ def main(context, **kw):
 
 class FractureCell(Operator):
     bl_idname = "object.add_fracture_cell_objects"
-    bl_label = "Cell Fracture Helper Objects"
+    bl_label = "Cell fracture selected mesh objects"
     bl_options = {'PRESET'}
 
     # -------------------------------------------------------------------------
@@ -138,11 +184,7 @@ class FractureCell(Operator):
     source = EnumProperty(
             name="Source",
             items=(('VERT_OWN', "Own Verts", "Use own vertices"),
-                   ('EDGE_OWN', "Own Edges", "Use own edges"),
-                   ('FACE_OWN', "Own Faces", "Use own faces"),
                    ('VERT_CHILD', "Child Verts", "Use own vertices"),
-                   ('EDGE_CHILD', "Child Edges", "Use own edges"),
-                   ('FACE_CHILD', "Child Faces", "Use own faces"),
                    ('PARTICLE', "Particles", ("All particle systems of the "
                                               "source object")),
                    ('PENCIL', "Grease Pencil", "This objects grease pencil"),
@@ -163,6 +205,42 @@ class FractureCell(Operator):
             description="Randomize point distrobution",
             min=0.0, max=1.0,
             default=0.0,
+            )
+
+    cell_scale = FloatVectorProperty(
+            name="Scale",
+            description="Scale Cell Shape",
+            size=3,
+            min=0.0, max=1.0,
+            default=(1.0, 1.0, 1.0),
+            )
+
+    # -------------------------------------------------------------------------
+    # Recursion
+
+    recursion = IntProperty(
+            name="Recursion",
+            description="Break shards resursively",
+            min=0, max=5000,
+            default=0,
+            )
+
+    recursion_chance = FloatProperty(
+            name="Random Factor",
+            description="Likelyhood of recursion",
+            min=0.0, max=1.0,
+            default=1.0,
+            )
+
+    recursion_chance_select = EnumProperty(
+            name="Recurse Over",
+            items=(('RANDOM', "Random", ""),
+                   ('SIZE_MIN', "Small", "Recursively subdivide smaller objects"),
+                   ('SIZE_MAX', "Big", "Recursively subdivide smaller objects"),
+                   ('CURSOR_MIN', "Cursor Close", "Recursively subdivide objects closer to the cursor"),
+                   ('CURSOR_MAX', "Cursor Far", "Recursively subdivide objects closer to the cursor"),
+                   ),
+            default='SIZE_MIN',
             )
 
     # -------------------------------------------------------------------------
@@ -198,6 +276,12 @@ class FractureCell(Operator):
             default=0.001,
             )
 
+    material_index = IntProperty(
+            name="Material",
+            description="Material index for interior faces",
+            default=0,
+            )
+
     # -------------------------------------------------------------------------
     # Object Options
 
@@ -214,31 +298,48 @@ class FractureCell(Operator):
             )
 
     # -------------------------------------------------------------------------
-    # Recursion
+    # Scene Options
+    #
+    # .. dirreferent from object options in that this controls how the objects
+    #    are setup in the scene.  
 
-    recursion = IntProperty(
-            name="Recursion",
-            description="Break shards resursively",
-            min=0, max=5000,
-            default=0,
+    use_layer_index = IntProperty(
+            name="Layer Index",
+            description="Layer to add the objects into or 0 for existing",
+            default=-1,
+            min=0, max=20,
             )
 
-    recursion_chance = FloatProperty(
-            name="Random Factor",
-            description="Likelyhood of recursion",
-            min=0.0, max=1.0,
-            default=1.0,
+    use_layer_next = BoolProperty(
+            name="Next Layer",
+            description="At the object into the next layer (layer index overrides)",
+            default=True,
             )
 
-    recursion_chance_select = EnumProperty(
-            name="Recurse Over",
-            items=(('RANDOM', "Random", ""),
-                   ('SIZE_MIN', "Small", "Recursively subdivide smaller objects"),
-                   ('SIZE_MAX', "Big", "Recursively subdivide smaller objects"),
-                   ('CURSOR_MIN', "Cursor Close", "Recursively subdivide objects closer to the cursor"),
-                   ('CURSOR_MAX', "Cursor Far", "Recursively subdivide objects closer to the cursor"),
-                   ),
-            default='SIZE_MIN',
+    group_name = StringProperty(
+            name="Group",
+            description="Create objects int a group "
+                        "(use existing or create new)",
+            )
+
+    # -------------------------------------------------------------------------
+    # Debug
+    use_debug_points = BoolProperty(
+            name="Debug Points",
+            description="Create mesh data showing the points used for fracture",
+            default=False,
+            )
+            
+    use_debug_redraw = BoolProperty(
+            name="Show Progress Realtime",
+            description="Redraw as fracture is done",
+            default=True,
+            )
+
+    use_debug_bool = BoolProperty(
+            name="Debug Boolean",
+            description="Skip applying the boolean modifier",
+            default=False,
             )
 
     def execute(self, context):
@@ -252,7 +353,7 @@ class FractureCell(Operator):
     def invoke(self, context, event):
         print(self.recursion_chance_select)
         wm = context.window_manager
-        return wm.invoke_props_dialog(self, width=1000)
+        return wm.invoke_props_dialog(self, width=600)
 
     def draw(self, context):
         layout = self.layout
@@ -265,22 +366,7 @@ class FractureCell(Operator):
         rowsub.prop(self, "source_limit")
         rowsub.prop(self, "source_noise")
         rowsub = col.row()
-
-        box = layout.box()
-        col = box.column()
-        col.label("Mesh Data")
-        rowsub = col.row(align=True)
-        rowsub.prop(self, "use_smooth_faces")
-        rowsub.prop(self, "use_smooth_edges")
-        rowsub.prop(self, "use_data_match")
-        rowsub.prop(self, "margin")
-        # rowsub.prop(self, "use_island_split")  # TODO
-
-        box = layout.box()
-        col = box.column()
-        col.label("Object")
-        rowsub = col.row(align=True)
-        rowsub.prop(self, "use_recenter")
+        rowsub.prop(self, "cell_scale")
 
         box = layout.box()
         col = box.column()
@@ -291,22 +377,58 @@ class FractureCell(Operator):
         rowsub.prop(self, "recursion_chance")
         rowsub.prop(self, "recursion_chance_select", expand=True)
 
-#def menu_func(self, context):
-#    self.layout.menu("INFO_MT_add_fracture_objects", icon="PLUGIN")
+        box = layout.box()
+        col = box.column()
+        col.label("Mesh Data")
+        rowsub = col.row()
+        rowsub.prop(self, "use_smooth_faces")
+        rowsub.prop(self, "use_smooth_edges")
+        rowsub.prop(self, "use_data_match")
+        rowsub.prop(self, "material_index")
+        rowsub = col.row()
+        # could be own section, control how we subdiv
+        rowsub.prop(self, "margin")
+        rowsub.prop(self, "use_island_split")
+
+        box = layout.box()
+        col = box.column()
+        col.label("Object")
+        rowsub = col.row(align=True)
+        rowsub.prop(self, "use_recenter")
+
+
+        box = layout.box()
+        col = box.column()
+        col.label("Scene")
+        rowsub = col.row(align=True)
+        rowsub.prop(self, "use_layer_index")
+        rowsub.prop(self, "use_layer_next")
+        rowsub.prop(self, "group_name")
+        
+        box = layout.box()
+        col = box.column()
+        col.label("Debug")
+        rowsub = col.row(align=True)
+        rowsub.prop(self, "use_debug_redraw")
+        rowsub.prop(self, "use_debug_points")
+        rowsub.prop(self, "use_debug_bool")
+
+
+def menu_func(self, context):
+    layout = self.layout
+    layout.label("Cell Fracture:")
+    layout.operator("object.add_fracture_cell_objects",
+                    text="Cell Fracture")
 
 
 def register():
     bpy.utils.register_class(FractureCell)
-
-    # Add the "add fracture objects" menu to the "Add" menu
-    # bpy.types.INFO_MT_add.append(menu_func)
+    bpy.types.VIEW3D_PT_tools_objectmode.append(menu_func)
 
 
 def unregister():
     bpy.utils.unregister_class(FractureCell)
-
-    # Remove "add fracture objects" menu from the "Add" menu.
-    # bpy.types.INFO_MT_add.remove(menu_func)
+    bpy.types.VIEW3D_PT_tools_objectmode.remove(menu_func)
 
 
 if __name__ == "__main__":
