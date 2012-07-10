@@ -145,8 +145,10 @@ def main_object(scene, obj, level, **kw):
         group = bpy.data.groups.get(group_name)
         if group is None:
             group = bpy.data.groups.new(group_name)
+        group_objects = group.objects[:]
         for obj_cell in objects:
-            group.objects.link(obj_cell)
+            if not in group_objects:
+                group.objects.link(obj_cell)
 
     if kw_copy["use_debug_redraw"]:
         obj.draw_type = obj_draw_type_prev
