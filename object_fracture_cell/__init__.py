@@ -147,7 +147,7 @@ def main_object(scene, obj, level, **kw):
             group = bpy.data.groups.new(group_name)
         group_objects = group.objects[:]
         for obj_cell in objects:
-            if not in group_objects:
+            if obj_cell not in group_objects:
                 group.objects.link(obj_cell)
 
     if kw_copy["use_debug_redraw"]:
@@ -316,7 +316,7 @@ class FractureCell(Operator):
     use_layer_index = IntProperty(
             name="Layer Index",
             description="Layer to add the objects into or 0 for existing",
-            default=-1,
+            default=0,
             min=0, max=20,
             )
 
@@ -415,7 +415,7 @@ class FractureCell(Operator):
         rowsub.prop(self, "use_layer_index")
         rowsub.prop(self, "use_layer_next")
         rowsub.prop(self, "group_name")
-        
+
         box = layout.box()
         col = box.column()
         col.label("Debug")
