@@ -95,7 +95,7 @@ def _points_from_object(obj, source):
 
     # geom particles
     if 'PARTICLE_OWN' in source:
-        points_from_verts(obj)
+        points_from_particles(obj)
 
     if 'PARTICLE_CHILD' in source:
         for obj_child in obj.children:
@@ -168,6 +168,8 @@ def cell_fracture_objects(scene, obj,
     del to_tuple
     del Vector
 
+    # end remove doubles
+    # ------------------
 
     if source_noise > 0.0:
         from random import random
@@ -180,9 +182,7 @@ def cell_fracture_objects(scene, obj,
         from mathutils.noise import random_unit_vector
         
         points[:] = [p + (random_unit_vector() * (scalar * random())) for p in points]
-    
-    # end remove doubles
-    # ------------------
+
 
     if use_debug_points:
         bm = bmesh.new()
@@ -319,10 +319,14 @@ def cell_fracture_boolean(scene, obj, objects,
                           use_debug_bool=False,
                           clean=True,
                           use_island_split=False,
+                          use_interior_vgroup=False,
                           use_debug_redraw=False,
                           ):
 
     objects_boolean = []
+
+    if use_interior_vgroup:
+        obj.data.polygons.foreach_set("hide", [False] * len(obj.data.polygons))
     
     for obj_cell in objects:
         mod = obj_cell.modifiers.new(name="Boolean", type='BOOLEAN')
@@ -330,6 +334,10 @@ def cell_fracture_boolean(scene, obj, objects,
         mod.operation = 'INTERSECT'
 
         if not use_debug_bool:
+
+            if use_interior_vgroup:
+                obj_cell.data.polygons.foreach_set("hide", [True] * len(obj_cell.data.polygons))
+
             mesh_new = obj_cell.to_mesh(scene,
                                         apply_modifiers=True,
                                         settings='PREVIEW')
@@ -364,6 +372,28 @@ def cell_fracture_boolean(scene, obj, objects,
                     traceback.print_exc()
                 bm.to_mesh(mesh_new)
                 bm.free()
+
+            if use_interior_vgroup and mesh_new:
+                bm = bmesh.new()
+                bm.from_mesh(mesh_new)
+                for bm_vert in bm.verts:
+                    bm_vert.tag = True
+                for bm_face in bm.faces:
+                    if not bm_face.hide:
+                        for bm_vert in bm_face.verts:
+                            bm_vert.tag = False
+                # now add all vgroups
+                defvert_lay = bm.verts.layers.deform.verify()
+                for bm_vert in bm.verts:
+                    if bm_vert.tag:
+                        bm_vert[defvert_lay][0] = 1.0
+                for bm_face in bm.faces:
+                    bm_face.hide = False
+                bm.to_mesh(mesh_new)
+                bm.free()
+
+                # add a vgroup
+                obj_cell.vertex_groups.new(name="Interior")
 
         if obj_cell is not None:
             objects_boolean.append(obj_cell)
