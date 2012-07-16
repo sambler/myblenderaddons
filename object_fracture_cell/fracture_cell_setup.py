@@ -320,8 +320,7 @@ def cell_fracture_boolean(scene, obj, objects,
 
     objects_boolean = []
 
-    if use_interior_vgroup or (use_smooth_edges is False):
-        do_hide_hack = True
+    do_hide_hack = use_interior_vgroup or (use_smooth_edges is False)
 
     if do_hide_hack:
         obj.data.polygons.foreach_set("hide", [False] * len(obj.data.polygons))
