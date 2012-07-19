@@ -52,6 +52,7 @@ def main_object(scene, obj, level, **kw):
     use_remove_original = kw_copy.pop("use_remove_original")
     recursion = kw_copy.pop("recursion")
     recursion_source_limit = kw_copy.pop("recursion_source_limit")
+    recursion_clamp = kw_copy.pop("recursion_clamp")
     recursion_chance = kw_copy.pop("recursion_chance")
     recursion_chance_select = kw_copy.pop("recursion_chance_select")
     use_layer_next = kw_copy.pop("use_layer_next")
@@ -60,6 +61,8 @@ def main_object(scene, obj, level, **kw):
     use_island_split = kw_copy.pop("use_island_split")
     use_debug_bool = kw_copy.pop("use_debug_bool")
     use_interior_vgroup = kw_copy.pop("use_interior_vgroup")
+    use_sharp_edges = kw_copy.pop("use_sharp_edges")
+    use_sharp_edges_apply = kw_copy.pop("use_sharp_edges_apply")
 
     if level != 0:
         kw_copy["source_limit"] = recursion_source_limit
@@ -76,57 +79,69 @@ def main_object(scene, obj, level, **kw):
     objects = fracture_cell_setup.cell_fracture_objects(scene, obj, **kw_copy)
     objects = fracture_cell_setup.cell_fracture_boolean(scene, obj, objects,
                                                         use_island_split=use_island_split,
-                                                        use_interior_vgroup=use_interior_vgroup,
+                                                        use_interior_hide=(use_interior_vgroup or use_sharp_edges),
                                                         use_debug_bool=use_debug_bool,
-                                                        use_debug_redraw=kw_copy["use_debug_redraw"])
-
-    # todo, split islands.
+                                                        use_debug_redraw=kw_copy["use_debug_redraw"],
+                                                        level=level,
+                                                        )
 
     # must apply after boolean.
     if use_recenter:
         bpy.ops.object.origin_set({"selected_editable_objects": objects},
                                   type='ORIGIN_GEOMETRY', center='MEDIAN')
 
-    if level < recursion:
+    if level == 0:
+        for level_sub in range(1, recursion + 1):
 
-        objects_recurse_input = [(i, o) for i, o in enumerate(objects)]
+            objects_recurse_input = [(i, o) for i, o in enumerate(objects)]
 
-        if recursion_chance != 1.0:
-            
-            if 0:
-                random.shuffle(objects_recurse_input)
-            else:
+            if recursion_chance != 1.0:
                 from mathutils import Vector
                 if recursion_chance_select == 'RANDOM':
-                    pass
-                elif recursion_chance_select == {'SIZE_MIN', 'SIZE_MAX'}:
+                    random.shuffle(objects_recurse_input)
+                elif recursion_chance_select in {'SIZE_MIN', 'SIZE_MAX'}:
                     objects_recurse_input.sort(key=lambda ob_pair:
                         (Vector(ob_pair[1].bound_box[0]) -
                          Vector(ob_pair[1].bound_box[6])).length_squared)
                     if recursion_chance_select == 'SIZE_MAX':
                         objects_recurse_input.reverse()
-                elif recursion_chance_select == {'CURSOR_MIN', 'CURSOR_MAX'}:
-                    print(recursion_chance_select)
+                elif recursion_chance_select in {'CURSOR_MIN', 'CURSOR_MAX'}:
                     c = scene.cursor_location.copy()
                     objects_recurse_input.sort(key=lambda ob_pair:
-                        (ob_pair[1].matrix_world.translation - c).length_squared)
+                        (ob_pair[1].location - c).length_squared)
                     if recursion_chance_select == 'CURSOR_MAX':
                         objects_recurse_input.reverse()
 
                 objects_recurse_input[int(recursion_chance * len(objects_recurse_input)):] = []
                 objects_recurse_input.sort()
 
-        # reverse index values so we can remove from original list.
-        objects_recurse_input.reverse()
+            # reverse index values so we can remove from original list.
+            objects_recurse_input.reverse()
 
-        objects_recursive = []
-        for i, obj_cell in objects_recurse_input:
-            assert(objects[i] is obj_cell)
-            objects_recursive += main_object(scene, obj_cell, level + 1, **kw)
-            if use_remove_original:
-                scene.objects.unlink(obj_cell)
-                del objects[i]
-        objects.extend(objects_recursive)
+            objects_recursive = []
+            for i, obj_cell in objects_recurse_input:
+                assert(objects[i] is obj_cell)
+                objects_recursive += main_object(scene, obj_cell, level_sub, **kw)
+                if use_remove_original:
+                    scene.objects.unlink(obj_cell)
+                    del objects[i]
+                if recursion_clamp and len(objects) + len(objects_recursive) >= recursion_clamp:
+                    break
+            objects.extend(objects_recursive)
+
+            if recursion_clamp and len(objects) > recursion_clamp:
+                break
+
+    #--------------
+    # Level Options
+    if level == 0:
+        # import pdb; pdb.set_trace()
+        if use_interior_vgroup or use_sharp_edges:
+            fracture_cell_setup.cell_fracture_interior_handle(objects,
+                                                              use_interior_vgroup=use_interior_vgroup,
+                                                              use_sharp_edges=use_sharp_edges,
+                                                              use_sharp_edges_apply=use_sharp_edges_apply,
+                                                              )
 
     #--------------
     # Scene Options
@@ -182,7 +197,7 @@ def main(context, **kw):
     bpy.ops.object.select_all(action='DESELECT')
     for obj_cell in objects:
         obj_cell.select = True
-    
+
     if mass_mode == 'UNIFORM':
         for obj_cell in objects:
             obj_cell.game.mass = mass
@@ -243,14 +258,14 @@ class FractureCell(Operator):
                    ('PENCIL', "Grease Pencil", "This objects grease pencil"),
                    ),
             options={'ENUM_FLAG'},
-            default={'PARTICLE_OWN', 'VERT_OWN'},
+            default={'PARTICLE_OWN'},
             )
 
     source_limit = IntProperty(
             name="Source Limit",
             description="Limit the number of input points, 0 for unlimited",
             min=0, max=5000,
-            default=1000,
+            default=100,
             )
 
     source_noise = FloatProperty(
@@ -285,11 +300,18 @@ class FractureCell(Operator):
             default=8,
             )
 
+    recursion_clamp = IntProperty(
+            name="Clamp Recursion",
+            description="Finish recursion when this number of objects is reached (prevents recursing for extended periods of time), zero disables",
+            min=0, max=10000,
+            default=250,
+            )
+
     recursion_chance = FloatProperty(
             name="Random Factor",
             description="Likelyhood of recursion",
             min=0.0, max=1.0,
-            default=1.0,
+            default=0.25,
             )
 
     recursion_chance_select = EnumProperty(
@@ -311,9 +333,15 @@ class FractureCell(Operator):
             default=False,
             )
 
-    use_smooth_edges = BoolProperty(
-            name="Smooth Edges",
-            description="Set sharp edges whem disabled",
+    use_sharp_edges = BoolProperty(
+            name="Sharp Edges",
+            description="Set sharp edges when disabled",
+            default=True,
+            )
+
+    use_sharp_edges_apply = BoolProperty(
+            name="Apply Split Edge",
+            description="Split sharp hard edges",
             default=True,
             )
 
@@ -459,6 +487,7 @@ class FractureCell(Operator):
         rowsub = col.row(align=True)
         rowsub.prop(self, "recursion")
         rowsub.prop(self, "recursion_source_limit")
+        rowsub.prop(self, "recursion_clamp")
         rowsub = col.row()
         rowsub.prop(self, "recursion_chance")
         rowsub.prop(self, "recursion_chance_select", expand=True)
@@ -468,12 +497,16 @@ class FractureCell(Operator):
         col.label("Mesh Data")
         rowsub = col.row()
         rowsub.prop(self, "use_smooth_faces")
-        rowsub.prop(self, "use_smooth_edges")
+        rowsub.prop(self, "use_sharp_edges")
+        rowsub.prop(self, "use_sharp_edges_apply")
         rowsub.prop(self, "use_data_match")
-        rowsub.prop(self, "use_interior_vgroup")
-        rowsub.prop(self, "material_index")
         rowsub = col.row()
-        # could be own section, control how we subdiv
+
+        # on same row for even layout but infact are not all that related
+        rowsub.prop(self, "material_index")
+        rowsub.prop(self, "use_interior_vgroup")
+
+        # could be own section, control how we subdiv        
         rowsub.prop(self, "margin")
         rowsub.prop(self, "use_island_split")
 
