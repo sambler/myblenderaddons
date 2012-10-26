@@ -821,8 +821,7 @@ class OBJECT_OT_PathEditing(bpy.types.Operator):
 
 class OBJECT_OT_AnimationStitchingButton(bpy.types.Operator):
     #Operator which calls stitching function, combining 2 animations onto the NLA.
-    """Stitche two defined animations into a single one via """ \
-    """alignment of NLA Tracks"""
+    """Stitch two defined animations into a single one via alignment of NLA Tracks"""
     bl_idname = "mocap.animstitch"
     bl_label = "Stitch Animations"
 
