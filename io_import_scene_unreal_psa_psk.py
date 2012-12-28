@@ -366,7 +366,7 @@ def pskimport(infile,importmesh,importbone,bDebugLogPSK,importmultiuvtextures):
              createbone.bindmat = mathutils.Quaternion((indata[7], -indata[4], -indata[5], -indata[6])).to_matrix()
              createbone.origmat = mathutils.Quaternion((indata[7], -indata[4], -indata[5], -indata[6])).to_matrix()
         
-        createbone.bindmat = mathutils.Matrix.Translation(mathutils.Vector((indata[8], indata[9], indata[10]))) *
+        createbone.bindmat = mathutils.Matrix.Translation(mathutils.Vector((indata[8], indata[9], indata[10]))) * \
                              createbone.bindmat.to_4x4()
 
         md5_bones.append(createbone)
