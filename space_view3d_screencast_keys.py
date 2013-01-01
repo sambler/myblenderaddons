@@ -19,19 +19,19 @@
 # <pep8 compliant>
 
 bl_info = {
-    'name': "Screencast Keys",
-    'author': 'Paulo Gomes, Bart Crouch, John E. Herrenyo, Gaia Clary, Pablo Vazquez',
-    'version': (1, 7),
-    'blender': (2, 6, 4),
-    'location': '3D View > Properties Panel > Screencast Keys',
-    'warning': '',
-    'description': 'Display keys pressed in the 3D View, '\
-        'useful for screencasts.',
-    'wiki_url': 'http://wiki.blender.org/index.php/Extensions:2.6/'
-                'Py/Scripts/3D_interaction/Screencast_Key_Status_Tool',
-    'tracker_url': 'http://projects.blender.org/tracker/index.php?'
-                   'func=detail&aid=21612',
-    'category': '3D View'}
+    "name": "Screencast Keys",
+    "author": "Paulo Gomes, Bart Crouch, John E. Herrenyo, Gaia Clary, Pablo Vazquez",
+    "version": (1, 7),
+    "blender": (2, 64, 0),
+    "location": "3D View > Properties Panel > Screencast Keys",
+    "warning": "",
+    "description": "Display keys pressed in the 3D View, "
+                   "useful for screencasts.",
+    "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/"
+                "Py/Scripts/3D_interaction/Screencast_Key_Status_Tool",
+    "tracker_url": "http://projects.blender.org/tracker/index.php?"
+                   "func=detail&aid=21612",
+    "category": "3D View"}
 
 import bgl
 import blf
@@ -581,7 +581,7 @@ class ScreencastKeysStatus(bpy.types.Operator):
         if not context.window_manager.screencast_keys_keys:
             # stop script
             context.window_manager.event_timer_remove(self._timer)
-            context.region.callback_remove(self._handle)
+            bpy.types.SpaceView3D.draw_handler_remove(self._handle, 'WINDOW')
             return {'CANCELLED'}
 
         return {'PASS_THROUGH'}
@@ -589,7 +589,7 @@ class ScreencastKeysStatus(bpy.types.Operator):
     def cancel(self, context):
         if context.window_manager.screencast_keys_keys:
             context.window_manager.event_timer_remove(self._timer)
-            context.region.callback_remove(self._handle)
+            bpy.types.SpaceView3D.draw_handler_remove(self._handle, 'WINDOW')
             context.window_manager.screencast_keys_keys = False
         return {'CANCELLED'}
 
@@ -603,8 +603,8 @@ class ScreencastKeysStatus(bpy.types.Operator):
                 self.mouse = []
                 self.mouse_time = []
                 ScreencastKeysStatus.overall_time = []
-                self._handle = context.region.callback_add(draw_callback_px,
-                    (self, context), 'POST_PIXEL')
+                self._handle = bpy.types.SpaceView3D.draw_handler_add(draw_callback_px,
+                    (self, context), 'WINDOW', 'POST_PIXEL')
                 self._timer = context.window_manager.event_timer_add(0.075,
                     context.window)
                 ScreencastKeysStatus.overall_time.insert(0, time.time())
