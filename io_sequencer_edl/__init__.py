@@ -275,7 +275,7 @@ class SEQUENCER_PT_import_edl(bpy.types.Panel):
         scene = context.scene
         edl_import_info = scene.edl_import_info
 
-        layout.operator(ReloadEDL.bl_idname)
+        layout.operator(ImportEDL.bl_idname)
 
         col = layout.column(align=True)
         col.prop(edl_import_info, "filepath", text="")
