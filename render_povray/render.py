@@ -873,7 +873,7 @@ def write_pov(filename, scene=None, info_callback=None):
                                             # Write three times the first point to compensate pov Bezier handling
                                             file.write('<%.6g,%.6g,%.6g>,%.7g,\n' % (controlPoint.co[0], controlPoint.co[1], controlPoint.co[2], abs(hDiameter)))
                                             file.write('<%.6g,%.6g,%.6g>,%.7g,\n' % (controlPoint.co[0], controlPoint.co[1], controlPoint.co[2], abs(hDiameter)))                                          
-											#file.write('<%.6g,%.6g,%.6g>,%.7g' % (particle.location[0], particle.location[1], particle.location[2], abs(hDiameter))) # Useless because particle location is the tip, not the root.
+                                            #file.write('<%.6g,%.6g,%.6g>,%.7g' % (particle.location[0], particle.location[1], particle.location[2], abs(hDiameter))) # Useless because particle location is the tip, not the root.
                                             #file.write(',\n')
                                         controlPointCounter += 1
                                         #totalNumberOfHairs += len(pSys.particles)# len(particle.hair_keys)
@@ -2011,7 +2011,7 @@ class PovrayRender(bpy.types.RenderEngine):
     DELAY = 0.5
 
     @staticmethod
-    def locate_binary():
+    def _locate_binary():
         addon_prefs = bpy.context.user_preferences.addons[__package__].preferences
 
         # Use the system preference if its set.
@@ -2087,7 +2087,7 @@ class PovrayRender(bpy.types.RenderEngine):
         except OSError:
             pass
 
-        pov_binary = PovrayRender.locate_binary()
+        pov_binary = PovrayRender._locate_binary()
         if not pov_binary:
             print("POV-Ray 3.7: could not execute povray, possibly POV-Ray isn't installed")
             return False
@@ -2350,47 +2350,49 @@ class PovrayRender(bpy.types.RenderEngine):
 
             # Not needed right now, might only be useful if we find a way to use temp raw output of
             # pov 3.7 (in which case it might go under _test_wait()).
-#            def update_image():
-#                # possible the image wont load early on.
-#                try:
-#                    lay.load_from_file(self._temp_file_out)
-#                    # XXX, tests for border render.
-#                    #lay.load_from_file(self._temp_file_out, xmin, ymin)
-#                    #lay.load_from_file(self._temp_file_out, xmin, ymin)
-#                except RuntimeError:
-#                    pass
+            '''
+            def update_image():
+                # possible the image wont load early on.
+                try:
+                    lay.load_from_file(self._temp_file_out)
+                    # XXX, tests for border render.
+                    #lay.load_from_file(self._temp_file_out, xmin, ymin)
+                    #lay.load_from_file(self._temp_file_out, xmin, ymin)
+                except RuntimeError:
+                    pass
 
-#            # Update while POV-Ray renders
-#            while True:
-#                # print("***POV RENDER LOOP***")
+            # Update while POV-Ray renders
+            while True:
+                # print("***POV RENDER LOOP***")
 
-#                # test if POV-Ray exists
-#                if self._process.poll() is not None:
-#                    print("***POV PROCESS FINISHED***")
-#                    update_image()
-#                    break
+                # test if POV-Ray exists
+                if self._process.poll() is not None:
+                    print("***POV PROCESS FINISHED***")
+                    update_image()
+                    break
 
-#                # user exit
-#                if self.test_break():
-#                    try:
-#                        self._process.terminate()
-#                        print("***POV PROCESS INTERRUPTED***")
-#                    except OSError:
-#                        pass
+                # user exit
+                if self.test_break():
+                    try:
+                        self._process.terminate()
+                        print("***POV PROCESS INTERRUPTED***")
+                    except OSError:
+                        pass
 
-#                    break
+                    break
 
-#                # Would be nice to redirect the output
-#                # stdout_value, stderr_value = self._process.communicate() # locks
+                # Would be nice to redirect the output
+                # stdout_value, stderr_value = self._process.communicate() # locks
 
-#                # check if the file updated
-#                new_size = os.path.getsize(self._temp_file_out)
+                # check if the file updated
+                new_size = os.path.getsize(self._temp_file_out)
 
-#                if new_size != prev_size:
-#                    update_image()
-#                    prev_size = new_size
+                if new_size != prev_size:
+                    update_image()
+                    prev_size = new_size
 
-#                time.sleep(self.DELAY)
+                time.sleep(self.DELAY)
+            '''
 
             self.end_result(result)
 
