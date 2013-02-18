@@ -25,7 +25,7 @@
 
 # ##### BEGIN COPYRIGHT BLOCK #####
 #
-# initial script copyright (c)2011,2012 Alexander Nussbaumer
+# initial script copyright (c)2011-2013 Alexander Nussbaumer
 #
 # ##### END COPYRIGHT BLOCK #####
 
@@ -357,11 +357,10 @@ class Ms3dImportOperator(Operator, ImportHelper):
         if (self.use_animation):
             box.prop(self, 'rotation_mode', icon=Ms3dUi.ICON_ROTATION_MODE,
                     expand=False)
-            box.prop(self, 'use_joint_size')
+            flow = box.column_flow()
+            flow.prop(self, 'use_joint_size')
             if (self.use_joint_size):
-                col = box.column()
-                row = col.row()
-                row.prop(self, 'joint_size')
+                flow.prop(self, 'joint_size')
             box.prop(self, 'use_joint_to_bones')
             if (self.use_joint_to_bones):
                 box.box().label(ms3d_str['LABEL_NAME_JOINT_TO_BONES'],
@@ -493,6 +492,14 @@ class Ms3dExportOperator(Operator, ExportHelper):
             options={'HIDDEN', }
             )
 
+    ##def object_items(self, blender_context):
+    ##    return[(item.name, item.name, "") for item in blender_context.selected_objects if item.type in {'MESH', }]
+    ##
+    ##object_name = EnumProperty(
+    ##        name="Object",
+    ##        description="select an object to export",
+    ##        items=object_items,
+    ##        )
 
     ##EXPORT_ACTIVE_ONLY:
     ##limit availability to only active mesh object
@@ -510,37 +517,41 @@ class Ms3dExportOperator(Operator, ExportHelper):
         layout = self.layout
 
         box = layout.box()
-        box.label(ms3d_str['LABEL_NAME_OPTIONS'], icon=Ms3dUi.ICON_OPTIONS)
-        box.prop(self, 'verbose', icon='SPEAKER')
+        flow = box.column_flow()
+        flow.label(ms3d_str['LABEL_NAME_OPTIONS'], icon=Ms3dUi.ICON_OPTIONS)
+        flow.prop(self, 'verbose', icon='SPEAKER')
 
         box = layout.box()
-        box.label(ms3d_str['LABEL_NAME_PROCESSING'],
+        flow = box.column_flow()
+        flow.label(ms3d_str['LABEL_NAME_PROCESSING'],
                 icon=Ms3dUi.ICON_PROCESSING)
-        row = box.row()
+        row = flow.row()
         row.label(ms3d_str['PROP_NAME_ACTIVE'], icon='ROTACTIVE')
         row.label(blender_context.active_object.name)
-        #box.prop(self, 'use_blender_names', icon='LINK_BLEND')
-        box.prop(self, 'use_blender_names')
-        box.prop(self, 'use_blender_materials')
+        ##flow.prop(self, 'object_name')
+        flow.prop(self, 'use_blender_names')
+        flow.prop(self, 'use_blender_materials')
 
         box = layout.box()
-        box.label(ms3d_str['LABEL_NAME_MODIFIER'],
+        flow = box.column_flow()
+        flow.label(ms3d_str['LABEL_NAME_MODIFIER'],
                 icon=Ms3dUi.ICON_MODIFIER)
-        box.prop(self, 'apply_transform')
-        row = box.row()
+        flow.prop(self, 'apply_transform')
+        row = flow.row()
         row.prop(self, 'apply_modifiers')
         sub = row.row()
         sub.active = self.apply_modifiers
         sub.prop(self, 'apply_modifiers_mode', text="")
 
         box = layout.box()
-        box.label(ms3d_str['LABEL_NAME_ANIMATION'],
+        flow = box.column_flow()
+        flow.label(ms3d_str['LABEL_NAME_ANIMATION'],
                 icon=Ms3dUi.ICON_ANIMATION)
-        box.prop(self, 'use_animation')
+        flow.prop(self, 'use_animation')
         if (self.use_animation):
-            box.prop(self, 'normalize_weights')
-            box.prop(self, 'shrink_to_keys')
-            box.prop(self, 'bake_each_frame')
+            flow.prop(self, 'normalize_weights')
+            flow.prop(self, 'shrink_to_keys')
+            flow.prop(self, 'bake_each_frame')
 
     # entrypoint for blender -> MS3D
     def execute(self, blender_context):

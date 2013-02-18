@@ -18,15 +18,17 @@
 
 # <pep8 compliant>
 
-import bpy
-from mathutils import Vector
 from math import pi, acos
-from rigify.utils import MetarigError
-from rigify.utils import copy_bone
-from rigify.utils import connected_children_names
-from rigify.utils import strip_org, make_mechanism_name, insert_before_lr
-from rigify.utils import create_widget, create_line_widget, create_sphere_widget
+
+import bpy
 from rna_prop_ui import rna_idprop_ui_prop_get
+from mathutils import Vector
+
+from ....utils import MetarigError
+from ....utils import copy_bone
+from ....utils import connected_children_names
+from ....utils import strip_org, make_mechanism_name, insert_before_lr
+from ....utils import create_widget, create_line_widget, create_sphere_widget
 
 
 def angle_on_plane(plane, vec1, vec2):
@@ -98,14 +100,15 @@ class Rig:
         bpy.ops.object.mode_set(mode='EDIT')
 
         # Create the bones
-        uarm = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], "_ik"))))
-        farm = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], "_ik"))))
+        uarm = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".ik"))))
+        farm = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".ik"))))
 
-        hand = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], "_ik")))
-        pole = copy_bone(self.obj, self.org_bones[0], strip_org(insert_before_lr(self.org_bones[0], "_pole")))
+        hand = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".ik")))
+        pole_target_name = self.params.elbow_target_base_name + "." + insert_before_lr(self.org_bones[0], ".ik").split(".", 1)[1]
+        pole = copy_bone(self.obj, self.org_bones[0], pole_target_name)
 
-        vishand = copy_bone(self.obj, self.org_bones[2], "VIS-" + strip_org(insert_before_lr(self.org_bones[2], "_ik")))
-        vispole = copy_bone(self.obj, self.org_bones[1], "VIS-" + strip_org(insert_before_lr(self.org_bones[0], "_pole")))
+        vishand = copy_bone(self.obj, self.org_bones[2], "VIS-" + strip_org(insert_before_lr(self.org_bones[2], ".ik")))
+        vispole = copy_bone(self.obj, self.org_bones[1], "VIS-" + strip_org(insert_before_lr(self.org_bones[0], "_pole.ik")))
 
         # Get edit bones
         eb = self.obj.data.edit_bones

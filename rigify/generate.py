@@ -24,14 +24,14 @@ import time
 import traceback
 import sys
 from rna_prop_ui import rna_idprop_ui_prop_get
-from rigify.utils import MetarigError, new_bone, get_rig_type
-from rigify.utils import ORG_PREFIX, MCH_PREFIX, DEF_PREFIX, WGT_PREFIX, ROOT_NAME, make_original_name
-from rigify.utils import RIG_DIR
-from rigify.utils import create_root_widget
-from rigify.utils import random_id
-from rigify.utils import copy_attributes
-from rigify.rig_ui_template import UI_SLIDERS, layers_ui, UI_REGISTER
-from rigify import rigs
+
+from .utils import MetarigError, new_bone, get_rig_type
+from .utils import ORG_PREFIX, MCH_PREFIX, DEF_PREFIX, WGT_PREFIX, ROOT_NAME, make_original_name
+from .utils import RIG_DIR
+from .utils import create_root_widget
+from .utils import random_id
+from .utils import copy_attributes
+from .rig_ui_template import UI_SLIDERS, layers_ui, UI_REGISTER
 
 RIG_MODULE = "rigs"
 ORG_LAYER = [n == 31 for n in range(0, 32)]  # Armature layer that original bones should be moved to.
@@ -157,17 +157,15 @@ def generate_rig(context, metarig):
 
         # rigify_type and rigify_parameters
         bone_gen.rigify_type = bone.rigify_type
-        if len(bone.rigify_parameters) > 0:
-            bone_gen.rigify_parameters.add()
-            for prop in dir(bone_gen.rigify_parameters[0]):
-                if (not prop.startswith("_")) \
-                and (not prop.startswith("bl_")) \
-                and (prop != "rna_type"):
-                    try:
-                        setattr(bone_gen.rigify_parameters[0], prop, \
-                                getattr(bone.rigify_parameters[0], prop))
-                    except AttributeError:
-                        print("FAILED TO COPY PARAMETER: " + str(prop))
+        for prop in dir(bone_gen.rigify_parameters):
+            if (not prop.startswith("_")) \
+            and (not prop.startswith("bl_")) \
+            and (prop != "rna_type"):
+                try:
+                    setattr(bone_gen.rigify_parameters, prop, \
+                            getattr(bone.rigify_parameters, prop))
+                except AttributeError:
+                    print("FAILED TO COPY PARAMETER: " + str(prop))
 
         # Custom properties
         for prop in bone.keys():
@@ -412,10 +410,7 @@ def get_bone_rigs(obj, bone_name, halt_on_missing=False):
         pass
     else:
         # Gather parameters
-        try:
-            params = obj.pose.bones[bone_name].rigify_parameters[0]
-        except (KeyError, IndexError):
-            params = None
+        params = obj.pose.bones[bone_name].rigify_parameters
 
         # Get the rig
         try:

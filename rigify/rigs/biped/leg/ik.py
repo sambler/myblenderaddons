@@ -18,15 +18,17 @@
 
 # <pep8 compliant>
 
-import bpy
-from mathutils import Vector
 from math import pi, acos
-from rigify.utils import MetarigError
-from rigify.utils import copy_bone, flip_bone, put_bone
-from rigify.utils import connected_children_names, has_connected_children
-from rigify.utils import strip_org, make_mechanism_name, insert_before_lr
-from rigify.utils import create_widget, create_line_widget, create_sphere_widget, create_circle_widget
+
+import bpy
 from rna_prop_ui import rna_idprop_ui_prop_get
+from mathutils import Vector
+
+from ....utils import MetarigError
+from ....utils import copy_bone, flip_bone, put_bone
+from ....utils import connected_children_names, has_connected_children
+from ....utils import strip_org, make_mechanism_name, insert_before_lr
+from ....utils import create_widget, create_line_widget, create_sphere_widget, create_circle_widget
 
 
 def align_x_axis(obj, bone, vec):
@@ -152,19 +154,20 @@ class Rig:
             make_rocker = True
 
         # Create the bones
-        thigh = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], "_ik"))))
-        shin = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], "_ik"))))
+        thigh = copy_bone(self.obj, self.org_bones[0], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[0], ".ik"))))
+        shin = copy_bone(self.obj, self.org_bones[1], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[1], ".ik"))))
 
-        foot = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], "_ik")))
+        foot = copy_bone(self.obj, self.org_bones[2], strip_org(insert_before_lr(self.org_bones[2], ".ik")))
         foot_ik_target = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(insert_before_lr(self.org_bones[2], "_ik_target"))))
-        pole = copy_bone(self.obj, self.org_bones[0], strip_org(insert_before_lr(self.org_bones[0], "_pole")))
+        pole_target_name = self.params.knee_target_base_name + "." + insert_before_lr(self.org_bones[0], ".ik").split(".", 1)[1]
+        pole = copy_bone(self.obj, self.org_bones[0], pole_target_name)
 
         toe = copy_bone(self.obj, self.org_bones[3], strip_org(self.org_bones[3]))
         toe_parent = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[3] + ".parent")))
         toe_parent_socket1 = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[3] + ".socket1")))
         toe_parent_socket2 = copy_bone(self.obj, self.org_bones[2], make_mechanism_name(strip_org(self.org_bones[3] + ".socket2")))
 
-        foot_roll = copy_bone(self.obj, self.org_bones[4], strip_org(insert_before_lr(self.org_bones[2], "_roll")))
+        foot_roll = copy_bone(self.obj, self.org_bones[4], strip_org(insert_before_lr(self.org_bones[2], "_roll.ik")))
         roll1 = copy_bone(self.obj, self.org_bones[4], make_mechanism_name(strip_org(self.org_bones[2] + ".roll.01")))
         roll2 = copy_bone(self.obj, self.org_bones[4], make_mechanism_name(strip_org(self.org_bones[2] + ".roll.02")))
 
@@ -172,8 +175,8 @@ class Rig:
             rocker1 = copy_bone(self.obj, self.org_bones[5], make_mechanism_name(strip_org(self.org_bones[2] + ".rocker.01")))
             rocker2 = copy_bone(self.obj, self.org_bones[5], make_mechanism_name(strip_org(self.org_bones[2] + ".rocker.02")))
 
-        visfoot = copy_bone(self.obj, self.org_bones[2], "VIS-" + strip_org(insert_before_lr(self.org_bones[2], "_ik")))
-        vispole = copy_bone(self.obj, self.org_bones[1], "VIS-" + strip_org(insert_before_lr(self.org_bones[0], "_pole")))
+        visfoot = copy_bone(self.obj, self.org_bones[2], "VIS-" + strip_org(insert_before_lr(self.org_bones[2], ".ik")))
+        vispole = copy_bone(self.obj, self.org_bones[1], "VIS-" + strip_org(insert_before_lr(self.org_bones[0], "_pole.ik")))
 
         # Get edit bones
         eb = self.obj.data.edit_bones
