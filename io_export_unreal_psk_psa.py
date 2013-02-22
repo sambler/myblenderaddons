@@ -496,6 +496,8 @@ class VTriangle:
         
     def dump(self):
         return pack('HHHBBL', self.WedgeIndex0, self.WedgeIndex1, self.WedgeIndex2, self.MatIndex, self.AuxMatIndex, self.SmoothingGroups)
+        #print("smooth",self.SmoothingGroups)
+        #return pack('HHHBBI', self.WedgeIndex0, self.WedgeIndex1, self.WedgeIndex2, self.MatIndex, self.AuxMatIndex, self.SmoothingGroups)
 
 # END UNREAL DATA STRUCTS
 #===========================================================================
@@ -987,7 +989,7 @@ def sortmesh(selectmesh):
         return selectmesh[0] #return object mesh
     else:
         return meshmerge(selectmesh) #return merge object mesh
-
+import binascii
 #===========================================================================
 # parse_mesh
 #===========================================================================
@@ -1037,7 +1039,7 @@ def parse_mesh( mesh, psk ):
     points_linked   = {}
     
     discarded_face_count = 0
-
+    sys.setrecursionlimit(1000000)
     smoothgroup_list = parse_smooth_groups(mesh.data)
     
     print("{} faces".format(len(mesh.data.tessfaces)))
@@ -1208,19 +1210,15 @@ def parse_mesh( mesh, psk ):
                 raise Error("Normal coplanar with face! points:", mesh.data.vertices[dindex0].co, mesh.data.vertices[dindex1].co, mesh.data.vertices[dindex2].co)
             
             face.select = True
-            #print("smooth:",(current_face.use_smooth))
-            #not sure if this right
-            #tri.SmoothingGroups
             if face.use_smooth == True:
                 tri.SmoothingGroups = 1
             else:
                 tri.SmoothingGroups = 0
-            
-            #tri.SmoothingGroups = 1
             tri.MatIndex = object_material_index
 
             if bpy.context.scene.udk_option_smoothing_groups:
                 tri.SmoothingGroups = smoothgroup_id
+                print("Bool Smooth")
             
             psk.AddFace(tri)
 
@@ -1448,19 +1446,7 @@ def parse_animation( armature, udk_bones, actions_to_export, psa ):
         if not len(action.fcurves):
             print("{} has no keys, skipping".format(action.name))
             continue
-        '''
-        if bpy.context.scene.udk_option_selectanimations:
-            print("Action Set is selected!")
-            bready = False
-            for actionlist in bpy.context.scene.udkas_list:
-                if actionlist.name == action.name and actionlist.bmatch == True and actionlist.bexport == True:
-                    bready = True
-                    print("Added Action Set:",action.name)
-                    break
-            if bready == False:#don't export it
-                print("Skipping Action Set:",action.name)
-                continue
-        '''
+
         # apply action to armature and update scene
         # note if loop all actions that is not armature it will override and will break armature animation.
         armature.animation_data.action = action
@@ -1619,10 +1605,11 @@ def find_armature_and_mesh():
         else:
             raise Error("There is no Armature in the list!")
         meshselected = []
-        parented_meshes = [obj for obj in armature.children if obj.type == 'MESH']
-        for obj in armature.children:
+        #parented_meshes = [obj for obj in armature.children if obj.type == 'MESH']
+        meshes = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH']
+        for obj in meshes:
             #print(dir(obj))
-            if obj.type == 'MESH' and obj.select == True:
+            if obj.type == 'MESH':
                 bexportmesh = False
                 #print("PARENT MESH:",obj.name)
                 for udkmeshlist in bpy.context.scene.udkmesh_list:
@@ -1642,12 +1629,12 @@ def find_armature_and_mesh():
     
         # otherwise, expect a single mesh parented to the armature (other object types are ignored)
         else:
-            print("Number of meshes:",len(parented_meshes))
-            print("Number of meshes (selected):",len(meshselected))
-            if len(parented_meshes) == 1:
-                mesh = parented_meshes[0]
+            print("Number of meshes:",len(meshes))
+            print("Number of meshes (selected):",len(meshes))
+            if len(meshes) == 1:
+                mesh = meshes[0]
                 
-            elif len(parented_meshes) > 1:
+            elif len(meshes) > 1:
                 if len(meshselected) >= 1:
                     mesh = sortmesh(meshselected)
                 else:
@@ -1716,10 +1703,10 @@ def find_armature_and_mesh():
         verbose("Found mesh: {}".format(mesh.name))
     if mesh == None or armature == None:
         raise Error("Check Mesh and Armature are list!")
-    if len(armature.pose.bones) == len(mesh.vertex_groups):
-        print("Armature and Mesh Vertex Groups matches Ok!")
-    else:
-        raise Error("Armature bones:" + str(len(armature.pose.bones)) + " Mesh Vertex Groups:" + str(len(mesh.vertex_groups)) +" doesn't match!")
+    #if len(armature.pose.bones) == len(mesh.vertex_groups):
+        #print("Armature and Mesh Vertex Groups matches Ok!")
+    #else:
+        #raise Error("Armature bones:" + str(len(armature.pose.bones)) + " Mesh Vertex Groups:" + str(len(mesh.vertex_groups)) +" doesn't match!")
     
     #this will check if object need to be rebuild.
     if bpy.context.scene.udk_option_rebuildobjects:
@@ -2164,7 +2151,7 @@ def rebuildarmature(obj):
     armdata = bpy.data.armatures.new(objectname)
     ob_new = bpy.data.objects.new(meshname, armdata)
     bpy.context.scene.objects.link(ob_new)
-    bpy.ops.object.mode_set(mode='OBJECT')
+    #bpy.ops.object.mode_set(mode='OBJECT')
     for i in bpy.context.scene.objects: i.select = False #deselect all objects
     ob_new.select = True
     bpy.context.scene.objects.active = obj
@@ -2232,8 +2219,8 @@ bpy.types.Scene.udkas_list_idx = IntProperty()
 class UL_UDKActionSetList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.label(item.name)
-        layout.prop(item, "bmatch", text="")
-        layout.prop(item, "bexport", text="")
+        layout.prop(item, "bmatch", text="Match")
+        layout.prop(item, "bexport", text="Export")
 
 class UDKObjListPG(bpy.types.PropertyGroup):
     bool    = BoolProperty(default=False)
@@ -2266,8 +2253,8 @@ bpy.types.Scene.udkmesh_list_idx = IntProperty()
 class UL_UDKMeshList(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         layout.label(item.name)
-        layout.prop(item, "bselect", text="")
-        layout.prop(item, "bexport", text="")
+        #layout.prop(item, "bselect", text="Select")
+        layout.prop(item, "bexport", text="Export")
 
 class UDKArmListPG(bpy.types.PropertyGroup):
     bool    = BoolProperty(default=False)
@@ -2279,6 +2266,10 @@ class UDKArmListPG(bpy.types.PropertyGroup):
 bpy.utils.register_class(UDKArmListPG)
 bpy.types.Scene.udkArm_list = CollectionProperty(type=UDKArmListPG)
 bpy.types.Scene.udkArm_list_idx = IntProperty()
+
+class UL_UDKArmList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        layout.label(item.name)
 
 class Panel_UDKExport( bpy.types.Panel ):
 
@@ -2324,15 +2315,18 @@ class Panel_UDKExport( bpy.types.Panel ):
         
         if context.scene.udk_option_selectobjects:
             layout.operator("object.selobjectpdate")
-            layout.label(text="ARMATURE")
-            layout.template_list("UI_UL_list", "", context.scene, "udkArm_list", context.scene, "udkArm_list_idx", rows=3)
-            layout.label(text="MESH - Select / Export")
-            layout.template_list("UL_UDKMeshList", "", context.scene, "udkmesh_list", context.scene, "udkmesh_list_idx", rows=5)
+            layout.label(text="ARMATURE - Index")
+            layout.template_list("UL_UDKArmList", "udk_armatures", context.scene, "udkArm_list",
+                                 context.scene, "udkArm_list_idx", rows=3)
+            layout.label(text="MESH - Export")
+            layout.template_list("UL_UDKMeshList", "", context.scene, "udkmesh_list",
+                                 context.scene, "udkmesh_list_idx", rows=5)
         layout.prop(context.scene, "udk_option_selectanimations")
         if context.scene.udk_option_selectanimations:
             layout.operator("action.setanimupdate")
             layout.label(text="Action Set(s) - Match / Export")
-            layout.template_list("UL_UDKActionSetList", "", context.scene, "udkas_list", context.scene, "udkas_list_idx", rows=5)
+            layout.template_list("UL_UDKActionSetList", "", context.scene, "udkas_list",
+                                 context.scene, "udkas_list_idx", rows=5)
         test = layout.separator()
         layout.prop(context.scene, "udk_option_scale")
         layout.prop(context.scene, "udk_option_rebuildobjects")
