@@ -92,9 +92,9 @@ class ExportVRML(bpy.types.Operator, ExportHelper):
         row.prop(self, "use_mesh_modifiers")
         row = layout.row()
         row.prop(self, "use_uv")
-        row.prop(self, "use_colors")
+        row.prop(self, "use_color")
         row = layout.row()
-        row.active = self.use_colors
+        row.active = self.use_color
         row.prop(self, "color_type")
 
 

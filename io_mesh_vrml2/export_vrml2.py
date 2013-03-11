@@ -148,28 +148,39 @@ def detect_default_image(obj, bm):
     return None
 
 
-def save_object(fw, obj,
+def save_object(fw, scene, obj,
                 use_mesh_modifiers,
                 use_color, color_type,
                 use_uv):
 
     assert(obj.type == 'MESH')
-    
-    # TODO use_mesh_modifiers
 
-    me = obj.data
-    if obj.mode == 'EDIT':
-        bm_orig = bmesh.from_edit_mesh(me)
-        bm = bm_orig.copy()
-    else:
+    if use_mesh_modifiers:
+        is_editmode = (obj.mode == 'EDIT')
+        if is_editmode:
+            bpy.ops.object.editmode_toggle()
+
+        me = obj.to_mesh(scene, True, 'PREVIEW', calc_tessface=False)
         bm = bmesh.new()
         bm.from_mesh(me)
+
+        if is_editmode:
+            bpy.ops.object.editmode_toggle()
+    else:
+        me = obj.data
+        if obj.mode == 'EDIT':
+            bm_orig = bmesh.from_edit_mesh(me)
+            bm = bm_orig.copy()
+        else:
+            bm = bmesh.new()
+            bm.from_mesh(me)
 
     bm.transform(obj.matrix_world)
     bmesh.ops.triangulate(bm, faces=bm.faces, use_beauty=True)
 
     # default empty
     material_colors = []
+    uv_image = None
 
     if use_color:
         if color_type == 'VERTEX':
@@ -199,11 +210,12 @@ def save_object(fw, obj,
 
     bm.free()
 
-def save_object_fp(filepath, obj, use_mesh_modifiers,
+def save_object_fp(filepath, scene, obj,
+                   use_mesh_modifiers,
                    use_color, color_type,
                    use_uv):
     file = open(filepath, 'w', encoding='utf-8')
-    save_object(file.write, obj,
+    save_object(file.write, scene, obj,
                 use_mesh_modifiers,
                 use_color, color_type,
                 use_uv)
@@ -217,7 +229,7 @@ def save(operator,
          color_type='MATERIAL',
          use_uv=True):
 
-    save_object_fp(filepath, context.object,
+    save_object_fp(filepath, context.scene, context.object,
                    use_mesh_modifiers,
                    use_color, color_type,
                    use_uv)
