@@ -131,10 +131,11 @@ def save_bmesh(fw, bm,
 
 def detect_default_image(obj, bm):
     tex_layer = bm.faces.layers.tex.active
-    for f in bm.faces:
-        image = f[tex_layer].image
-        if image is not None:
-            return image
+    if tex_layer is not None:
+        for f in bm.faces:
+            image = f[tex_layer].image
+            if image is not None:
+                return image
     for m in obj.data.materials:
         if m is not None:
             # backwards so topmost are highest priority
