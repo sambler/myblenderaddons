@@ -139,7 +139,7 @@ def detect_default_image(obj, bm):
     for m in obj.data.materials:
         if m is not None:
             # backwards so topmost are highest priority
-            for mtex in reversed(mat.texture_slots):
+            for mtex in reversed(m.texture_slots):
                 if mtex and mtex.use_map_color_diffuse:
                     texture = mtex.texture
                     if texture and texture.type == 'IMAGE':
