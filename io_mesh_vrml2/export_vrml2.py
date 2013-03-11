@@ -20,14 +20,22 @@
 
 import bpy
 import bmesh
+import os
 
-def save_bmesh(fw, bm, use_color, color_type, material_colors):
+def save_bmesh(fw, bm,
+               use_color, color_type, material_colors,
+               use_uv, uv_image):
     fw('#VRML V2.0 utf8\n')
     fw('#modeled using blender3d http://blender.org\n')
     fw('Shape {\n')
     fw('\tappearance Appearance {\n')
-    fw('\t\tmaterial Material {\n')
-    fw('\t\t}\n')  # end 'Material'
+    if use_uv:
+        fw('\t\ttexture ImageTexture {\n')
+        fw('\t\t\turl "%s"\n' % os.path.basename(uv_image.filepath))
+        fw('\t\t}\n')  # end 'ImageTexture'
+    else:
+        fw('\t\tmaterial Material {\n')
+        fw('\t\t}\n')  # end 'Material'
     fw('\t}\n')  # end 'Appearance'
 
     fw('\tgeometry IndexedFaceSet {\n')
@@ -70,8 +78,9 @@ def save_bmesh(fw, bm, use_color, color_type, material_colors):
             del v
             fw(']\n')  # end 'color[]'
             fw('\t\t}\n')  # end 'Color'
-    
-    if use_color:
+
+        # ---
+
         if color_type == 'MATERIAL':
             fw('\t\tcolorIndex [ ')
             i = None
@@ -85,6 +94,29 @@ def save_bmesh(fw, bm, use_color, color_type, material_colors):
         elif color_type == 'VERTEX':
             pass
 
+    if use_uv:
+        fw('\t\ttexCoord TextureCoordinate {\n')
+        fw('\t\t\tpoint [ ')
+        v = None
+        uv_layer = bm.loops.layers.uv.active
+        assert(uv_layer is not None)
+        for f in bm.faces:
+            for l in f.loops:
+                fw("%.4f %.4f " % l[uv_layer].uv[:])
+
+        del f
+        fw(']\n')  # end 'point[]'
+        fw('\t\t}\n')  # end 'TextureCoordinate'
+
+        # ---
+
+        fw('\t\ttexCoordIndex [ ')
+        i = None
+        for i in range(0, len(bm.faces) * 3, 3):
+            fw("%d %d %d -1 " % (i, i + 1, i + 2))
+        del i
+        fw(']\n')  # end 'coordIndex[]'
+
     fw('\t\tcoordIndex [ ')
     f = fv = None
     for f in bm.faces:
@@ -97,8 +129,30 @@ def save_bmesh(fw, bm, use_color, color_type, material_colors):
     fw('}\n')  # end 'Shape'
 
 
-def save_object(fw, obj, use_mesh_modifiers, use_color, color_type):
-    
+def detect_default_image(obj, bm):
+    tex_layer = bm.faces.layers.tex.active
+    for f in bm.faces:
+        image = f[tex_layer].image
+        if image is not None:
+            return image
+    for m in obj.data.materials:
+        if m is not None:
+            # backwards so topmost are highest priority
+            for mtex in reversed(mat.texture_slots):
+                if mtex and mtex.use_map_color_diffuse:
+                    texture = mtex.texture
+                    if texture and texture.type == 'IMAGE':
+                        image = texture.image
+                        if image is not None:
+                            return image
+    return None
+
+
+def save_object(fw, obj,
+                use_mesh_modifiers,
+                use_color, color_type,
+                use_uv):
+
     assert(obj.type == 'MESH')
     
     # TODO use_mesh_modifiers
@@ -131,25 +185,42 @@ def save_object(fw, obj, use_mesh_modifiers, use_color, color_type):
         else:
             assert(0)
 
+    if use_uv:
+        if bm.loops.layers.uv.active is None:
+            use_uv = False
+        uv_image = detect_default_image(obj, bm)
+        if uv_image is None:
+            use_uv = False
+
     material_colors = []
-    save_bmesh(fw, bm, use_color, color_type, material_colors)
+    save_bmesh(fw, bm,
+               use_color, color_type, material_colors,
+               use_uv, uv_image)
 
     bm.free()
 
-def save_object_fp(filepath, obj, use_mesh_modifiers, use_color, color_type):
-    file = filepath(filepath)
-    save_object(file.write, use_color, color_type)
+def save_object_fp(filepath, obj, use_mesh_modifiers,
+                   use_color, color_type,
+                   use_uv):
+    file = open(filepath, 'w', encoding='utf-8')
+    save_object(file.write, obj,
+                use_mesh_modifiers,
+                use_color, color_type,
+                use_uv)
     file.close()
 
 def save(operator,
          context,
          filepath="",
          use_mesh_modifiers=True,
-         use_colors=True,
-         color_type='MATERIAL'):
+         use_color=True,
+         color_type='MATERIAL',
+         use_uv=True):
 
     save_object_fp(filepath, context.object,
-                   use_mesh_modifiers, use_color, color_type)
+                   use_mesh_modifiers,
+                   use_color, color_type,
+                   use_uv)
 
     return {'FINISHED'}
 

@@ -42,24 +42,25 @@ import bpy
 from bpy.props import CollectionProperty, StringProperty, BoolProperty, EnumProperty
 from bpy_extras.io_utils import ExportHelper
 
-class ExportPLY(bpy.types.Operator, ExportHelper):
-    """Export a single object as a Stanford PLY with normals, """ \
+class ExportVRML(bpy.types.Operator, ExportHelper):
+    """Export a single object as a VRML2, """ \
     """colors and texture coordinates"""
-    bl_idname = "export_mesh.ply"
+    bl_idname = "export_mesh.vrml2"
     bl_label = "Export PLY"
 
-    filename_ext = ".ply"
-    filter_glob = StringProperty(default="*.ply", options={'HIDDEN'})
+    filename_ext = ".wrl"
+    filter_glob = StringProperty(default="*.wrl", options={'HIDDEN'})
 
     use_mesh_modifiers = BoolProperty(
             name="Apply Modifiers",
             description="Apply Modifiers to the exported mesh",
             default=True,
             )
-    use_colors = BoolProperty(
+    use_color = BoolProperty(
             name="Vertex Colors",
             description="Export the active vertex color layer",
-            default=True)
+            default=True,
+            )
     color_type = EnumProperty(
             name='Color',
             items=(
@@ -67,6 +68,10 @@ class ExportPLY(bpy.types.Operator, ExportHelper):
             ('VERTEX', "Vertex Color", "")),
             default='MATERIAL',
             )
+    use_uv = BoolProperty(
+            name="Texture/UVs",
+            description="Export the active texture and UV coords",
+            default=True)
 
     @classmethod
     def poll(cls, context):
@@ -85,6 +90,8 @@ class ExportPLY(bpy.types.Operator, ExportHelper):
 
         row = layout.row()
         row.prop(self, "use_mesh_modifiers")
+        row = layout.row()
+        row.prop(self, "use_uv")
         row.prop(self, "use_colors")
         row = layout.row()
         row.active = self.use_colors
@@ -92,7 +99,7 @@ class ExportPLY(bpy.types.Operator, ExportHelper):
 
 
 def menu_func_export(self, context):
-    self.layout.operator(ExportPLY.bl_idname, text="VRML2 (.wrl)")
+    self.layout.operator(ExportVRML.bl_idname, text="VRML2 (.wrl)")
 
 
 def register():
