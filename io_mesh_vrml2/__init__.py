@@ -40,7 +40,7 @@ if "bpy" in locals():
 import os
 import bpy
 from bpy.props import CollectionProperty, StringProperty, BoolProperty, EnumProperty
-from bpy_extras.io_utils import ExportHelper
+from bpy_extras.io_utils import ExportHelper, path_reference_mode
 
 class ExportVRML(bpy.types.Operator, ExportHelper):
     """Export a single object as a VRML2, """ \
@@ -71,7 +71,10 @@ class ExportVRML(bpy.types.Operator, ExportHelper):
     use_uv = BoolProperty(
             name="Texture/UVs",
             description="Export the active texture and UV coords",
-            default=True)
+            default=True,
+            )
+
+    path_mode = path_reference_mode
 
     @classmethod
     def poll(cls, context):
@@ -96,6 +99,9 @@ class ExportVRML(bpy.types.Operator, ExportHelper):
         row = layout.row()
         row.active = self.use_color
         row.prop(self, "color_type")
+        row = layout.row()
+        row.prop(self, "path_mode")
+        
 
 
 def menu_func_export(self, context):

@@ -19,19 +19,35 @@
 # <pep8-80 compliant>
 
 import bpy
+import bpy_extras
 import bmesh
 import os
 
 def save_bmesh(fw, bm,
                use_color, color_type, material_colors,
-               use_uv, uv_image):
-    fw('#VRML V2.0 utf8\n')
-    fw('#modeled using blender3d http://blender.org\n')
+               use_uv, uv_image,
+               path_mode, copy_set):
+
+    base_src = os.path.dirname(bpy.data.filepath)
+    base_dst = os.path.dirname(fw.__self__.name)
+
     fw('Shape {\n')
     fw('\tappearance Appearance {\n')
     if use_uv:
         fw('\t\ttexture ImageTexture {\n')
-        fw('\t\t\turl "%s"\n' % os.path.basename(uv_image.filepath))
+        filepath = uv_image.filepath
+        filepath_full = bpy.path.abspath(filepath, library=uv_image.library)
+        filepath_ref = bpy_extras.io_utils.path_reference(filepath_full, base_src, base_dst, path_mode, "textures", copy_set, uv_image.library)
+        filepath_base = os.path.basename(filepath_full)
+        
+        images = [
+            filepath_ref,
+            filepath_base,
+            filepath_full,
+        ]
+        fw('\t\t\turl [ %s ]\n' % " ".join(['"%s"' % f for f in images]) )
+        del images
+        del filepath_ref, filepath_base, filepath_full, filepath
         fw('\t\t}\n')  # end 'ImageTexture'
     else:
         fw('\t\tmaterial Material {\n')
@@ -152,7 +168,8 @@ def detect_default_image(obj, bm):
 def save_object(fw, scene, obj,
                 use_mesh_modifiers,
                 use_color, color_type,
-                use_uv):
+                use_uv,
+                path_mode, copy_set):
 
     assert(obj.type == 'MESH')
 
@@ -204,23 +221,13 @@ def save_object(fw, scene, obj,
         if uv_image is None:
             use_uv = False
 
-    material_colors = []
     save_bmesh(fw, bm,
                use_color, color_type, material_colors,
-               use_uv, uv_image)
+               use_uv, uv_image,
+               path_mode, copy_set)
 
     bm.free()
 
-def save_object_fp(filepath, scene, obj,
-                   use_mesh_modifiers,
-                   use_color, color_type,
-                   use_uv):
-    file = open(filepath, 'w', encoding='utf-8')
-    save_object(file.write, scene, obj,
-                use_mesh_modifiers,
-                use_color, color_type,
-                use_uv)
-    file.close()
 
 def save(operator,
          context,
@@ -228,11 +235,26 @@ def save(operator,
          use_mesh_modifiers=True,
          use_color=True,
          color_type='MATERIAL',
-         use_uv=True):
+         use_uv=True,
+         path_mode='AUTO'):
 
-    save_object_fp(filepath, context.scene, context.object,
-                   use_mesh_modifiers,
-                   use_color, color_type,
-                   use_uv)
+    # store files to copy
+    copy_set = set()
+
+    file = open(filepath, 'w', encoding='utf-8')
+    fw = file.write
+    fw('#VRML V2.0 utf8\n')
+    fw('#modeled using blender3d http://blender.org\n')
+
+    save_object(fw, context.scene, context.object,
+                use_mesh_modifiers,
+                use_color, color_type,
+                use_uv,
+                path_mode, copy_set)
+
+    file.close()
+
+    # copy all collected files.
+    bpy_extras.io_utils.path_reference_copy(copy_set)
 
     return {'FINISHED'}
