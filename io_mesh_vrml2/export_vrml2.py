@@ -235,5 +235,3 @@ def save(operator,
                    use_uv)
 
     return {'FINISHED'}
-
-# save_object(open("/test.wrl", 'w', encoding='utf-8').write, bpy.context.object)

@@ -46,7 +46,7 @@ class ExportVRML(bpy.types.Operator, ExportHelper):
     """Export a single object as a VRML2, """ \
     """colors and texture coordinates"""
     bl_idname = "export_mesh.vrml2"
-    bl_label = "Export PLY"
+    bl_label = "Export VRML2"
 
     filename_ext = ".wrl"
     filter_glob = StringProperty(default="*.wrl", options={'HIDDEN'})
