@@ -177,16 +177,10 @@ def save_object(fw, global_matrix,
     assert(obj.type == 'MESH')
 
     if use_mesh_modifiers:
-        is_editmode = (obj.mode == 'EDIT')
-        if is_editmode:
-            bpy.ops.object.editmode_toggle()
-
+        obj.update_from_editmode()
         me = obj.to_mesh(scene, True, 'PREVIEW', calc_tessface=False)
         bm = bmesh.new()
         bm.from_mesh(me)
-
-        if is_editmode:
-            bpy.ops.object.editmode_toggle()
     else:
         me = obj.data
         if obj.mode == 'EDIT':
@@ -206,16 +200,16 @@ def save_object(fw, global_matrix,
     if use_color:
         if color_type == 'VERTEX':
             if bm.loops.layers.color.active is None:
-                use_color = False
-        elif color_type == 'MATERIAL':
+                # fallback to material
+                color_type = 'MATERIAL'
+        if color_type == 'MATERIAL':
             if not me.materials:
                 use_color = False
             else:
                 material_colors = [
                         "%.2f %.2f %.2f " % (m.diffuse_color[:] if m else (1.0, 1.0, 1.0))
                         for m in me.materials]
-        else:
-            assert(0)
+        assert(color_type in {'VERTEX', 'MATERIAL'})
 
     if use_uv:
         if bm.loops.layers.uv.active is None:
