@@ -581,6 +581,7 @@ class Print3DScaleToBounds(Operator):
                                         if obj.type == 'MESH' for v in obj.bound_box])
 
         self.length_init = self.length = length
+        self.axis_init = axis
 
         wm = context.window_manager
         return wm.invoke_props_dialog(self)
