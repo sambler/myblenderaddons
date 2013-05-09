@@ -442,7 +442,8 @@ class MeshExportObject(ExportObject):
         # Create the mesh enumerator based on options
         MeshEnumerator = None
         if (self.Config.ExportUVCoordinates and Mesh.uv_textures) or \
-            (self.Config.ExportVertexColors and Mesh.vertex_colors):
+            (self.Config.ExportVertexColors and Mesh.vertex_colors) or \
+            (self.Config.ExportSkinWeights):
             MeshEnumerator = MeshExportObject._UnrolledFacesMeshEnumerator(Mesh)
         else:
             MeshEnumerator = MeshExportObject._OneToOneMeshEnumerator(Mesh)
@@ -471,7 +472,7 @@ class MeshExportObject(ExportObject):
             PolygonVertexIndexes = PolygonVertexIndexes[::-1]
             
             for VertexIndex in PolygonVertexIndexes:
-                self.Exporter.File.Write("{};".format(VertexIndex),
+                self.Exporter.File.Write("{},".format(VertexIndex),
                     Indent=False)
             
             if Index == PolygonCount - 1:
@@ -569,7 +570,7 @@ class MeshExportObject(ExportObject):
             
             # Reverse the winding order
             for VertexIndex in Polygon[::-1]:
-                self.Exporter.File.Write("{};".format(VertexIndex),
+                self.Exporter.File.Write("{},".format(VertexIndex),
                     Indent=False)
             
             if Index == FaceCount - 1:
@@ -605,7 +606,7 @@ class MeshExportObject(ExportObject):
                 Vertices.append(tuple(Vertex.uv))
             for Vertex in Vertices:
                 self.Exporter.File.Write("{:9f};{:9f};".format(Vertex[0],
-                    Vertex[1]))
+                    1.0 - Vertex[1]))
                 Index += 1
                 if Index == VertexCount:
                     self.Exporter.File.Write(";\n", Indent=False)
