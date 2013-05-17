@@ -1120,7 +1120,14 @@ class LinkToOutputNode(Operator, NodeToolBase):
     
     @classmethod
     def poll(cls, context):
-        return context.active_node
+        space = context.space_data
+        valid = False
+        if (space.type == 'NODE_EDITOR' and
+                space.node_tree is not None and
+                context.active_node is not None and
+                ):
+            valid = True
+        return valid
     
     def execute(self, context):
         nodes, links = get_nodes_links(context)
