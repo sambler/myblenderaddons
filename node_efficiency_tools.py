@@ -1124,7 +1124,7 @@ class LinkToOutputNode(Operator, NodeToolBase):
         valid = False
         if (space.type == 'NODE_EDITOR' and
                 space.node_tree is not None and
-                context.active_node is not None and
+                context.active_node is not None
                 ):
             valid = True
         return valid
