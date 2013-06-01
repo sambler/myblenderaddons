@@ -19,8 +19,8 @@
 bl_info = {
     'name': "Nodes Efficiency Tools",
     'author': "Bartek Skorupa",
-    'version': (2, 28),
-    'blender': (2, 6, 6),
+    'version': (2, 31),
+    'blender': (2, 6, 7),
     'location': "Node Editor Properties Panel (Ctrl-SPACE)",
     'description': "Nodes Efficiency Tools",
     'warning': "",
@@ -300,7 +300,12 @@ class MergeNodes(Operator, NodeToolBase):
                 last_add = nodes[count_before]
                 # add links from last_add to all links 'to_socket' of out links of first selected.
                 for fs_link in first_selected.outputs[0].links:
-                    links.new(last_add.outputs[0], fs_link.to_socket)
+                    # Prevent cyclic dependencies when nodes to be marged are linked to one another.
+                    # Create list of invalid indexes.
+                    invalid_i = [n[0] for n in (selected_mix + selected_math + selected_shader)]
+                    # Link only if "to_node" index not in invalid indexes list.
+                    if fs_link.to_node not in [nodes[i] for i in invalid_i]:
+                        links.new(last_add.outputs[0], fs_link.to_socket)
                 # add link from "first" selected and "first" add node
                 links.new(first_selected.outputs[0], nodes[count_after - 1].inputs[first])
                 # add links between added ADD nodes and between selected and ADD nodes
@@ -1107,10 +1112,11 @@ class DetachOutputs(Operator, NodeToolBase):
             node.select = True
         bpy.ops.node.delete_reconnect()
         for new_node in new_nodes:
-            new_node.location.y += 100.0
             new_node.select = True
-
+        bpy.ops.transform.translate('INVOKE_DEFAULT')
+        
         return {'FINISHED'}
+
 
 class LinkToOutputNode(Operator, NodeToolBase):
     bl_idname = "node.link_to_output_node"
@@ -1119,7 +1125,14 @@ class LinkToOutputNode(Operator, NodeToolBase):
     
     @classmethod
     def poll(cls, context):
-        return context.active_node
+        space = context.space_data
+        valid = False
+        if (space.type == 'NODE_EDITOR' and
+                space.node_tree is not None and
+                context.active_node is not None
+                ):
+            valid = True
+        return valid
     
     def execute(self, context):
         nodes, links = get_nodes_links(context)
@@ -1584,7 +1597,10 @@ kmi_defs = (
     (SelectParentChildren.bl_idname, 'RIGHT_BRACKET', False, False, False, (('option', 'CHILD'),)),
     # Select Parent
     (SelectParentChildren.bl_idname, 'LEFT_BRACKET', False, False, False, (('option', 'PARENT'),)),
+    # Add Texture Setup
     (NodesAddTextureSetup.bl_idname, 'T', True, False, False, None),
+    # Copy Label from active to selected
+    (NodesCopyLabel.bl_idname, 'V', False, True, False, (('option', 'FROM_ACTIVE'),)),
     # MENUS
     ('wm.call_menu', 'SPACE', True, False, False, (('name', EfficiencyToolsMenu.bl_idname),)),
     ('wm.call_menu', 'SLASH', False, False, False, (('name', AddReroutesMenu.bl_idname),)),
