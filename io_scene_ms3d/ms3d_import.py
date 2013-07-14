@@ -437,7 +437,8 @@ class Ms3dImporter():
                 blender_image_diffuse = load_image(
                         file_name_diffuse, dir_name_diffuse)
                 name_diffuse = path.splitext(file_name_diffuse)[0]
-                blender_image_diffuse.name = FORMAT_IMAGE.format(name_diffuse)
+                if blender_image_diffuse:
+                    blender_image_diffuse.name = FORMAT_IMAGE.format(name_diffuse)
                 blender_texture_diffuse = \
                         blender_context.blend_data.textures.new(
                         name=FORMAT_TEXTURE.format(name_diffuse),
@@ -462,7 +463,8 @@ class Ms3dImporter():
                 blender_image_alpha = load_image(
                         file_name_alpha, dir_name_alpha)
                 name_alpha = path.splitext(file_name_alpha)[0]
-                blender_image_alpha.name = FORMAT_IMAGE.format(name_alpha)
+                if blender_image_alpha:
+                    blender_image_alpha.name = FORMAT_IMAGE.format(name_alpha)
                 blender_texture_alpha = blender_context.blend_data.textures.new(
                         name=FORMAT_TEXTURE.format(file_name_alpha),
                         type='IMAGE')
