@@ -1383,7 +1383,6 @@ def save_single(operator, scene, filepath="",
            )
 
         # Write the Real Mesh data here
-        _tm = time.process_time()
         fw('\n\t\tVertices: ')
         i = -1
         for v in me_vertices:
@@ -1396,9 +1395,7 @@ def save_single(operator, scene, filepath="",
                     i = 0
                 fw(',%.6f,%.6f,%.6f' % v.co[:])
             i += 1
-        print("Old verts: done in %f secs..." % (time.process_time() - _tm))
 
-        _tm = time.process_time()
         fw('\n\t\tPolygonVertexIndex: ')
         i = -1
         for f in me_faces:
@@ -1420,7 +1417,6 @@ def save_single(operator, scene, filepath="",
                 else:
                     fw(',%i,%i,%i,%i' % (fi[0], fi[1], fi[2], fi[3] ^ -1))
             i += 1
-        print("Old faces: done in %f secs..." % (time.process_time() - _tm))
 
         # write loose edges as faces.
         for ed in me_edges:
