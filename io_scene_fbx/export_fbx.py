@@ -1383,9 +1383,9 @@ def save_single(operator, scene, filepath="",
            )
 
         # Write the Real Mesh data here
+        _tm = time.process_time()
         fw('\n\t\tVertices: ')
         i = -1
-
         for v in me_vertices:
             if i == -1:
                 fw('%.6f,%.6f,%.6f' % v.co[:])
@@ -1396,7 +1396,9 @@ def save_single(operator, scene, filepath="",
                     i = 0
                 fw(',%.6f,%.6f,%.6f' % v.co[:])
             i += 1
+        print("Old verts: done in %f secs..." % (time.process_time() - _tm))
 
+        _tm = time.process_time()
         fw('\n\t\tPolygonVertexIndex: ')
         i = -1
         for f in me_faces:
@@ -1418,6 +1420,7 @@ def save_single(operator, scene, filepath="",
                 else:
                     fw(',%i,%i,%i,%i' % (fi[0], fi[1], fi[2], fi[3] ^ -1))
             i += 1
+        print("Old faces: done in %f secs..." % (time.process_time() - _tm))
 
         # write loose edges as faces.
         for ed in me_edges:
@@ -2601,7 +2604,8 @@ Connections:  {''')
         frame_orig = scene.frame_current
 
         if use_anim_optimize:
-            ANIM_OPTIMIZE_PRECISSION_FLOAT = 0.1 ** anim_optimize_precision
+            # Do we really want to keep such behavior? User could enter real value directly...
+            ANIM_OPTIMIZE_PRECISSION_FLOAT = 10 ** (-anim_optimize_precision + 2)
 
         # default action, when no actions are avaioable
         tmp_actions = []
