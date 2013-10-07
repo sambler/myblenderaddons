@@ -1537,7 +1537,6 @@ def save_single(operator, scene, filepath="",
         uvlayers = []
         uvtextures = []
         if do_uvs:
-            print("Do UVs!")
             uvlayers = me.uv_layers
             uvtextures = me.uv_textures
             t_uv = [None] * len(me.loops) * 2
