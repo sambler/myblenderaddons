@@ -194,8 +194,8 @@ url_manual_mapping = (
     ("bpy.types.GreasePencil.*", "3D_interaction/Sketching/Drawing"),
     ("bpy.types.Group.*", "Modeling/Objects/Groups_and_Parenting#Grouping_objects"),
     ("bpy.types.Image.*", "Textures/Types/Image"),
-    ("bpy.types.ShapeKey.*", "Animation/Basic/Deformation/Shape_Keys"), # not an ID but include because of Key
-    ("bpy.types.Key.*", "Animation/Basic/Deformation/Shape_Keys"),
+    ("bpy.types.ShapeKey.*", "Animation/Techs/Shape/Shape_Keys"), # not an ID but include because of Key
+    ("bpy.types.Key.*", "Animation/Techs/Shape/Shape_Keys"),
     #("bpy.types.Lattice.*", ""), # TODO - manual has no place for this! XXX
     ("bpy.types.Library.*", "Manual/Data_System/Linked_Libraries"),
     #("bpy.types.Mask.*", ""), # TODO - manual has no place for this! XXX
@@ -217,6 +217,8 @@ url_manual_mapping = (
     ("bpy.types.MovieClip.*", "Motion_Tracking#Movie_Clip_Editor"),
     #("bpy.types.NodeTree.*", ""),  # dont document
     ("bpy.types.Object.*",  "Modeling/Objects"),  # catchall, TODO - refine
+    ("bpy.types.Object.*shape_key*", "Animation/Techs/Shape/Shape_Keys"),
+    ("bpy.types.Object.join_shapes", "Animation/Techs/Shape/Shape_Keys"),
     ("bpy.types.ParticleSettings.*", "Physics/Particles"),
     ("bpy.types.Scene.*", "Interface/Scenes"),
     ("bpy.types.Screen.*", "Interface/Screens"),
@@ -299,6 +301,16 @@ url_manual_mapping = (
     # ("bpy.ops.mask.*",  ""),  # TODO
     ("bpy.ops.material.new",  "Materials/Assigning_a_material#Creating_a_new_Material"),
     ("bpy.ops.material.*",  "Materials"),
+    ("bpy.ops.mesh.vertices_smooth", "Modeling/Meshes/Editing/Deforming/Smooth"),
+    ("bpy.ops.view3d.edit_mesh_extrude*", "Modeling/Meshes/Editing/Duplicating/Extrude"),
+    ("bpy.ops.mesh.subdivide", "Modeling/Meshes/Editing/Subdividing/Subdivide"),
+    ("bpy.ops.mesh.loopcut_slide", "Modeling/Meshes/Editing/Subdividing/Loop_Subdivide"),
+    ("bpy.ops.mesh.bridge_edge_loops", "Modeling/Meshes/Editing/Edges#Bridge_Edge_Loops"),
+    ("bpy.ops.mesh.duplicate_move", "Modeling/Meshes/Editing/Duplicating/Duplicate"),
+    ("bpy.ops.mesh.spin", "Modeling/Meshes/Editing/Duplicating/Spin"),
+    ("bpy.ops.mesh.screw", "Modeling/Meshes/Editing/Duplicating/Screw"),
+    ("bpy.ops.mesh.knife*", "Modeling/Meshes/Editing/Subdividing/Knife_Subdivide"),
+    ("bpy.ops.mesh.bisect", "Modeling/Meshes/Editing/Subdividing/Bisect"),
     ("bpy.ops.mball.*",  "Modeling/Metas"),
     ("bpy.ops.mesh.*",  "Modeling/Meshes"),
     ("bpy.ops.nla.*",  "Animation/Editors/NLA"),
@@ -325,6 +337,10 @@ url_manual_mapping = (
     ("bpy.ops.text.*",  "Extensions/Python/Text_editor"),
     ("bpy.ops.texture.*",  "Textures"),
     ("bpy.ops.time.*",  "Animation/Timeline"),
+    ("bpy.ops.transform.edge_slide", "Modeling/Meshes/Editing/Edges#Edge_Slide"),
+    ("bpy.ops.transform.vert_slide", "Modeling/Meshes/Editing/Vertices#Vertex_Slide"),
+    ("bpy.ops.transform.shrink_fatten", "Modeling/Meshes/Editing/Deforming/Shrink-Fatten"),
+    ("bpy.ops.transform.push_pull", "3D_interaction/Transformations/Advanced/Push_Pull"),
     ("bpy.ops.transform.*",  "3D_interaction/Transform_Control"),
     ("bpy.ops.ui.*",  "Interface"),
     ("bpy.ops.uv.*",  "Textures/Mapping/UV/Layout_Editing"),
