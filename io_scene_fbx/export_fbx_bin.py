@@ -49,9 +49,11 @@ FBX_TEMPLATES_VERSION = 100
 FBX_MODELS_VERSION = 232
 
 FBX_GEOMETRY_VERSION = 124
-FBX_GEOMETRY_NORMAL_VERSION = 102
-FBX_GEOMETRY_BINORMAL_VERSION = 102
-FBX_GEOMETRY_TANGENT_VERSION = 102
+# Revert back normals to 101 (simple 3D values) for now, 102 (4D + weights) seems not well supported by most apps
+# currently, apart from some AD products.
+FBX_GEOMETRY_NORMAL_VERSION = 101
+FBX_GEOMETRY_BINORMAL_VERSION = 101
+FBX_GEOMETRY_TANGENT_VERSION = 101
 FBX_GEOMETRY_SMOOTHING_VERSION = 102
 FBX_GEOMETRY_VCOLOR_VERSION = 101
 FBX_GEOMETRY_UV_VERSION = 101
@@ -183,6 +185,11 @@ def _key_to_uid(uids, key):
             uid = -uid
         if uid >= 2**63:
             uid //= 2
+    # Try to make our uid shorter!
+    if uid > int(1e9):
+        t_uid = uid % int(1e9)
+        if t_uid not in uids:
+            uid = t_uid
     # Make sure our uid *is* unique.
     if uid in uids:
         inc = 1 if uid < 2**62 else -1
@@ -218,6 +225,11 @@ def get_key_from_fbxuid(uid):
 # Blender-specific key generators
 def get_blenderID_key(bid):
     return "B" + bid.rna_type.name + "::" + bid.name
+
+
+def get_blender_empty_key(obj):
+    """Return bone's keys (Model and NodeAttribute)."""
+    return "|".join((get_blenderID_key(obj), "Empty"))
 
 
 def get_blender_bone_key(armature, bone):
@@ -432,20 +444,53 @@ def elem_props_compound(elem, cmpd_name, custom=False):
     return _setter
 
 
+def elem_props_template_init(templates, template_type):
+    """
+    Init a writing template of given type, for *one* element's properties.
+    """
+    ret = None
+    if template_type in templates:
+        tmpl = templates[template_type]
+        written = tmpl.written[0]
+        props = tmpl.properties
+        ret = OrderedDict((name, [val, ptype, anim, written]) for name, (val, ptype, anim) in props.items())
+    return ret or OrderedDict()
+
+
 def elem_props_template_set(template, elem, ptype_name, name, value, animatable=False):
     """
     Only add a prop if the same value is not already defined in given template.
     Note it is important to not give iterators as value, here!
     """
     ptype = FBX_PROPERTIES_DEFINITIONS[ptype_name]
-    tmpl_val, tmpl_ptype, tmpl_animatable = template.properties.get(name, (None, None, False))
+    if len(ptype) > 3:
+        value = tuple(value)
+    tmpl_val, tmpl_ptype, tmpl_animatable, tmpl_written = template.get(name, (None, None, False, False))
     # Note animatable flag from template takes precedence over given one, if applicable.
     if tmpl_ptype is not None:
-        if ((len(ptype) == 3 and (tmpl_val, tmpl_ptype) == (value, ptype_name)) or
-                (len(ptype) > 3 and (tuple(tmpl_val), tmpl_ptype) == (tuple(value), ptype_name))):
+        if (tmpl_written and
+            ((len(ptype) == 3 and (tmpl_val, tmpl_ptype) == (value, ptype_name)) or
+             (len(ptype) > 3 and (tuple(tmpl_val), tmpl_ptype) == (value, ptype_name)))):
             return  # Already in template and same value.
         _elem_props_set(elem, ptype, name, value, _elem_props_flags(tmpl_animatable, False))
+        template[name][3] = True
     else:
+        _elem_props_set(elem, ptype, name, value, _elem_props_flags(animatable, False))
+
+
+def elem_props_template_finalize(template, elem):
+    """
+    Finalize one element's template/props.
+    Issue is, some templates might be "needed" by different types (e.g. NodeAttribute is for lights, cameras, etc.),
+    but values for only *one* subtype can be written as template. So we have to be sure we write those for ths other
+    subtypes in each and every elements, if they are not overriden by that element.
+    Yes, hairy, FBX that is to say. When they could easily support several subtypes per template... :(
+    """
+    for name, (value, ptype_name, animatable, written) in template.items():
+        if written:
+            continue
+        ptype = FBX_PROPERTIES_DEFINITIONS[ptype_name]
+        print(elem, ptype, name, value, _elem_props_flags(animatable, False))
         _elem_props_set(elem, ptype, name, value, _elem_props_flags(animatable, False))
 
 
@@ -462,37 +507,55 @@ def elem_connection(elem, c_type, uid_src, uid_dst, prop_dst=None):
 ##### Templates #####
 # TODO: check all those "default" values, they should match Blender's default as much as possible, I guess?
 
-FBXTemplate = namedtuple("FBXTemplate", ("type_name", "prop_type_name", "properties", "nbr_users"))
+FBXTemplate = namedtuple("FBXTemplate", ("type_name", "prop_type_name", "properties", "nbr_users", "written"))
 
 
 def fbx_templates_generate(root, fbx_templates):
     # We may have to gather different templates in the same node (e.g. NodeAttribute template gathers properties
     # for Lights, Cameras, LibNodes, etc.).
+    ref_templates = {(tmpl.type_name, tmpl.prop_type_name) : tmpl for tmpl in fbx_templates.values()}
+
     templates = OrderedDict()
-    for type_name, prop_type_name, properties, nbr_users in fbx_templates.values():
+    for type_name, prop_type_name, properties, nbr_users, _written in fbx_templates.values():
         if type_name not in templates:
-            templates[type_name] = [OrderedDict(((prop_type_name, properties),)), nbr_users]
+            templates[type_name] = [OrderedDict(((prop_type_name, (properties, nbr_users)),)), nbr_users]
         else:
-            templates[type_name][0][prop_type_name] = properties
+            templates[type_name][0][prop_type_name] = (properties, nbr_users)
             templates[type_name][1] += nbr_users
 
     for type_name, (subprops, nbr_users) in templates.items():
         template = elem_data_single_string(root, b"ObjectType", type_name)
         elem_data_single_int32(template, b"Count", nbr_users)
 
-        for prop_type_name, properties in subprops.items():
-            if prop_type_name and properties:
-                elem = elem_data_single_string(template, b"PropertyTemplate", prop_type_name)
-                props = elem_properties(elem)
-                for name, (value, ptype, animatable) in properties.items():
-                    elem_props_set(props, ptype, name, value, animatable=animatable)
+        if len(subprops) == 1:
+            prop_type_name, (properties, _nbr_sub_type_users) = next(iter(subprops.items()))
+            subprops = (prop_type_name, properties)
+            ref_templates[(type_name, prop_type_name)].written[0] = True
+        else:
+            # Ack! Even though this could/should work, looks like it is not supported. So we have to chose one. :|
+            max_users = max_props = -1
+            written_prop_type_name = None
+            for prop_type_name, (properties, nbr_sub_type_users) in subprops.items():
+                if nbr_sub_type_users > max_users or (nbr_sub_type_users == max_users and len(properties) > max_props):
+                    max_users = nbr_sub_type_users
+                    max_props = len(properties)
+                    written_prop_type_name = prop_type_name
+            subprops = (written_prop_type_name, properties)
+            ref_templates[(type_name, written_prop_type_name)].written[0] = True
+
+        prop_type_name, properties = subprops
+        if prop_type_name and properties:
+            elem = elem_data_single_string(template, b"PropertyTemplate", prop_type_name)
+            props = elem_properties(elem)
+            for name, (value, ptype, animatable) in properties.items():
+                elem_props_set(props, ptype, name, value, animatable=animatable)
 
 
 def fbx_template_def_globalsettings(scene, settings, override_defaults=None, nbr_users=0):
     props = OrderedDict()
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"GlobalSettings", b"", props, nbr_users)
+    return FBXTemplate(b"GlobalSettings", b"", props, nbr_users, [False])
 
 
 def fbx_template_def_model(scene, settings, override_defaults=None, nbr_users=0):
@@ -573,7 +636,18 @@ def fbx_template_def_model(scene, settings, override_defaults=None, nbr_users=0)
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"Model", b"FbxNode", props, nbr_users)
+    return FBXTemplate(b"Model", b"FbxNode", props, nbr_users, [False])
+
+
+def fbx_template_def_null(scene, settings, override_defaults=None, nbr_users=0):
+    props = OrderedDict((
+        (b"Color", ((0.8, 0.8, 0.8), "p_color_rgb", False)),
+        (b"Size", (100.0, "p_double", False)),
+        (b"Look", (1, "p_enum", False)),  # Cross (0 is None, i.e. invisible?).
+    ))
+    if override_defaults is not None:
+        props.update(override_defaults)
+    return FBXTemplate(b"NodeAttribute", b"FbxNull", props, nbr_users, [False])
 
 
 def fbx_template_def_light(scene, settings, override_defaults=None, nbr_users=0):
@@ -591,7 +665,7 @@ def fbx_template_def_light(scene, settings, override_defaults=None, nbr_users=0)
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"NodeAttribute", b"FbxLight", props, nbr_users)
+    return FBXTemplate(b"NodeAttribute", b"FbxLight", props, nbr_users, [False])
 
 
 def fbx_template_def_camera(scene, settings, override_defaults=None, nbr_users=0):
@@ -706,14 +780,14 @@ def fbx_template_def_camera(scene, settings, override_defaults=None, nbr_users=0
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"NodeAttribute", b"FbxCamera", props, nbr_users)
+    return FBXTemplate(b"NodeAttribute", b"FbxCamera", props, nbr_users, [False])
 
 
 def fbx_template_def_bone(scene, settings, override_defaults=None, nbr_users=0):
     props = OrderedDict()
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"NodeAttribute", b"LimbNode", props, nbr_users)
+    return FBXTemplate(b"NodeAttribute", b"LimbNode", props, nbr_users, [False])
 
 
 def fbx_template_def_geometry(scene, settings, override_defaults=None, nbr_users=0):
@@ -724,10 +798,10 @@ def fbx_template_def_geometry(scene, settings, override_defaults=None, nbr_users
         (b"Primary Visibility", (True, "p_bool", False)),
         (b"Casts Shadows", (True, "p_bool", False)),
         (b"Receive Shadows", (True, "p_bool", False)),
-))
+    ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"Geometry", b"FbxMesh", props, nbr_users)
+    return FBXTemplate(b"Geometry", b"FbxMesh", props, nbr_users, [False])
 
 
 def fbx_template_def_material(scene, settings, override_defaults=None, nbr_users=0):
@@ -765,7 +839,7 @@ def fbx_template_def_material(scene, settings, override_defaults=None, nbr_users
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"Material", b"FbxSurfacePhong", props, nbr_users)
+    return FBXTemplate(b"Material", b"FbxSurfacePhong", props, nbr_users, [False])
 
 
 def fbx_template_def_texture_file(scene, settings, override_defaults=None, nbr_users=0):
@@ -792,7 +866,7 @@ def fbx_template_def_texture_file(scene, settings, override_defaults=None, nbr_u
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"Texture", b"FbxFileTexture", props, nbr_users)
+    return FBXTemplate(b"Texture", b"FbxFileTexture", props, nbr_users, [False])
 
 
 def fbx_template_def_video(scene, settings, override_defaults=None, nbr_users=0):
@@ -819,21 +893,21 @@ def fbx_template_def_video(scene, settings, override_defaults=None, nbr_users=0)
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"Video", b"FbxVideo", props, nbr_users)
+    return FBXTemplate(b"Video", b"FbxVideo", props, nbr_users, [False])
 
 
 def fbx_template_def_pose(scene, settings, override_defaults=None, nbr_users=0):
     props = OrderedDict()
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"Pose", b"", props, nbr_users)
+    return FBXTemplate(b"Pose", b"", props, nbr_users, [False])
 
 
 def fbx_template_def_deformer(scene, settings, override_defaults=None, nbr_users=0):
     props = OrderedDict()
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"Deformer", b"", props, nbr_users)
+    return FBXTemplate(b"Deformer", b"", props, nbr_users, [False])
 
 
 def fbx_template_def_animstack(scene, settings, override_defaults=None, nbr_users=0):
@@ -846,7 +920,7 @@ def fbx_template_def_animstack(scene, settings, override_defaults=None, nbr_user
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"AnimationStack", b"FbxAnimStack", props, nbr_users)
+    return FBXTemplate(b"AnimationStack", b"FbxAnimStack", props, nbr_users, [False])
 
 
 def fbx_template_def_animlayer(scene, settings, override_defaults=None, nbr_users=0):
@@ -863,7 +937,7 @@ def fbx_template_def_animlayer(scene, settings, override_defaults=None, nbr_user
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"AnimationLayer", b"FbxAnimLayer", props, nbr_users)
+    return FBXTemplate(b"AnimationLayer", b"FbxAnimLayer", props, nbr_users, [False])
 
 
 def fbx_template_def_animcurvenode(scene, settings, override_defaults=None, nbr_users=0):
@@ -872,14 +946,14 @@ def fbx_template_def_animcurvenode(scene, settings, override_defaults=None, nbr_
     ))
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"AnimationCurveNode", b"FbxAnimCurveNode", props, nbr_users)
+    return FBXTemplate(b"AnimationCurveNode", b"FbxAnimCurveNode", props, nbr_users, [False])
 
 
 def fbx_template_def_animcurve(scene, settings, override_defaults=None, nbr_users=0):
     props = OrderedDict()
     if override_defaults is not None:
         props.update(override_defaults)
-    return FBXTemplate(b"AnimationCurve", b"", props, nbr_users)
+    return FBXTemplate(b"AnimationCurve", b"", props, nbr_users, [False])
 
 
 ##### FBX objects generators. #####
@@ -984,6 +1058,25 @@ def fbx_data_element_custom_properties(props, bid):
             elem_props_set(props, "p_double", k.encode(), v, custom=True)
 
 
+def fbx_data_empty_elements(root, empty, scene_data):
+    """
+    Write the Empty data block.
+    """
+    empty_key = scene_data.data_empties[empty]
+
+    null = elem_data_single_int64(root, b"NodeAttribute", get_fbxuid_from_key(empty_key))
+    null.add_string(fbx_name_class(empty.name.encode(), b"NodeAttribute"))
+    null.add_string(b"Null")
+
+    elem_data_single_string(null, b"TypeFlags", b"Null")
+
+    tmpl = elem_props_template_init(scene_data.templates, b"Null")
+    props = elem_properties(null)
+    elem_props_template_finalize(tmpl, props)
+
+    # No custom properties, already saved with object (Model).
+
+
 def fbx_data_lamp_elements(root, lamp, scene_data):
     """
     Write the Lamp data block.
@@ -1008,7 +1101,7 @@ def fbx_data_lamp_elements(root, lamp, scene_data):
 
     elem_data_single_int32(light, b"GeometryVersion", FBX_GEOMETRY_VERSION)  # Sic...
 
-    tmpl = scene_data.templates[b"Light"]
+    tmpl = elem_props_template_init(scene_data.templates, b"Light")
     props = elem_properties(light)
     elem_props_template_set(tmpl, props, "p_enum", b"LightType", FBX_LIGHT_TYPES[lamp.type])
     elem_props_template_set(tmpl, props, "p_bool", b"CastLight", do_light)
@@ -1022,6 +1115,7 @@ def fbx_data_lamp_elements(root, lamp, scene_data):
         elem_props_template_set(tmpl, props, "p_double", b"OuterAngle", math.degrees(lamp.spot_size))
         elem_props_template_set(tmpl, props, "p_double", b"InnerAngle",
                                 math.degrees(lamp.spot_size * (1.0 - lamp.spot_blend)))
+    elem_props_template_finalize(tmpl, props)
 
     # Custom properties.
     if scene_data.settings.use_custom_properties:
@@ -1060,8 +1154,9 @@ def fbx_data_camera_elements(root, cam_obj, scene_data):
     cam.add_string(fbx_name_class(cam_data.name.encode(), b"NodeAttribute"))
     cam.add_string(b"Camera")
 
-    tmpl = scene_data.templates[b"Camera"]
+    tmpl = elem_props_template_init(scene_data.templates, b"Camera")
     props = elem_properties(cam)
+
     elem_props_template_set(tmpl, props, "p_vector", b"Position", loc)
     elem_props_template_set(tmpl, props, "p_vector", b"UpVector", up)
     elem_props_template_set(tmpl, props, "p_vector", b"InterestPosition", loc + to)  # Point, not vector!
@@ -1088,6 +1183,8 @@ def fbx_data_camera_elements(root, cam_obj, scene_data):
     elem_props_template_set(tmpl, props, "p_double", b"FarPlane", cam_data.clip_end * gscale)
     elem_props_template_set(tmpl, props, "p_enum", b"BackPlaneDistanceMode", 1)  # RelativeToCamera.
     elem_props_template_set(tmpl, props, "p_double", b"BackPlaneDistance", cam_data.clip_end * gscale)
+
+    elem_props_template_finalize(tmpl, props)
 
     # Custom properties.
     if scene_data.settings.use_custom_properties:
@@ -1134,8 +1231,10 @@ def fbx_data_mesh_elements(root, me, scene_data):
     geom.add_string(fbx_name_class(me.name.encode(), b"Geometry"))
     geom.add_string(b"Mesh")
 
-    tmpl = scene_data.templates[b"Geometry"]
+    tmpl = elem_props_template_init(scene_data.templates, b"Geometry")
     props = elem_properties(geom)
+
+    elem_props_template_finalize(tmpl, props)
 
     # Custom properties.
     if scene_data.settings.use_custom_properties:
@@ -1259,7 +1358,9 @@ def fbx_data_mesh_elements(root, me, scene_data):
     me.calc_normals_split()
     def _nortuples_gen(raw_nors, m):
         # Great, now normals are also expected 4D!
-        gen = zip(*(iter(raw_nors),) * 3 + (_infinite_gen(1.0),))
+        # XXX Back to 3D normals for now!
+        #gen = zip(*(iter(raw_nors),) * 3 + (_infinite_gen(1.0),))
+        gen = zip(*(iter(raw_nors),) * 3)
         return gen if m is None else (m * Vector(v) for v in gen)
 
     t_ln = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops) * 3
@@ -1277,14 +1378,14 @@ def fbx_data_mesh_elements(root, me, scene_data):
         ln2idx = tuple(set(t_ln))
         elem_data_single_float64_array(lay_nor, b"Normals", chain(*ln2idx))
         # Normal weights, no idea what it is.
-        t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(ln2idx)
-        elem_data_single_float64_array(lay_nor, b"NormalsW", t_lnw)
+        #t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(ln2idx)
+        #elem_data_single_float64_array(lay_nor, b"NormalsW", t_lnw)
 
         ln2idx = {nor: idx for idx, nor in enumerate(ln2idx)}
         elem_data_single_int32_array(lay_nor, b"NormalsIndex", (ln2idx[n] for n in t_ln))
 
         del ln2idx
-        del t_lnw
+        #del t_lnw
     else:
         lay_nor = elem_data_single_int32(geom, b"LayerElementNormal", 0)
         elem_data_single_int32(lay_nor, b"Version", FBX_GEOMETRY_NORMAL_VERSION)
@@ -1293,8 +1394,8 @@ def fbx_data_mesh_elements(root, me, scene_data):
         elem_data_single_string(lay_nor, b"ReferenceInformationType", b"Direct")
         elem_data_single_float64_array(lay_nor, b"Normals", chain(*t_ln))
         # Normal weights, no idea what it is.
-        t_ln = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
-        elem_data_single_float64_array(lay_nor, b"NormalsW", t_ln)
+        #t_ln = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
+        #elem_data_single_float64_array(lay_nor, b"NormalsW", t_ln)
     del t_ln
 
     # tspace
@@ -1303,7 +1404,7 @@ def fbx_data_mesh_elements(root, me, scene_data):
         tspacenumber = len(me.uv_layers)
         if tspacenumber:
             t_ln = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops) * 3
-            t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
+            #t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
             for idx, uvlayer in enumerate(me.uv_layers):
                 name = uvlayer.name
                 me.calc_tangents(name)
@@ -1317,7 +1418,7 @@ def fbx_data_mesh_elements(root, me, scene_data):
                 elem_data_single_string(lay_nor, b"ReferenceInformationType", b"Direct")
                 elem_data_single_float64_array(lay_nor, b"Binormals", chain(*_nortuples_gen(t_ln, geom_mat_no)))
                 # Binormal weights, no idea what it is.
-                elem_data_single_float64_array(lay_nor, b"BinormalsW", t_lnw)
+                #elem_data_single_float64_array(lay_nor, b"BinormalsW", t_lnw)
 
                 # Loop tangents.
                 # NOTE: this is not supported by importer currently.
@@ -1329,10 +1430,10 @@ def fbx_data_mesh_elements(root, me, scene_data):
                 elem_data_single_string(lay_nor, b"ReferenceInformationType", b"Direct")
                 elem_data_single_float64_array(lay_nor, b"Binormals", chain(*_nortuples_gen(t_ln, geom_mat_no)))
                 # Tangent weights, no idea what it is.
-                elem_data_single_float64_array(lay_nor, b"TangentsW", t_lnw)
+                #elem_data_single_float64_array(lay_nor, b"TangentsW", t_lnw)
 
             del t_ln
-            del t_lnw
+            #del t_lnw
             me.free_tangents()
 
     me.free_normals_split()
@@ -1490,8 +1591,9 @@ def fbx_data_material_elements(root, mat, scene_data):
     elem_data_single_string(fbx_mat, b"ShadingModel", mat_type)
     elem_data_single_int32(fbx_mat, b"MultiLayer", 0)  # Should be bool...
 
-    tmpl = scene_data.templates[b"Material"]
+    tmpl = elem_props_template_init(scene_data.templates, b"Material")
     props = elem_properties(fbx_mat)
+
     elem_props_template_set(tmpl, props, "p_string", b"ShadingModel", mat_type.decode())
     elem_props_template_set(tmpl, props, "p_color", b"EmissiveColor", mat.diffuse_color)
     elem_props_template_set(tmpl, props, "p_number", b"EmissiveFactor", mat.emit)
@@ -1521,6 +1623,8 @@ def fbx_data_material_elements(root, mat, scene_data):
         elem_props_template_set(tmpl, props, "p_color", b"ReflectionColor", mat.mirror_color)
         elem_props_template_set(tmpl, props, "p_number", b"ReflectionFactor",
                                 mat.raytrace_mirror.reflect_factor if mat.raytrace_mirror.use else 0.0)
+
+    elem_props_template_finalize(tmpl, props)
 
     # Custom properties.
     if scene_data.settings.use_custom_properties:
@@ -1582,7 +1686,7 @@ def fbx_data_texture_file_elements(root, tex, scene_data):
     if tex.texture.extension in {'REPEAT'}:
         wrap_mode = 0  # Repeat
 
-    tmpl = scene_data.templates[b"TextureFile"]
+    tmpl = elem_props_template_init(scene_data.templates, b"TextureFile")
     props = elem_properties(fbx_tex)
     elem_props_template_set(tmpl, props, "p_enum", b"AlphaSource", alpha_source)
     elem_props_template_set(tmpl, props, "p_bool", b"PremultiplyAlpha",
@@ -1593,6 +1697,7 @@ def fbx_data_texture_file_elements(root, tex, scene_data):
     elem_props_template_set(tmpl, props, "p_vector_3d", b"Translation", tex.offset)
     elem_props_template_set(tmpl, props, "p_vector_3d", b"Scaling", tex.scale)
     elem_props_template_set(tmpl, props, "p_bool", b"UseMipMap", tex.texture.use_mipmap)
+    elem_props_template_finalize(tmpl, props)
 
     # Custom properties.
     if scene_data.settings.use_custom_properties:
@@ -1637,7 +1742,6 @@ def fbx_data_armature_elements(root, armature, scene_data):
     """
 
     # Bones "data".
-    tmpl = scene_data.templates[b"Bone"]
     for bo in armature.data.bones:
         _bo_key, bo_data_key, _arm = scene_data.data_bones[bo]
         fbx_bo = elem_data_single_int64(root, b"NodeAttribute", get_fbxuid_from_key(bo_data_key))
@@ -1645,8 +1749,10 @@ def fbx_data_armature_elements(root, armature, scene_data):
         fbx_bo.add_string(b"LimbNode")
         elem_data_single_string(fbx_bo, b"TypeFlags", b"Skeleton")
 
+        tmpl = elem_props_template_init(scene_data.templates, b"Bone")
         props = elem_properties(fbx_bo)
         elem_props_template_set(tmpl, props, "p_double", b"Size", (bo.tail_local - bo.head_local).length)
+        elem_props_template_finalize(tmpl, props)
 
         # Custom properties.
         if scene_data.settings.use_custom_properties:
@@ -1751,14 +1857,12 @@ def fbx_data_object_elements(root, obj, scene_data):
     loc, rot, scale, matrix, matrix_rot = fbx_object_tx(scene_data, obj)
     rot = tuple(units_convert_iter(rot, "radian", "degree"))
 
-    tmpl = scene_data.templates[b"Model"]
+    tmpl = elem_props_template_init(scene_data.templates, b"Model")
     # For now add only loc/rot/scale...
     props = elem_properties(model)
     elem_props_template_set(tmpl, props, "p_lcl_translation", b"Lcl Translation", loc)
     elem_props_template_set(tmpl, props, "p_lcl_rotation", b"Lcl Rotation", rot)
     elem_props_template_set(tmpl, props, "p_lcl_scaling", b"Lcl Scaling", scale)
-
-    # TODO: "constraints" (limit loc/rot/scale, and target-to-object).
 
     # Custom properties.
     if scene_data.settings.use_custom_properties:
@@ -1784,6 +1888,8 @@ def fbx_data_object_elements(root, obj, scene_data):
         elem_props_template_set(tmpl, props, "p_enum", b"BackgroundMode", 0)  # Don't know what it means
         elem_props_template_set(tmpl, props, "p_bool", b"ForegroundTransparent", True)
 
+    elem_props_template_finalize(tmpl, props)
+
 
 def fbx_data_animation_elements(root, scene_data):
     """
@@ -1799,12 +1905,23 @@ def fbx_data_animation_elements(root, scene_data):
         return (int(v) for v in units_convert_iter((f / fps for f, _v in keys), "second", "ktime"))
 
     astack_key, alayers = animations
-    acn_tmpl = scene_data.templates[b"AnimationCurveNode"]
 
     # Animation stack.
     astack = elem_data_single_int64(root, b"AnimationStack", get_fbxuid_from_key(astack_key))
     astack.add_string(fbx_name_class(scene.name.encode(), b"AnimStack"))
     astack.add_string(b"")
+
+    astack_tmpl = elem_props_template_init(scene_data.templates, b"AnimationStack")
+    astack_props = elem_properties(astack)
+    r = scene_data.scene.render
+    fps = r.fps / r.fps_base
+    f_start = int(units_convert(scene_data.scene.frame_start / fps, "second", "ktime"))
+    f_end = int(units_convert(scene_data.scene.frame_end / fps, "second", "ktime"))
+    elem_props_template_set(astack_tmpl, astack_props, "p_timestamp", b"LocalStart", f_start)
+    elem_props_template_set(astack_tmpl, astack_props, "p_timestamp", b"LocalStop", f_end)
+    elem_props_template_set(astack_tmpl, astack_props, "p_timestamp", b"ReferenceStart", f_start)
+    elem_props_template_set(astack_tmpl, astack_props, "p_timestamp", b"ReferenceStop", f_end)
+    elem_props_template_finalize(astack_tmpl, astack_props)
 
     for obj, (alayer_key, acurvenodes) in alayers.items():
         # Animation layer.
@@ -1818,6 +1935,7 @@ def fbx_data_animation_elements(root, scene_data):
             acurvenode.add_string(fbx_name_class(acurvenode_name.encode(), b"AnimCurveNode"))
             acurvenode.add_string(b"")
 
+            acn_tmpl = elem_props_template_init(scene_data.templates, b"AnimationCurveNode")
             acn_props = elem_properties(acurvenode)
 
             for fbx_item, (acurve_key, def_value, keys, _acurve_valid) in acurves.items():
@@ -1850,6 +1968,8 @@ def fbx_data_animation_elements(root, scene_data):
                     elem_data_single_float32_array(acurve, b"KeyAttrDataFloat", keyattr_datafloat)
                     elem_data_single_int32_array(acurve, b"KeyAttrRefCount", (nbr_keys,))
 
+            elem_props_template_finalize(acn_tmpl, acn_props)
+
 
 ##### Top-level FBX data container. #####
 
@@ -1861,7 +1981,7 @@ def fbx_data_animation_elements(root, scene_data):
 FBXData = namedtuple("FBXData", (
     "templates", "templates_users", "connections",
     "settings", "scene", "objects", "animations",
-    "data_lamps", "data_cameras", "data_meshes", "mesh_mat_indices",
+    "data_empties", "data_lamps", "data_cameras", "data_meshes", "mesh_mat_indices",
     "data_bones", "data_deformers",
     "data_world", "data_materials", "data_textures", "data_videos",
 ))
@@ -1982,8 +2102,6 @@ def fbx_animations_simplify(scene_data, animdata):
         p_currframe, p_key, p_key_write = keys[0]
         p_keyed = [(p_currframe - max_frame_diff, val) for val in p_key]
         for currframe, key, key_write in keys:
-            #if obj.name == "Cube":
-                #print(currframe, key, key_write)
             for idx, (val, p_val) in enumerate(zip(key, p_key)):
                 p_keyedframe, p_keyedval = p_keyed[idx]
                 if val == p_val:
@@ -2082,16 +2200,19 @@ def fbx_data_from_scene(scene, settings):
     Do some pre-processing over scene's data...
     """
     objtypes = settings.object_types
+    objects = settings.context_objects
 
     ##### Gathering data...
 
     # This is rather simple for now, maybe we could end generating templates with most-used values
     # instead of default ones?
-    objects = OrderedDict((obj, get_blenderID_key(obj)) for obj in scene.objects if obj.type in objtypes)
+    objects = OrderedDict((obj, get_blenderID_key(obj)) for obj in objects if obj.type in objtypes)
     data_lamps = OrderedDict((obj.data, get_blenderID_key(obj.data)) for obj in objects if obj.type == 'LAMP')
     # Unfortunately, FBX camera data contains object-level data (like position, orientation, etc.)...
     data_cameras = OrderedDict((obj, get_blenderID_key(obj.data)) for obj in objects if obj.type == 'CAMERA')
     data_meshes = OrderedDict((obj.data, (get_blenderID_key(obj.data), obj)) for obj in objects if obj.type == 'MESH')
+    # Yep! Contains nothing, but needed!
+    data_empties = OrderedDict((obj, get_blender_empty_key(obj)) for obj in objects if obj.type == 'EMPTY')
 
     # Armatures!
     data_bones = OrderedDict()
@@ -2156,7 +2277,7 @@ def fbx_data_from_scene(scene, settings):
             if tex in data_textures:
                 data_textures[tex][1][mat] = tex_fbx_props
             else:
-                data_textures[tex] = (get_blenderID_key(tex), OrderedDict((mat, tex_fbx_props)))
+                data_textures[tex] = (get_blenderID_key(tex), OrderedDict(((mat, tex_fbx_props),)))
             if img in data_videos:
                 data_videos[img][1].append(tex)
             else:
@@ -2167,7 +2288,7 @@ def fbx_data_from_scene(scene, settings):
     tmp_scdata = FBXData(  # Kind of hack, we need a temp scene_data for object's space handling to bake animations...
         None, None, None,
         settings, scene, objects, None,
-        data_lamps, data_cameras, data_meshes, None,
+        data_empties, data_lamps, data_cameras, data_meshes, None,
         data_bones, data_deformers,
         data_world, data_materials, data_textures, data_videos,
     )
@@ -2178,7 +2299,9 @@ def fbx_data_from_scene(scene, settings):
     templates = OrderedDict()
     templates[b"GlobalSettings"] = fbx_template_def_globalsettings(scene, settings, nbr_users=1)
 
-    # XXX Looks like there can only be one NodeAttribute template? At lest, never found a light template... :/
+    if data_empties:
+        templates[b"Null"] = fbx_template_def_null(scene, settings, nbr_users=len(data_empties))
+
     if data_lamps:
         templates[b"Light"] = fbx_template_def_light(scene, settings, nbr_users=len(data_lamps))
 
@@ -2264,6 +2387,11 @@ def fbx_data_from_scene(scene, settings):
             continue
         connections.append((b"OO", get_fbxuid_from_key(bo_key), get_fbxuid_from_key(objects[par]), None))
 
+    # Empties
+    for empty_obj, empty_key in data_empties.items():
+        empty_obj_key = objects[empty_obj]
+        connections.append((b"OO", get_fbxuid_from_key(empty_key), get_fbxuid_from_key(empty_obj_key), None))
+
     # Cameras
     for obj_cam, cam_key in data_cameras.items():
         cam_obj_key = objects[obj_cam]
@@ -2348,7 +2476,7 @@ def fbx_data_from_scene(scene, settings):
     return FBXData(
         templates, templates_users, connections,
         settings, scene, objects, animations,
-        data_lamps, data_cameras, data_meshes, mesh_mat_indices,
+        data_empties, data_lamps, data_cameras, data_meshes, mesh_mat_indices,
         data_bones, data_deformers,
         data_world, data_materials, data_textures, data_videos,
     )
@@ -2455,10 +2583,10 @@ def fbx_header_elements(root, scene_data, time=None):
     f_start = scene_data.scene.frame_start
     f_end = scene_data.scene.frame_end
     elem_props_set(props, "p_enum", b"TimeMode", 14)  # FPS, 14 = custom...
-    elem_props_set(props, "p_timestamp", b"TimeSpanStart", int(units_convert(f_start / fps, "second", "ktime")))
-    elem_props_set(props, "p_timestamp", b"TimeSpanStop", int(units_convert(f_end / fps, "second", "ktime")))
-    #elem_props_set(props, "p_timestamp", b"TimeSpanStart", 0)
-    #elem_props_set(props, "p_timestamp", b"TimeSpanStop", FBX_KTIME)
+    #elem_props_set(props, "p_timestamp", b"TimeSpanStart", int(units_convert(f_start / fps, "second", "ktime")))
+    #elem_props_set(props, "p_timestamp", b"TimeSpanStop", int(units_convert(f_end / fps, "second", "ktime")))
+    elem_props_set(props, "p_timestamp", b"TimeSpanStart", 0)
+    elem_props_set(props, "p_timestamp", b"TimeSpanStop", FBX_KTIME)
     elem_props_set(props, "p_double", b"CustomFrameRate", fps)
 
     ##### End of GlobalSettings element.
@@ -2515,6 +2643,9 @@ def fbx_objects_elements(root, scene_data):
     Data (objects, geometry, material, textures, armatures, etc.
     """
     objects = elem_empty(root, b"Objects")
+
+    for empty in scene_data.data_empties.keys():
+        fbx_data_empty_elements(objects, empty, scene_data)
 
     for lamp in scene_data.data_lamps.keys():
         fbx_data_lamp_elements(objects, lamp, scene_data)
