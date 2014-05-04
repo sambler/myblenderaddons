@@ -1802,6 +1802,7 @@ def fbx_data_armature_elements(root, armature, scene_data):
         * BindPose.
     Note armature itself has no data, it is a mere "Null" Model...
     """
+    mat_world_arm = fbx_object_matrix(scene_data, armature, global_space=True)
 
     # Bones "data".
     for bo in armature.data.bones:
@@ -1860,7 +1861,8 @@ def fbx_data_armature_elements(root, armature, scene_data):
             elem_data_single_float64(fbx_skin, b"Link_DeformAcuracy", 50.0)  # Only vague idea what it is...
 
             # Pre-process vertex weights (also to check vertices assigned ot more than four bones).
-            bo_vg_idx = {bo.name: obj.vertex_groups[bo.name].index for bo in clusters.keys()}
+            bo_vg_idx = {bo.name: obj.vertex_groups[bo.name].index
+                         for bo in clusters.keys() if bo.name in obj.vertex_groups}
             valid_idxs = set(bo_vg_idx.values())
             vgroups = {vg.index: OrderedDict() for vg in obj.vertex_groups}
             verts_vgroups = (sorted(((vg.group, vg.weight) for vg in v.groups if vg.weight and vg.group in valid_idxs),
@@ -1872,9 +1874,10 @@ def fbx_data_armature_elements(root, armature, scene_data):
 
             for bo, clstr_key in clusters.items():
                 # Find which vertices are affected by this bone/vgroup pair, and matching weights.
-                vg_idx = bo_vg_idx[bo.name]
-                indices = vgroups[vg_idx].keys()
-                weights = vgroups[vg_idx].values()
+                # Note we still write a cluster for bones not affecting the mesh, to get 'rest pose' data
+                # (the TransformBlah matrices).
+                vg_idx = bo_vg_idx.get(bo.name, None)
+                indices, weights = ((), ()) if vg_idx is None else zip(*vgroups[vg_idx].items())
 
                 # Create the cluster.
                 fbx_clstr = elem_data_single_int64(root, b"Deformer", get_fbxuid_from_key(clstr_key))
@@ -1885,11 +1888,10 @@ def fbx_data_armature_elements(root, armature, scene_data):
                 # No idea what that user data might be...
                 fbx_userdata = elem_data_single_string(fbx_clstr, b"UserData", b"")
                 fbx_userdata.add_string(b"")
-                if indices:
-                    elem_data_single_int32_array(fbx_clstr, b"Indexes", indices)
-                    elem_data_single_float64_array(fbx_clstr, b"Weights", weights)
-                # Transform and TransformLink matrices...
-                # They seem to be mostly the same as BindPose ones???
+                elem_data_single_int32_array(fbx_clstr, b"Indexes", indices)
+                elem_data_single_float64_array(fbx_clstr, b"Weights", weights)
+                # Transform, TransformLink and TransformAssociateModel matrices...
+                # They seem to be doublons of BindPose ones??? Have armature (associatemodel) in addition, though.
                 # WARNING! Even though official FBX API presents Transform in global space,
                 #          **it is stored in bone space in FBX data!** See:
                 #          http://area.autodesk.com/forum/autodesk-fbx/fbx-sdk/why-the-values-return-
@@ -1897,6 +1899,7 @@ def fbx_data_armature_elements(root, armature, scene_data):
                 elem_data_single_float64_array(fbx_clstr, b"Transform",
                                                matrix_to_array(mat_world_bones[bo].inverted() * mat_world_obj))
                 elem_data_single_float64_array(fbx_clstr, b"TransformLink", matrix_to_array(mat_world_bones[bo]))
+                elem_data_single_float64_array(fbx_clstr, b"TransformAssociateModel", matrix_to_array(mat_world_arm))
 
 
 def fbx_data_object_elements(root, obj, scene_data):
@@ -2121,6 +2124,9 @@ def fbx_skeleton_from_armature(scene, settings, armature, objects, data_meshes, 
         data_bones[bo] = (key, data_key, armature)
         bones[bo.name] = bo
 
+    if not bones:
+        return
+
     for obj in objects.keys():
         if not isinstance(obj, Object):
             continue
@@ -2142,17 +2148,11 @@ def fbx_skeleton_from_armature(scene, settings, armature, objects, data_meshes, 
         if not found:
             continue
 
-        # Now we have a mesh using this armature. First, find out which bones are concerned!
-        # XXX Assuming here non-used bones can have no cluster, this has to be checked!
-        used_bones = tuple(bones[vg.name] for vg in obj.vertex_groups if vg.name in bones)
-        if not used_bones:
-            continue
-
+        # Now we have a mesh using this armature.
         # Note: bindpose have no relations at all (no connections), so no need for any preprocess for them.
-
         # Create skin & clusters relations (note skins are connected to geometry, *not* model!).
         _key, me, _free = data_meshes[obj]
-        clusters = OrderedDict((bo, get_blender_bone_cluster_key(armature, me, bo)) for bo in used_bones)
+        clusters = OrderedDict((bo, get_blender_bone_cluster_key(armature, me, bo)) for bo in bones.values())
         data_deformers.setdefault(armature, OrderedDict())[me] = (get_blender_armature_skin_key(armature, me),
                                                                   obj, clusters)
 
