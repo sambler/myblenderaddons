@@ -1877,7 +1877,7 @@ def fbx_data_armature_elements(root, armature, scene_data):
                 # Note we still write a cluster for bones not affecting the mesh, to get 'rest pose' data
                 # (the TransformBlah matrices).
                 vg_idx = bo_vg_idx.get(bo.name, None)
-                indices, weights = ((), ()) if vg_idx is None else zip(*vgroups[vg_idx].items())
+                indices, weights = ((), ()) if vg_idx is None or not vgroups[vg_idx] else zip(*vgroups[vg_idx].items())
 
                 # Create the cluster.
                 fbx_clstr = elem_data_single_int64(root, b"Deformer", get_fbxuid_from_key(clstr_key))
@@ -2455,6 +2455,8 @@ def fbx_data_from_scene(scene, settings):
 
     # Animation...
     animations = ()
+    frame_start = scene.frame_start
+    frame_end = scene.frame_end
     if settings.bake_anim:
         # From objects & bones only for a start.
         tmp_scdata = FBXData(  # Kind of hack, we need a temp scene_data for object's space handling to bake animations...
@@ -2465,6 +2467,7 @@ def fbx_data_from_scene(scene, settings):
             data_world, data_materials, data_textures, data_videos,
         )
         animations, frame_start, frame_end = fbx_animations_objects(tmp_scdata)
+        
 
     ##### Creation of templates...
 
