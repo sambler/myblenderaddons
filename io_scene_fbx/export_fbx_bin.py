@@ -27,565 +27,60 @@ import math
 import os
 import time
 
-import collections
-from collections import namedtuple, OrderedDict
-import itertools
+from collections import OrderedDict
 from itertools import zip_longest, chain
 
 import bpy
 import bpy_extras
-from bpy.types import Object, Bone, PoseBone
 from mathutils import Vector, Matrix
 
 from . import encode_bin, data_types
-
-
-# "Constants"
-FBX_VERSION = 7400
-FBX_HEADER_VERSION = 1003
-FBX_SCENEINFO_VERSION = 100
-FBX_TEMPLATES_VERSION = 100
-
-FBX_MODELS_VERSION = 232
-
-FBX_GEOMETRY_VERSION = 124
-# Revert back normals to 101 (simple 3D values) for now, 102 (4D + weights) seems not well supported by most apps
-# currently, apart from some AD products.
-FBX_GEOMETRY_NORMAL_VERSION = 101
-FBX_GEOMETRY_BINORMAL_VERSION = 101
-FBX_GEOMETRY_TANGENT_VERSION = 101
-FBX_GEOMETRY_SMOOTHING_VERSION = 102
-FBX_GEOMETRY_VCOLOR_VERSION = 101
-FBX_GEOMETRY_UV_VERSION = 101
-FBX_GEOMETRY_MATERIAL_VERSION = 101
-FBX_GEOMETRY_LAYER_VERSION = 100
-FBX_POSE_BIND_VERSION = 100
-FBX_DEFORMER_SKIN_VERSION = 101
-FBX_DEFORMER_CLUSTER_VERSION = 100
-FBX_MATERIAL_VERSION = 102
-FBX_TEXTURE_VERSION = 202
-FBX_ANIM_KEY_VERSION = 4008
-
-FBX_NAME_CLASS_SEP = b"\x00\x01"
-
-FBX_KTIME = 46186158000  # This is the number of "ktimes" in one second (yep, precision over the nanosecond...)
-
-
-MAT_CONVERT_LAMP = Matrix.Rotation(math.pi / 2.0, 4, 'X')  # Blender is -Z, FBX is -Y.
-MAT_CONVERT_CAMERA = Matrix.Rotation(math.pi / 2.0, 4, 'Y')  # Blender is -Z, FBX is +X.
-#MAT_CONVERT_BONE = Matrix.Rotation(math.pi / -2.0, 4, 'X')  # Blender is +Y, FBX is +Z.
-MAT_CONVERT_BONE = Matrix()
-
-
-BLENDER_OTHER_OBJECT_TYPES = {'CURVE', 'SURFACE', 'FONT', 'META'}
-BLENDER_OBJECT_TYPES_MESHLIKE = {'MESH'} | BLENDER_OTHER_OBJECT_TYPES
-
-
-# Lamps.
-FBX_LIGHT_TYPES = {
-    'POINT': 0,  # Point.
-    'SUN': 1,    # Directional.
-    'SPOT': 2,   # Spot.
-    'HEMI': 1,   # Directional.
-    'AREA': 3,   # Area.
-}
-FBX_LIGHT_DECAY_TYPES = {
-    'CONSTANT': 0,                   # None.
-    'INVERSE_LINEAR': 1,             # Linear.
-    'INVERSE_SQUARE': 2,             # Quadratic.
-    'CUSTOM_CURVE': 2,               # Quadratic.
-    'LINEAR_QUADRATIC_WEIGHTED': 2,  # Quadratic.
-}
-
-
-##### Misc utilities #####
-
-# Note: this could be in a utility (math.units e.g.)...
-
-UNITS = {
-    "meter": 1.0,  # Ref unit!
-    "kilometer": 0.001,
-    "millimeter": 1000.0,
-    "foot": 1.0 / 0.3048,
-    "inch": 1.0 / 0.0254,
-    "turn": 1.0,  # Ref unit!
-    "degree": 360.0,
-    "radian": math.pi * 2.0,
-    "second": 1.0,  # Ref unit!
-    "ktime": FBX_KTIME,
-}
-
-
-def units_convert(val, u_from, u_to):
-    """Convert value."""
-    conv = UNITS[u_to] / UNITS[u_from]
-    return val * conv
-
-
-def units_convert_iter(it, u_from, u_to):
-    """Convert value."""
-    conv = UNITS[u_to] / UNITS[u_from]
-    return (v * conv for v in it)
-
-
-def matrix_to_array(mat):
-    """Concatenate matrix's columns into a single, flat tuple"""
-    # blender matrix is row major, fbx is col major so transpose on write
-    return tuple(f for v in mat.transposed() for f in v)
-
-
-def similar_values(v1, v2, e=1e-6):
-    """Return True if v1 and v2 are nearly the same."""
-    if v1 == v2:
-        return True
-    return ((abs(v1 - v2) / max(abs(v1), abs(v2))) <= e)
-
-
-RIGHT_HAND_AXES = {
-    # Up, Front -> FBX values (tuples of (axis, sign), Up, Front, Coord).
-    # Note: Since we always stay in right-handed system, third coord sign is always positive!
-    ('X',  'Y'):  ((0, 1),  (1, -1),  (2, 1)),
-    ('X',  '-Y'): ((0, 1),  (1, 1), (2, 1)),
-    ('X',  'Z'):  ((0, 1),  (2, -1),  (1, 1)),
-    ('X',  '-Z'): ((0, 1),  (2, 1), (1, 1)),
-    ('-X', 'Y'):  ((0, -1), (1, -1),  (2, 1)),
-    ('-X', '-Y'): ((0, -1), (1, 1), (2, 1)),
-    ('-X', 'Z'):  ((0, -1), (2, -1),  (1, 1)),
-    ('-X', '-Z'): ((0, -1), (2, 1), (1, 1)),
-    ('Y',  'X'):  ((1, 1),  (0, -1),  (2, 1)),
-    ('Y',  '-X'): ((1, 1),  (0, 1), (2, 1)),
-    ('Y',  'Z'):  ((1, 1),  (2, -1),  (0, 1)),
-    ('Y',  '-Z'): ((1, 1),  (2, 1), (0, 1)),
-    ('-Y', 'X'):  ((1, -1), (0, -1),  (2, 1)),
-    ('-Y', '-X'): ((1, -1), (0, 1), (2, 1)),
-    ('-Y', 'Z'):  ((1, -1), (2, -1),  (0, 1)),
-    ('-Y', '-Z'): ((1, -1), (2, 1), (0, 1)),
-    ('Z',  'X'):  ((2, 1),  (0, -1),  (1, 1)),
-    ('Z',  '-X'): ((2, 1),  (0, 1), (1, 1)),
-    ('Z',  'Y'):  ((2, 1),  (1, -1),  (0, 1)),  # Blender system!
-    ('Z',  '-Y'): ((2, 1),  (1, 1), (0, 1)),
-    ('-Z', 'X'):  ((2, -1), (0, -1),  (1, 1)),
-    ('-Z', '-X'): ((2, -1), (0, 1), (1, 1)),
-    ('-Z', 'Y'):  ((2, -1), (1, -1),  (0, 1)),
-    ('-Z', '-Y'): ((2, -1), (1, 1), (0, 1)),
-}
-
-
-FBX_FRAMERATES = (
-    (-1.0, 14),  # Custom framerate.
-    (120.0, 1),
-    (100.0, 2),
-    (60.0, 3),
-    (50.0, 4),
-    (48.0, 5),
-    (30.0, 6),  # BW NTSC.
-    (30.0 / 1.001, 9),  # Color NTSC.
-    (25.0, 10),
-    (24.0, 11),
-    (24.0 / 1.001, 13),
-    (96.0, 15),
-    (72.0, 16),
-    (60.0 / 1.001, 17),
+from .export_fbx_bin_utils import (
+    # Constants.
+    FBX_VERSION, FBX_HEADER_VERSION, FBX_SCENEINFO_VERSION, FBX_TEMPLATES_VERSION,
+    FBX_MODELS_VERSION,
+    FBX_GEOMETRY_VERSION, FBX_GEOMETRY_NORMAL_VERSION, FBX_GEOMETRY_BINORMAL_VERSION, FBX_GEOMETRY_TANGENT_VERSION,
+    FBX_GEOMETRY_SMOOTHING_VERSION, FBX_GEOMETRY_VCOLOR_VERSION, FBX_GEOMETRY_UV_VERSION,
+    FBX_GEOMETRY_MATERIAL_VERSION, FBX_GEOMETRY_LAYER_VERSION,
+    FBX_POSE_BIND_VERSION, FBX_DEFORMER_SKIN_VERSION, FBX_DEFORMER_CLUSTER_VERSION,
+    FBX_MATERIAL_VERSION, FBX_TEXTURE_VERSION,
+    FBX_ANIM_KEY_VERSION,
+    FBX_KTIME,
+    BLENDER_OTHER_OBJECT_TYPES, BLENDER_OBJECT_TYPES_MESHLIKE,
+    FBX_LIGHT_TYPES, FBX_LIGHT_DECAY_TYPES,
+    RIGHT_HAND_AXES, FBX_FRAMERATES,
+    # Miscellaneous utils.
+    units_convert, units_convert_iter, matrix_to_array, similar_values,
+    # UUID from key.
+    get_fbx_uuid_from_key,
+    # Key generators.
+    get_blenderID_key, get_blenderID_name,
+    get_blender_empty_key, get_blender_bone_key,
+    get_blender_armature_bindpose_key, get_blender_armature_skin_key, get_blender_bone_cluster_key,
+    get_blender_anim_id_base, get_blender_anim_stack_key, get_blender_anim_layer_key,
+    get_blender_anim_curve_node_key, get_blender_anim_curve_key,
+    # FBX element data.
+    elem_empty,
+    elem_data_single_bool, elem_data_single_int16, elem_data_single_int32, elem_data_single_int64,
+    elem_data_single_float32, elem_data_single_float64,
+    elem_data_single_bytes, elem_data_single_string, elem_data_single_string_unicode,
+    elem_data_single_bool_array, elem_data_single_int32_array, elem_data_single_int64_array,
+    elem_data_single_float32_array, elem_data_single_float64_array,
+    elem_data_single_byte_array, elem_data_vec_float64,
+    # FBX element properties.
+    elem_properties, elem_props_set, elem_props_compound,
+    # FBX element properties handling templates.
+    elem_props_template_init, elem_props_template_set, elem_props_template_finalize,
+    # Templates.
+    FBXTemplate, fbx_templates_generate,
+    # Objects.
+    ObjectWrapper, fbx_name_class,
+    # Top level.
+    FBXSettingsMedia, FBXSettings, FBXData,
 )
-
-
-##### UIDs code. #####
-
-# ID class (mere int).
-class UID(int):
-    pass
-
-
-# UIDs storage.
-_keys_to_uids = {}
-_uids_to_keys = {}
-
-
-def _key_to_uid(uids, key):
-    # TODO: Check this is robust enough for our needs!
-    # Note: We assume we have already checked the related key wasn't yet in _keys_to_uids!
-    #       As int64 is signed in FBX, we keep uids below 2**63...
-    if isinstance(key, int) and 0 <= key < 2**63:
-        # We can use value directly as id!
-        uid = key
-    else:
-        uid = hash(key)
-        if uid < 0:
-            uid = -uid
-        if uid >= 2**63:
-            uid //= 2
-    # Try to make our uid shorter!
-    if uid > int(1e9):
-        t_uid = uid % int(1e9)
-        if t_uid not in uids:
-            uid = t_uid
-    # Make sure our uid *is* unique.
-    if uid in uids:
-        inc = 1 if uid < 2**62 else -1
-        while uid in uids:
-            uid += inc
-            if 0 > uid >= 2**63:
-                # Note that this is more that unlikely, but does not harm anyway...
-                raise ValueError("Unable to generate an UID for key {}".format(key))
-    return UID(uid)
-
-
-def get_fbxuid_from_key(key):
-    """
-    Return an UID for given key, which is assumed hasable.
-    """
-    uid = _keys_to_uids.get(key, None)
-    if uid is None:
-        uid = _key_to_uid(_uids_to_keys, key)
-        _keys_to_uids[key] = uid
-        _uids_to_keys[uid] = key
-    return uid
-
-
-# XXX Not sure we'll actually need this one?
-def get_key_from_fbxuid(uid):
-    """
-    Return the key which generated this uid.
-    """
-    assert(uid.__class__ == UID)
-    return _uids_to_keys.get(uid, None)
-
-
-# Blender-specific key generators
-def get_blenderID_key(bid):
-    return "B" + bid.rna_type.name + "::" + bid.name
-
-
-def get_blender_empty_key(obj):
-    """Return bone's keys (Model and NodeAttribute)."""
-    return "|".join((get_blenderID_key(obj), "Empty"))
-
-
-def get_blender_bone_key(armature, bone):
-    """Return bone's keys (Model and NodeAttribute)."""
-    key = "|".join((get_blenderID_key(armature), get_blenderID_key(bone)))
-    return key, key + "_Data"
-
-
-def get_blender_armature_bindpose_key(armature, mesh):
-    """Return armature's bindpose key."""
-    return "|".join((get_blenderID_key(armature), get_blenderID_key(mesh), "BindPose"))
-
-
-def get_blender_armature_skin_key(armature, mesh):
-    """Return armature's skin key."""
-    return "|".join((get_blenderID_key(armature), get_blenderID_key(mesh), "DeformerSkin"))
-
-
-def get_blender_bone_cluster_key(armature, mesh, bone):
-    """Return bone's cluster key."""
-    return "|".join((get_blenderID_key(armature), get_blenderID_key(mesh),
-                     get_blenderID_key(bone), "SubDeformerCluster"))
-
-
-def get_blender_anim_id_base(scene, ref_id):
-    if ref_id is not None:
-        return get_blenderID_key(scene) + "|" + get_blenderID_key(ref_id)
-    else:
-        return get_blenderID_key(scene)
-
-
-def get_blender_anim_stack_key(scene, ref_id):
-    """Return single anim stack key."""
-    return get_blender_anim_id_base(scene, ref_id) + "|AnimStack"
-
-
-def get_blender_anim_layer_key(scene, ref_id):
-    """Return ID's anim layer key."""
-    return get_blender_anim_id_base(scene, ref_id) + "|AnimLayer"
-
-
-def get_blender_anim_curve_node_key(scene, ref_id, ID, fbx_prop_name):
-    """Return (stack/layer, ID, fbxprop) curve node key."""
-    return "|".join((get_blender_anim_id_base(scene, ref_id), get_blenderID_key(ID), fbx_prop_name, "AnimCurveNode"))
-
-
-def get_blender_anim_curve_key(scene, ref_id, ID, fbx_prop_name, fbx_prop_item_name):
-    """Return (stack/layer, ID, fbxprop, item) curve key."""
-    return "|".join((get_blender_anim_id_base(scene, ref_id), get_blenderID_key(ID), fbx_prop_name,
-                     fbx_prop_item_name, "AnimCurve"))
-
-
-##### Element generators. #####
-
-# Note: elem may be None, in this case the element is not added to any parent.
-def elem_empty(elem, name):
-    sub_elem = encode_bin.FBXElem(name)
-    if elem is not None:
-        elem.elems.append(sub_elem)
-    return sub_elem
-
-
-def elem_properties(elem):
-    return elem_empty(elem, b"Properties70")
-
-
-def _elem_data_single(elem, name, value, func_name):
-    sub_elem = elem_empty(elem, name)
-    getattr(sub_elem, func_name)(value)
-    return sub_elem
-
-
-def _elem_data_vec(elem, name, value, func_name):
-    sub_elem = elem_empty(elem, name)
-    func = getattr(sub_elem, func_name)
-    for v in value:
-        func(v)
-    return sub_elem
-
-
-def elem_data_single_bool(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_bool")
-
-
-def elem_data_single_int16(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_int16")
-
-
-def elem_data_single_int32(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_int32")
-
-
-def elem_data_single_int64(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_int64")
-
-
-def elem_data_single_float32(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_float32")
-
-
-def elem_data_single_float64(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_float64")
-
-
-def elem_data_single_bytes(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_bytes")
-
-
-def elem_data_single_string(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_string")
-
-
-def elem_data_single_string_unicode(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_string_unicode")
-
-
-def elem_data_single_bool_array(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_bool_array")
-
-
-def elem_data_single_int32_array(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_int32_array")
-
-
-def elem_data_single_int64_array(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_int64_array")
-
-
-def elem_data_single_float32_array(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_float32_array")
-
-
-def elem_data_single_float64_array(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_float64_array")
-
-
-def elem_data_single_byte_array(elem, name, value):
-    return _elem_data_single(elem, name, value, "add_byte_array")
-
-
-def elem_data_vec_float64(elem, name, value):
-    return _elem_data_vec(elem, name, value, "add_float64")
-
-##### Generators for standard FBXProperties70 properties. #####
-
-# Properties definitions, format: (b"type_1", b"label(???)", "name_set_value_1", "name_set_value_2", ...)
-# XXX Looks like there can be various variations of formats here... Will have to be checked ultimately!
-#     Also, those "custom" types like 'FieldOfView' or 'Lcl Translation' are pure nonsense,
-#     these are just Vector3D ultimately... *sigh* (again).
-FBX_PROPERTIES_DEFINITIONS = {
-    # Generic types.
-    "p_bool": (b"bool", b"", "add_int32"),  # Yes, int32 for a bool (and they do have a core bool type)!!!
-    "p_integer": (b"int", b"Integer", "add_int32"),
-    "p_ulonglong": (b"ULongLong", b"", "add_int64"),
-    "p_double": (b"double", b"Number", "add_float64"),  # Non-animatable?
-    "p_number": (b"Number", b"", "add_float64"),  # Animatable-only?
-    "p_enum": (b"enum", b"", "add_int32"),
-    "p_vector_3d": (b"Vector3D", b"Vector", "add_float64", "add_float64", "add_float64"),  # Non-animatable?
-    "p_vector": (b"Vector", b"", "add_float64", "add_float64", "add_float64"),  # Animatable-only?
-    "p_color_rgb": (b"ColorRGB", b"Color", "add_float64", "add_float64", "add_float64"),  # Non-animatable?
-    "p_color": (b"Color", b"", "add_float64", "add_float64", "add_float64"),  # Animatable-only?
-    "p_string": (b"KString", b"", "add_string_unicode"),
-    "p_string_url": (b"KString", b"Url", "add_string_unicode"),
-    "p_timestamp": (b"KTime", b"Time", "add_int64"),
-    "p_datetime": (b"DateTime", b"", "add_string_unicode"),
-    # Special types.
-    "p_object": (b"object", b""),  # XXX Check this! No value for this prop??? Would really like to know how it works!
-    "p_compound": (b"Compound", b""),
-    # Specific types (sic).
-    ## Objects (Models).
-    "p_lcl_translation": (b"Lcl Translation", b"", "add_float64", "add_float64", "add_float64"),
-    "p_lcl_rotation": (b"Lcl Rotation", b"", "add_float64", "add_float64", "add_float64"),
-    "p_lcl_scaling": (b"Lcl Scaling", b"", "add_float64", "add_float64", "add_float64"),
-    "p_visibility": (b"Visibility", b"", "add_float64"),
-    "p_visibility_inheritance": (b"Visibility Inheritance", b"", "add_int32"),
-    ## Cameras!!!
-    "p_roll": (b"Roll", b"", "add_float64"),
-    "p_opticalcenterx": (b"OpticalCenterX", b"", "add_float64"),
-    "p_opticalcentery": (b"OpticalCenterY", b"", "add_float64"),
-    "p_fov": (b"FieldOfView", b"", "add_float64"),
-    "p_fov_x": (b"FieldOfViewX", b"", "add_float64"),
-    "p_fov_y": (b"FieldOfViewY", b"", "add_float64"),
-}
-
-
-def _elem_props_set(elem, ptype, name, value, flags):
-    p = elem_data_single_string(elem, b"P", name)
-    for t in ptype[:2]:
-        p.add_string(t)
-    p.add_string(flags)
-    if len(ptype) == 3:
-        getattr(p, ptype[2])(value)
-    elif len(ptype) > 3:
-        # We assume value is iterable, else it's a bug!
-        for callback, val in zip(ptype[2:], value):
-            getattr(p, callback)(val)
-
-
-def _elem_props_flags(animatable, custom):
-    if animatable and custom:
-        return b"AU"
-    elif animatable:
-        return b"A"
-    elif custom:
-        return b"U"
-    return b""
-
-
-def elem_props_set(elem, ptype, name, value=None, animatable=False, custom=False):
-    ptype = FBX_PROPERTIES_DEFINITIONS[ptype]
-    _elem_props_set(elem, ptype, name, value, _elem_props_flags(animatable, custom))
-
-
-def elem_props_compound(elem, cmpd_name, custom=False):
-    def _setter(ptype, name, value, animatable=False, custom=False):
-        name = cmpd_name + b"|" + name
-        elem_props_set(elem, ptype, name, value, animatable=animatable, custom=custom)
-
-    elem_props_set(elem, "p_compound", cmpd_name, custom=custom)
-    return _setter
-
-
-def elem_props_template_init(templates, template_type):
-    """
-    Init a writing template of given type, for *one* element's properties.
-    """
-    ret = None
-    if template_type in templates:
-        tmpl = templates[template_type]
-        written = tmpl.written[0]
-        props = tmpl.properties
-        ret = OrderedDict((name, [val, ptype, anim, written]) for name, (val, ptype, anim) in props.items())
-    return ret or OrderedDict()
-
-
-def elem_props_template_set(template, elem, ptype_name, name, value, animatable=False):
-    """
-    Only add a prop if the same value is not already defined in given template.
-    Note it is important to not give iterators as value, here!
-    """
-    ptype = FBX_PROPERTIES_DEFINITIONS[ptype_name]
-    if len(ptype) > 3:
-        value = tuple(value)
-    tmpl_val, tmpl_ptype, tmpl_animatable, tmpl_written = template.get(name, (None, None, False, False))
-    # Note animatable flag from template takes precedence over given one, if applicable.
-    if tmpl_ptype is not None:
-        if (tmpl_written and
-            ((len(ptype) == 3 and (tmpl_val, tmpl_ptype) == (value, ptype_name)) or
-             (len(ptype) > 3 and (tuple(tmpl_val), tmpl_ptype) == (value, ptype_name)))):
-            return  # Already in template and same value.
-        _elem_props_set(elem, ptype, name, value, _elem_props_flags(tmpl_animatable, False))
-        template[name][3] = True
-    else:
-        _elem_props_set(elem, ptype, name, value, _elem_props_flags(animatable, False))
-
-
-def elem_props_template_finalize(template, elem):
-    """
-    Finalize one element's template/props.
-    Issue is, some templates might be "needed" by different types (e.g. NodeAttribute is for lights, cameras, etc.),
-    but values for only *one* subtype can be written as template. So we have to be sure we write those for ths other
-    subtypes in each and every elements, if they are not overriden by that element.
-    Yes, hairy, FBX that is to say. When they could easily support several subtypes per template... :(
-    """
-    for name, (value, ptype_name, animatable, written) in template.items():
-        if written:
-            continue
-        ptype = FBX_PROPERTIES_DEFINITIONS[ptype_name]
-        _elem_props_set(elem, ptype, name, value, _elem_props_flags(animatable, False))
-
-
-##### Generators for connection elements. #####
-
-def elem_connection(elem, c_type, uid_src, uid_dst, prop_dst=None):
-    e = elem_data_single_string(elem, b"C", c_type)
-    e.add_int64(uid_src)
-    e.add_int64(uid_dst)
-    if prop_dst is not None:
-        e.add_string(prop_dst)
-
 
 ##### Templates #####
 # TODO: check all those "default" values, they should match Blender's default as much as possible, I guess?
-
-FBXTemplate = namedtuple("FBXTemplate", ("type_name", "prop_type_name", "properties", "nbr_users", "written"))
-
-
-def fbx_templates_generate(root, fbx_templates):
-    # We may have to gather different templates in the same node (e.g. NodeAttribute template gathers properties
-    # for Lights, Cameras, LibNodes, etc.).
-    ref_templates = {(tmpl.type_name, tmpl.prop_type_name): tmpl for tmpl in fbx_templates.values()}
-
-    templates = OrderedDict()
-    for type_name, prop_type_name, properties, nbr_users, _written in fbx_templates.values():
-        if type_name not in templates:
-            templates[type_name] = [OrderedDict(((prop_type_name, (properties, nbr_users)),)), nbr_users]
-        else:
-            templates[type_name][0][prop_type_name] = (properties, nbr_users)
-            templates[type_name][1] += nbr_users
-
-    for type_name, (subprops, nbr_users) in templates.items():
-        template = elem_data_single_string(root, b"ObjectType", type_name)
-        elem_data_single_int32(template, b"Count", nbr_users)
-
-        if len(subprops) == 1:
-            prop_type_name, (properties, _nbr_sub_type_users) = next(iter(subprops.items()))
-            subprops = (prop_type_name, properties)
-            ref_templates[(type_name, prop_type_name)].written[0] = True
-        else:
-            # Ack! Even though this could/should work, looks like it is not supported. So we have to chose one. :|
-            max_users = max_props = -1
-            written_prop_type_name = None
-            for prop_type_name, (properties, nbr_sub_type_users) in subprops.items():
-                if nbr_sub_type_users > max_users or (nbr_sub_type_users == max_users and len(properties) > max_props):
-                    max_users = nbr_sub_type_users
-                    max_props = len(properties)
-                    written_prop_type_name = prop_type_name
-            subprops = (written_prop_type_name, properties)
-            ref_templates[(type_name, written_prop_type_name)].written[0] = True
-
-        prop_type_name, properties = subprops
-        if prop_type_name and properties:
-            elem = elem_data_single_string(template, b"PropertyTemplate", prop_type_name)
-            props = elem_properties(elem)
-            for name, (value, ptype, animatable) in properties.items():
-                elem_props_set(props, ptype, name, value, animatable=animatable)
-
 
 def fbx_template_def_globalsettings(scene, settings, override_defaults=None, nbr_users=0):
     props = OrderedDict()
@@ -992,106 +487,17 @@ def fbx_template_def_animcurve(scene, settings, override_defaults=None, nbr_user
     return FBXTemplate(b"AnimationCurve", b"", props, nbr_users, [False])
 
 
+##### Generators for connection elements. #####
+
+def elem_connection(elem, c_type, uid_src, uid_dst, prop_dst=None):
+    e = elem_data_single_string(elem, b"C", c_type)
+    e.add_int64(uid_src)
+    e.add_int64(uid_dst)
+    if prop_dst is not None:
+        e.add_string(prop_dst)
+
+
 ##### FBX objects generators. #####
-def has_valid_parent(scene_data, obj):
-    if isinstance(obj, PoseBone):
-        obj = obj.bone
-    return obj.parent and obj.parent in scene_data.objects
-
-
-def use_bake_space_transform(scene_data, obj):
-    # NOTE: Only applies to object types supporting this!!! Currently, only meshes...
-    #       Also, do not apply it to children objects.
-    # TODO: Check whether this can work for bones too...
-    return (scene_data.settings.bake_space_transform and not isinstance(obj, (PoseBone, Bone)) and
-            obj.type in BLENDER_OBJECT_TYPES_MESHLIKE and not has_valid_parent(scene_data, obj))
-
-
-def fbx_object_matrix(scene_data, obj, armature=None, local_space=False, global_space=False):
-    """
-    Generate object transform matrix (*always* in matching *FBX* space!).
-    If local_space is True, returned matrix is *always* in local space.
-    Else if global_space is True, returned matrix is always in world space.
-    If both local_space and global_space are False, returned matrix is in parent space if parent is valid,
-    else in world space.
-    Note local_space has precedence over global_space.
-    If obj is a bone, and global_space is True, armature must be provided (it's the bone's armature object!).
-    Applies specific rotation to bones, lamps and cameras (conversion Blender -> FBX).
-    """
-    is_posebone = isinstance(obj, PoseBone)
-    is_bone = is_posebone or isinstance(obj, Bone)
-    # Objects which are not bones and do not have any parent are *always* in global space (unless local_space is True!).
-    is_global = not local_space and (global_space or not (is_bone or has_valid_parent(scene_data, obj)))
-
-    # Up till here, our matrix is in local space, time to bring it in its final desired space.
-    if is_bone:
-        bo = obj
-        matrix = (bo.matrix if is_posebone else bo.matrix_local) * MAT_CONVERT_BONE
-
-        # Bones are in armature (object) space currently, either bring them to global space or real
-        # local space (relative to parent bone).
-        if is_global:
-            matrix = armature.matrix_world * matrix
-        else:  # Handle parent bone is needed.
-            par_matrix = None
-            if is_posebone and bo.bone.parent:
-                par_matrix = scene_data.bones_to_posebones[bo.bone.parent].matrix
-            elif bo.parent:
-                par_matrix = bo.parent.matrix_local
-            if par_matrix:
-                par_matrix = par_matrix * MAT_CONVERT_BONE
-                matrix = par_matrix.inverted() * matrix
-    else:
-        matrix = obj.matrix_local
-
-        # Lamps, and cameras need to be rotated (in local space!).
-        if obj.type == 'LAMP':
-            matrix = matrix * MAT_CONVERT_LAMP
-        elif obj.type == 'CAMERA':
-            matrix = matrix * MAT_CONVERT_CAMERA
-
-        if obj.parent:
-            if is_global:
-                # Move matrix to global Blender space.
-                matrix = obj.parent.matrix_world * matrix
-            elif use_bake_space_transform(scene_data, obj.parent):
-                # Blender's and FBX's local space of parent may differ if we use bake_space_transform...
-                # Apply parent's *Blender* local space...
-                matrix = obj.parent.matrix_local * matrix
-                # ...and move it back into parent's *FBX* local space.
-                par_mat = fbx_object_matrix(scene_data, obj.parent, local_space=True)
-                matrix = par_mat.inverted() * matrix
-
-    if use_bake_space_transform(scene_data, obj):
-        # If we bake the transforms we need to post-multiply inverse global transform.
-        # This means that the global transform will not apply to children of this transform.
-        matrix = matrix * scene_data.settings.global_matrix_inv
-    if is_global:
-        # In any case, pre-multiply the global matrix to get it in FBX global space!
-        matrix = scene_data.settings.global_matrix * matrix
-
-    return matrix
-
-
-def fbx_object_tx(scene_data, obj, rot_euler_compat=None):
-    """
-    Generate object transform data (always in local space when possible).
-    """
-    matrix = fbx_object_matrix(scene_data, obj)
-    loc, rot, scale = matrix.decompose()
-    matrix_rot = rot.to_matrix()
-    # quat -> euler, we always use 'XYZ' order, use ref rotation if given.
-    if rot_euler_compat is not None:
-        rot = rot.to_euler('XYZ', rot_euler_compat)
-    else:
-        rot = rot.to_euler('XYZ')
-
-    return loc, rot, scale, matrix, matrix_rot
-
-
-def fbx_name_class(name, cls):
-    return FBX_NAME_CLASS_SEP.join((name, cls))
-
 
 def fbx_data_element_custom_properties(props, bid):
     """
@@ -1112,7 +518,7 @@ def fbx_data_empty_elements(root, empty, scene_data):
     """
     empty_key = scene_data.data_empties[empty]
 
-    null = elem_data_single_int64(root, b"NodeAttribute", get_fbxuid_from_key(empty_key))
+    null = elem_data_single_int64(root, b"NodeAttribute", get_fbx_uuid_from_key(empty_key))
     null.add_string(fbx_name_class(empty.name.encode(), b"NodeAttribute"))
     null.add_string(b"Null")
 
@@ -1143,7 +549,7 @@ def fbx_data_lamp_elements(root, lamp, scene_data):
         do_shadow = lamp.shadow_method not in {'NOSHADOW'}
         shadow_color = lamp.shadow_color
 
-    light = elem_data_single_int64(root, b"NodeAttribute", get_fbxuid_from_key(lamp_key))
+    light = elem_data_single_int64(root, b"NodeAttribute", get_fbx_uuid_from_key(lamp_key))
     light.add_string(fbx_name_class(lamp.name.encode(), b"NodeAttribute"))
     light.add_string(b"Light")
 
@@ -1176,12 +582,13 @@ def fbx_data_camera_elements(root, cam_obj, scene_data):
     """
     gscale = scene_data.settings.global_scale
 
-    cam_data = cam_obj.data
+    cam = cam_obj.bdata
+    cam_data = cam.data
     cam_key = scene_data.data_cameras[cam_obj]
 
     # Real data now, good old camera!
     # Object transform info.
-    loc, rot, scale, matrix, matrix_rot = fbx_object_tx(scene_data, cam_obj)
+    loc, rot, scale, matrix, matrix_rot = cam_obj.fbx_object_tx(scene_data)
     up = matrix_rot * Vector((0.0, 1.0, 0.0))
     to = matrix_rot * Vector((0.0, 0.0, -1.0))
     # Render settings.
@@ -1198,7 +605,7 @@ def fbx_data_camera_elements(root, cam_obj, scene_data):
     offsetx = filmwidth * cam_data.shift_x
     offsety = filmaspect * filmheight * cam_data.shift_y
 
-    cam = elem_data_single_int64(root, b"NodeAttribute", get_fbxuid_from_key(cam_key))
+    cam = elem_data_single_int64(root, b"NodeAttribute", get_fbx_uuid_from_key(cam_key))
     cam.add_string(fbx_name_class(cam_data.name.encode(), b"NodeAttribute"))
     cam.add_string(b"Camera")
 
@@ -1267,7 +674,7 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
     # No gscale/gmat here, all data are supposed to be in object space.
     smooth_type = scene_data.settings.mesh_smooth_type
 
-    do_bake_space_transform = use_bake_space_transform(scene_data, me_obj)
+    do_bake_space_transform = ObjectWrapper(me_obj).use_bake_space_transform(scene_data)
 
     # Vertices are in object space, but we are post-multiplying all transforms with the inverse of the
     # global matrix, so we need to apply the global matrix to the vertices to get the correct result.
@@ -1279,7 +686,7 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
         geom_mat_no.translation = Vector()
         geom_mat_no.normalize()
 
-    geom = elem_data_single_int64(root, b"Geometry", get_fbxuid_from_key(me_key))
+    geom = elem_data_single_int64(root, b"Geometry", get_fbx_uuid_from_key(me_key))
     geom.add_string(fbx_name_class(me.name.encode(), b"Geometry"))
     geom.add_string(b"Mesh")
 
@@ -1644,7 +1051,7 @@ def fbx_data_material_elements(root, mat, scene_data):
     # Approximation...
     mat_type = b"Phong" if mat.specular_shader in {'COOKTORR', 'PHONG', 'BLINN'} else b"Lambert"
 
-    fbx_mat = elem_data_single_int64(root, b"Material", get_fbxuid_from_key(mat_key))
+    fbx_mat = elem_data_single_int64(root, b"Material", get_fbx_uuid_from_key(mat_key))
     fbx_mat.add_string(fbx_name_class(mat.name.encode(), b"Material"))
     fbx_mat.add_string(b"")
 
@@ -1713,7 +1120,7 @@ def fbx_data_texture_file_elements(root, tex, scene_data):
     img = tex.texture.image
     fname_abs, fname_rel = _gen_vid_path(img, scene_data)
 
-    fbx_tex = elem_data_single_int64(root, b"Texture", get_fbxuid_from_key(tex_key))
+    fbx_tex = elem_data_single_int64(root, b"Texture", get_fbx_uuid_from_key(tex_key))
     fbx_tex.add_string(fbx_name_class(tex.name.encode(), b"Texture"))
     fbx_tex.add_string(b"")
 
@@ -1773,7 +1180,7 @@ def fbx_data_video_elements(root, vid, scene_data):
     vid_key, _texs = scene_data.data_videos[vid]
     fname_abs, fname_rel = _gen_vid_path(vid, scene_data)
 
-    fbx_vid = elem_data_single_int64(root, b"Video", get_fbxuid_from_key(vid_key))
+    fbx_vid = elem_data_single_int64(root, b"Video", get_fbx_uuid_from_key(vid_key))
     fbx_vid.add_string(fbx_name_class(vid.name.encode(), b"Video"))
     fbx_vid.add_string(b"Clip")
 
@@ -1793,7 +1200,7 @@ def fbx_data_video_elements(root, vid, scene_data):
         elem_data_single_byte_array(fbx_vid, b"Content", b"")
 
 
-def fbx_data_armature_elements(root, armature, scene_data):
+def fbx_data_armature_elements(root, arm_obj, scene_data):
     """
     Write:
         * Bones "data" (NodeAttribute::LimbNode, contains pretty much nothing!).
@@ -1802,12 +1209,13 @@ def fbx_data_armature_elements(root, armature, scene_data):
         * BindPose.
     Note armature itself has no data, it is a mere "Null" Model...
     """
-    mat_world_arm = fbx_object_matrix(scene_data, armature, global_space=True)
+    mat_world_arm = arm_obj.fbx_object_matrix(scene_data, global_space=True)
 
     # Bones "data".
-    for bo in armature.data.bones:
-        _bo_key, bo_data_key, _arm = scene_data.data_bones[bo]
-        fbx_bo = elem_data_single_int64(root, b"NodeAttribute", get_fbxuid_from_key(bo_data_key))
+    for bo_obj in arm_obj.bones:
+        bo = bo_obj.bdata
+        bo_data_key = scene_data.data_bones[bo_obj]
+        fbx_bo = elem_data_single_int64(root, b"NodeAttribute", get_fbx_uuid_from_key(bo_data_key))
         fbx_bo.add_string(fbx_name_class(bo.name.encode(), b"NodeAttribute"))
         fbx_bo.add_string(b"LimbNode")
         elem_data_single_string(fbx_bo, b"TypeFlags", b"Skeleton")
@@ -1823,48 +1231,49 @@ def fbx_data_armature_elements(root, armature, scene_data):
 
     # Deformers and BindPoses.
     # Note: we might also use Deformers for our "parent to vertex" stuff???
-    deformer = scene_data.data_deformers.get(armature, None)
+    deformer = scene_data.data_deformers.get(arm_obj, None)
     if deformer is not None:
-        for me, (skin_key, obj, clusters) in deformer.items():
+        for me, (skin_key, ob_obj, clusters) in deformer.items():
             # BindPose.
             # We assume bind pose for our bones are their "Editmode" pose...
             # All matrices are expected in global (world) space.
-            bindpose_key = get_blender_armature_bindpose_key(armature, me)
-            fbx_pose = elem_data_single_int64(root, b"Pose", get_fbxuid_from_key(bindpose_key))
+            bindpose_key = get_blender_armature_bindpose_key(arm_obj.bdata, me)
+            fbx_pose = elem_data_single_int64(root, b"Pose", get_fbx_uuid_from_key(bindpose_key))
             fbx_pose.add_string(fbx_name_class(me.name.encode(), b"Pose"))
             fbx_pose.add_string(b"BindPose")
 
             elem_data_single_string(fbx_pose, b"Type", b"BindPose")
             elem_data_single_int32(fbx_pose, b"Version", FBX_POSE_BIND_VERSION)
-            elem_data_single_int32(fbx_pose, b"NbPoseNodes", 1 + len(armature.data.bones))
+            elem_data_single_int32(fbx_pose, b"NbPoseNodes", 1 + len(arm_obj.bdata.data.bones))
 
             # First node is mesh/object.
-            mat_world_obj = fbx_object_matrix(scene_data, obj, global_space=True)
+            mat_world_obj = ob_obj.fbx_object_matrix(scene_data, global_space=True)
             fbx_posenode = elem_empty(fbx_pose, b"PoseNode")
-            elem_data_single_int64(fbx_posenode, b"Node", get_fbxuid_from_key(scene_data.objects[obj]))
+            elem_data_single_int64(fbx_posenode, b"Node", ob_obj.fbx_uuid)
             elem_data_single_float64_array(fbx_posenode, b"Matrix", matrix_to_array(mat_world_obj))
             # And all bones of armature!
             mat_world_bones = {}
-            for bo in armature.data.bones:
-                bomat = fbx_object_matrix(scene_data, bo, armature, global_space=True)
-                mat_world_bones[bo] = bomat
+            for bo_obj in arm_obj.bones:
+                bomat = bo_obj.fbx_object_matrix(scene_data, rest=True, global_space=True)
+                mat_world_bones[bo_obj] = bomat
                 fbx_posenode = elem_empty(fbx_pose, b"PoseNode")
-                elem_data_single_int64(fbx_posenode, b"Node", get_fbxuid_from_key(scene_data.objects[bo]))
+                elem_data_single_int64(fbx_posenode, b"Node", bo_obj.fbx_uuid)
                 elem_data_single_float64_array(fbx_posenode, b"Matrix", matrix_to_array(bomat))
 
             # Deformer.
-            fbx_skin = elem_data_single_int64(root, b"Deformer", get_fbxuid_from_key(skin_key))
-            fbx_skin.add_string(fbx_name_class(armature.name.encode(), b"Deformer"))
+            fbx_skin = elem_data_single_int64(root, b"Deformer", get_fbx_uuid_from_key(skin_key))
+            fbx_skin.add_string(fbx_name_class(arm_obj.name.encode(), b"Deformer"))
             fbx_skin.add_string(b"Skin")
 
             elem_data_single_int32(fbx_skin, b"Version", FBX_DEFORMER_SKIN_VERSION)
             elem_data_single_float64(fbx_skin, b"Link_DeformAcuracy", 50.0)  # Only vague idea what it is...
 
             # Pre-process vertex weights (also to check vertices assigned ot more than four bones).
-            bo_vg_idx = {bo.name: obj.vertex_groups[bo.name].index
-                         for bo in clusters.keys() if bo.name in obj.vertex_groups}
+            ob = ob_obj.bdata
+            bo_vg_idx = {bo_obj.bdata.name: ob.vertex_groups[bo_obj.bdata.name].index
+                         for bo_obj in clusters.keys() if bo_obj.bdata.name in ob.vertex_groups}
             valid_idxs = set(bo_vg_idx.values())
-            vgroups = {vg.index: OrderedDict() for vg in obj.vertex_groups}
+            vgroups = {vg.index: OrderedDict() for vg in ob.vertex_groups}
             verts_vgroups = (sorted(((vg.group, vg.weight) for vg in v.groups if vg.weight and vg.group in valid_idxs),
                                     key=lambda e: e[1], reverse=True)
                              for v in me.vertices)
@@ -1872,7 +1281,8 @@ def fbx_data_armature_elements(root, armature, scene_data):
                 for vg_idx, w in vgs:
                     vgroups[vg_idx][idx] = w
 
-            for bo, clstr_key in clusters.items():
+            for bo_obj, clstr_key in clusters.items():
+                bo = bo_obj.bdata
                 # Find which vertices are affected by this bone/vgroup pair, and matching weights.
                 # Note we still write a cluster for bones not affecting the mesh, to get 'rest pose' data
                 # (the TransformBlah matrices).
@@ -1880,7 +1290,7 @@ def fbx_data_armature_elements(root, armature, scene_data):
                 indices, weights = ((), ()) if vg_idx is None or not vgroups[vg_idx] else zip(*vgroups[vg_idx].items())
 
                 # Create the cluster.
-                fbx_clstr = elem_data_single_int64(root, b"Deformer", get_fbxuid_from_key(clstr_key))
+                fbx_clstr = elem_data_single_int64(root, b"Deformer", get_fbx_uuid_from_key(clstr_key))
                 fbx_clstr.add_string(fbx_name_class(bo.name.encode(), b"SubDeformer"))
                 fbx_clstr.add_string(b"Cluster")
 
@@ -1897,34 +1307,33 @@ def fbx_data_armature_elements(root, armature, scene_data):
                 #          http://area.autodesk.com/forum/autodesk-fbx/fbx-sdk/why-the-values-return-
                 #                 by-fbxcluster-gettransformmatrix-x-not-same-with-the-value-in-ascii-fbx-file/
                 elem_data_single_float64_array(fbx_clstr, b"Transform",
-                                               matrix_to_array(mat_world_bones[bo].inverted() * mat_world_obj))
-                elem_data_single_float64_array(fbx_clstr, b"TransformLink", matrix_to_array(mat_world_bones[bo]))
+                                               matrix_to_array(mat_world_bones[bo_obj].inverted() * mat_world_obj))
+                elem_data_single_float64_array(fbx_clstr, b"TransformLink", matrix_to_array(mat_world_bones[bo_obj]))
                 elem_data_single_float64_array(fbx_clstr, b"TransformAssociateModel", matrix_to_array(mat_world_arm))
 
 
-def fbx_data_object_elements(root, obj, scene_data):
+def fbx_data_object_elements(root, ob_obj, scene_data):
     """
     Write the Object (Model) data blocks.
-    Note we handle "Model" part of bones as well here!
+    Note this "Model" can also be bone or dupli!
     """
     obj_type = b"Null"  # default, sort of empty...
-    if isinstance(obj, Bone):
+    if ob_obj.is_bone:
         obj_type = b"LimbNode"
-    elif (obj.type in BLENDER_OBJECT_TYPES_MESHLIKE):
+    elif (ob_obj.type in BLENDER_OBJECT_TYPES_MESHLIKE):
         obj_type = b"Mesh"
-    elif (obj.type == 'LAMP'):
+    elif (ob_obj.type == 'LAMP'):
         obj_type = b"Light"
-    elif (obj.type == 'CAMERA'):
+    elif (ob_obj.type == 'CAMERA'):
         obj_type = b"Camera"
-    obj_key = scene_data.objects[obj]
-    model = elem_data_single_int64(root, b"Model", get_fbxuid_from_key(obj_key))
-    model.add_string(fbx_name_class(obj.name.encode(), b"Model"))
+    model = elem_data_single_int64(root, b"Model", ob_obj.fbx_uuid)
+    model.add_string(fbx_name_class(ob_obj.name.encode(), b"Model"))
     model.add_string(obj_type)
 
     elem_data_single_int32(model, b"Version", FBX_MODELS_VERSION)
 
     # Object transform info.
-    loc, rot, scale, matrix, matrix_rot = fbx_object_tx(scene_data, obj)
+    loc, rot, scale, matrix, matrix_rot = ob_obj.fbx_object_tx(scene_data)
     rot = tuple(units_convert_iter(rot, "radian", "degree"))
 
     tmpl = elem_props_template_init(scene_data.templates, b"Model")
@@ -1936,7 +1345,7 @@ def fbx_data_object_elements(root, obj, scene_data):
 
     # Custom properties.
     if scene_data.settings.use_custom_properties:
-        fbx_data_element_custom_properties(props, obj)
+        fbx_data_element_custom_properties(props, ob_obj.bdata)
 
     # Those settings would obviously need to be edited in a complete version of the exporter, may depends on
     # object type, etc.
@@ -1945,7 +1354,7 @@ def fbx_data_object_elements(root, obj, scene_data):
     elem_data_single_bool(model, b"Shading", True)
     elem_data_single_string(model, b"Culling", b"CullingOff")
 
-    if isinstance(obj, Object) and obj.type == 'CAMERA':
+    if obj_type == b"Camera":
         # Why, oh why are FBX cameras such a mess???
         # And WHY add camera data HERE??? Not even sure this is needed...
         render = scene_data.scene.render
@@ -1977,7 +1386,7 @@ def fbx_data_animation_elements(root, scene_data):
 
     # Animation stacks.
     for astack_key, alayers, alayer_key, name, f_start, f_end in animations:
-        astack = elem_data_single_int64(root, b"AnimationStack", get_fbxuid_from_key(astack_key))
+        astack = elem_data_single_int64(root, b"AnimationStack", get_fbx_uuid_from_key(astack_key))
         astack.add_string(fbx_name_class(name, b"AnimStack"))
         astack.add_string(b"")
 
@@ -1994,19 +1403,19 @@ def fbx_data_animation_elements(root, scene_data):
         elem_props_template_finalize(astack_tmpl, astack_props)
 
         # For now, only one layer for all animations.
-        alayer = elem_data_single_int64(root, b"AnimationLayer", get_fbxuid_from_key(alayer_key))
+        alayer = elem_data_single_int64(root, b"AnimationLayer", get_fbx_uuid_from_key(alayer_key))
         alayer.add_string(fbx_name_class(name, b"AnimLayer"))
         alayer.add_string(b"")
 
-        for obj, (alayer_key, acurvenodes) in alayers.items():
+        for ob_obj, (alayer_key, acurvenodes) in alayers.items():
             # Animation layer.
-            # alayer = elem_data_single_int64(root, b"AnimationLayer", get_fbxuid_from_key(alayer_key))
-            # alayer.add_string(fbx_name_class(obj.name.encode(), b"AnimLayer"))
+            # alayer = elem_data_single_int64(root, b"AnimationLayer", get_fbx_uuid_from_key(alayer_key))
+            # alayer.add_string(fbx_name_class(ob_obj.name.encode(), b"AnimLayer"))
             # alayer.add_string(b"")
 
             for fbx_prop, (acurvenode_key, acurves, acurvenode_name) in acurvenodes.items():
                 # Animation curve node.
-                acurvenode = elem_data_single_int64(root, b"AnimationCurveNode", get_fbxuid_from_key(acurvenode_key))
+                acurvenode = elem_data_single_int64(root, b"AnimationCurveNode", get_fbx_uuid_from_key(acurvenode_key))
                 acurvenode.add_string(fbx_name_class(acurvenode_name.encode(), b"AnimCurveNode"))
                 acurvenode.add_string(b"")
 
@@ -2014,11 +1423,12 @@ def fbx_data_animation_elements(root, scene_data):
                 acn_props = elem_properties(acurvenode)
 
                 for fbx_item, (acurve_key, def_value, keys, _acurve_valid) in acurves.items():
-                    elem_props_template_set(acn_tmpl, acn_props, "p_number", fbx_item.encode(), def_value, animatable=True)
+                    elem_props_template_set(acn_tmpl, acn_props, "p_number", fbx_item.encode(),
+                                            def_value, animatable=True)
 
                     # Only create Animation curve if needed!
                     if keys:
-                        acurve = elem_data_single_int64(root, b"AnimationCurve", get_fbxuid_from_key(acurve_key))
+                        acurve = elem_data_single_int64(root, b"AnimationCurve", get_fbx_uuid_from_key(acurve_key))
                         acurve.add_string(fbx_name_class(b"", b"AnimCurve"))
                         acurve.add_string(b"")
 
@@ -2048,20 +1458,6 @@ def fbx_data_animation_elements(root, scene_data):
 
 
 ##### Top-level FBX data container. #####
-
-# Helper container gathering some data we need multiple times:
-#     * templates.
-#     * objects.
-#     * connections.
-#     * takes.
-FBXData = namedtuple("FBXData", (
-    "templates", "templates_users", "connections",
-    "settings", "scene", "objects", "animations", "frame_start", "frame_end",
-    "data_empties", "data_lamps", "data_cameras", "data_meshes", "mesh_mat_indices",
-    "bones_to_posebones", "data_bones", "data_deformers",
-    "data_world", "data_materials", "data_textures", "data_videos",
-))
-
 
 def fbx_mat_properties_from_texture(tex):
     """
@@ -2107,7 +1503,7 @@ def fbx_mat_properties_from_texture(tex):
     return tex_fbx_props
 
 
-def fbx_skeleton_from_armature(scene, settings, armature, objects, data_meshes, bones_to_posebones,
+def fbx_skeleton_from_armature(scene, settings, arm_obj, objects, data_meshes,
                                data_bones, data_deformers, arm_parents):
     """
     Create skeleton from armature/bones (NodeAttribute/LimbNode and Model/LimbNode), and for each deformed mesh,
@@ -2115,33 +1511,28 @@ def fbx_skeleton_from_armature(scene, settings, armature, objects, data_meshes, 
     Also supports "parent to bone" (simple parent to Model/LimbNode).
     arm_parents is a set of tuples (armature, object) for all successful armature bindings.
     """
-    arm = armature.data
-    bones = OrderedDict()
-    for bo, pbo in zip(arm.bones, armature.pose.bones):
-        key, data_key = get_blender_bone_key(armature, bo)
-        objects[bo] = key
-        bones_to_posebones[bo] = pbo
-        data_bones[bo] = (key, data_key, armature)
-        bones[bo.name] = bo
+    arm_data = arm_obj.bdata.data
+    bones = OrderedDict()  # Because we do not have any ordered set :/
+    for bo in arm_obj.bones:
+        data_key = get_blender_bone_key(arm_obj.bdata, bo.bdata)
+        data_bones[bo] = data_key
+        bones[bo] = None
 
     if not bones:
         return
 
-    for obj in objects.keys():
-        if not isinstance(obj, Object):
-            continue
-        if obj.type not in {'MESH'}:
-            continue
-        if obj.parent != armature:
+    for ob_obj in objects:
+        if not (ob_obj.is_object and ob_obj.type == 'MESH' and ob_obj.parent == arm_obj):
             continue
 
         # Always handled by an Armature modifier...
+        ob = ob_obj.bdata
         found = False
-        for mod in obj.modifiers:
+        for mod in ob.modifiers:
             if mod.type not in {'ARMATURE'}:
                 continue
             # We only support vertex groups binding method, not bone envelopes one!
-            if mod.object == armature and mod.use_vertex_groups:
+            if mod.object == arm_obj.bdata and mod.use_vertex_groups:
                 found = True
                 break
 
@@ -2151,13 +1542,15 @@ def fbx_skeleton_from_armature(scene, settings, armature, objects, data_meshes, 
         # Now we have a mesh using this armature.
         # Note: bindpose have no relations at all (no connections), so no need for any preprocess for them.
         # Create skin & clusters relations (note skins are connected to geometry, *not* model!).
-        _key, me, _free = data_meshes[obj]
-        clusters = OrderedDict((bo, get_blender_bone_cluster_key(armature, me, bo)) for bo in bones.values())
-        data_deformers.setdefault(armature, OrderedDict())[me] = (get_blender_armature_skin_key(armature, me),
-                                                                  obj, clusters)
+        _key, me, _free = data_meshes[ob]
+        clusters = OrderedDict((bo, get_blender_bone_cluster_key(arm_obj.bdata, me, bo.bdata)) for bo in bones)
+        data_deformers.setdefault(arm_obj, OrderedDict())[me] = (get_blender_armature_skin_key(arm_obj.bdata, me),
+                                                                 ob_obj, clusters)
 
         # We don't want a regular parent relationship for those in FBX...
-        arm_parents.add((armature, obj))
+        arm_parents.add((arm_obj, ob_obj))
+
+    objects.update(bones)
 
 
 def fbx_animations_simplify(scene_data, animdata):
@@ -2170,7 +1563,7 @@ def fbx_animations_simplify(scene_data, animdata):
     max_frame_diff = step * fac * 10  # max step of 10 frames.
     value_diff_fac = fac / 1000  # min value evolution: 0.1% of whole range.
 
-    for obj, keys in animdata.items():
+    for keys in animdata.values():
         if not keys:
             continue
         extremums = [(min(values), max(values)) for values in zip(*(k[1] for k in keys))]
@@ -2198,14 +1591,27 @@ def fbx_animations_simplify(scene_data, animdata):
         p_key_write[:] = [True] * len(p_key_write)
 
 
-def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero):
+def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero, objects=None, force_keep=False):
     """
     Generate animation data (a single AnimStack) from objects, for a given frame range.
     """
-    objects = scene_data.objects
     bake_step = scene_data.settings.bake_anim_step
     scene = scene_data.scene
-    bone_map = scene_data.bones_to_posebones
+
+    if objects is not None:
+        # Add bones and duplis!
+        for ob_obj in tuple(objects):
+            if not ob_obj.is_object:
+                continue
+            if ob_obj.type == 'ARMATURE':
+                objects |= set(ob_obj.bones)
+            ob_obj.dupli_list_create(scene, 'RENDER')
+            for dp_obj in ob_obj.dupli_list:
+                if dp_obj in scene_data.objects:
+                    objects.add(dp_obj)
+            ob_obj.dupli_list_clear()
+    else:
+        objects = scene_data.objects
 
     # FBX mapping info: Property affected, and name of the "sub" property (to distinguish e.g. vector's channels).
     fbx_names = (
@@ -2215,7 +1621,7 @@ def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero):
     )
 
     back_currframe = scene.frame_current
-    animdata = OrderedDict((obj, []) for obj in objects.keys())
+    animdata = OrderedDict((obj, []) for obj in objects)
 
     p_rots = {}
 
@@ -2223,15 +1629,18 @@ def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero):
     while currframe < f_end:
         real_currframe = currframe - f_start if start_zero else currframe
         scene.frame_set(int(currframe), currframe - int(currframe))
-        for obj in objects.keys():
-            # Get PoseBone from bone...
-            tobj = bone_map[obj] if isinstance(obj, Bone) else obj
+
+        for ob_obj in objects:
+            ob_obj.dupli_list_create(scene, 'RENDER')
+        for ob_obj in objects:
             # We compute baked loc/rot/scale for all objects (rot being euler-compat with previous value!).
-            p_rot = p_rots.get(tobj, None)
-            loc, rot, scale, _m, _mr = fbx_object_tx(scene_data, tobj, p_rot)
-            p_rots[tobj] = rot
+            p_rot = p_rots.get(ob_obj, None)
+            loc, rot, scale, _m, _mr = ob_obj.fbx_object_tx(scene_data, rot_euler_compat=p_rot)
+            p_rots[ob_obj] = rot
             tx = tuple(loc) + tuple(units_convert_iter(rot, "radian", "degree")) + tuple(scale)
-            animdata[obj].append((real_currframe, tx, [False] * len(tx)))
+            animdata[ob_obj].append((real_currframe, tx, [False] * len(tx)))
+        for ob_obj in objects:
+            ob_obj.dupli_list_clear()
         currframe += bake_step
 
     scene.frame_set(back_currframe, 0.0)
@@ -2241,7 +1650,7 @@ def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero):
     animations = OrderedDict()
 
     # And now, produce final data (usable by FBX export code)...
-    for obj, keys in animdata.items():
+    for ob_obj, keys in animdata.items():
         if not keys:
             continue
         curves = [[] for k in keys[0][1]]
@@ -2250,6 +1659,7 @@ def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero):
                 if wrt:
                     curves[idx].append((currframe, val))
 
+        obj_key = ob_obj.key
         # Get PoseBone from bone...
         #tobj = bone_map[obj] if isinstance(obj, Bone) else obj
         #loc, rot, scale, _m, _mr = fbx_object_tx(scene_data, tobj)
@@ -2259,11 +1669,12 @@ def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero):
         final_keys = OrderedDict()
         for idx, c in enumerate(curves):
             fbx_group, fbx_gname, fbx_item = fbx_names[idx]
-            fbx_item_key = get_blender_anim_curve_key(scene, ref_id, obj, fbx_group, fbx_item)
+            fbx_item_key = get_blender_anim_curve_key(scene, ref_id, obj_key, fbx_group, fbx_item)
             if fbx_group not in final_keys:
-                fbx_group_key = get_blender_anim_curve_node_key(scene, ref_id, obj, fbx_group)
+                fbx_group_key = get_blender_anim_curve_node_key(scene, ref_id, obj_key, fbx_group)
                 final_keys[fbx_group] = (fbx_group_key, OrderedDict(), fbx_gname)
-            final_keys[fbx_group][1][fbx_item] = (fbx_item_key, dtx[idx], c, True if len(c) > 1 else False)
+            final_keys[fbx_group][1][fbx_item] = (fbx_item_key, dtx[idx], c,
+                                                  True if (len(c) > 1 or (len(c) > 0 and force_keep)) else False)
         # And now, remove anim groups (i.e. groups of curves affecting a single FBX property) with no curve at all!
         del_groups = []
         for grp, (_k, data, _n) in final_keys.items():
@@ -2274,11 +1685,12 @@ def fbx_animations_objects_do(scene_data, ref_id, f_start, f_end, start_zero):
             del final_keys[grp]
 
         if final_keys:
-            animations[obj] = (get_blender_anim_layer_key(scene, obj), final_keys)
+            #animations[obj] = (get_blender_anim_layer_key(scene, obj.bdata), final_keys)
+            animations[ob_obj] = ("dummy_unused_key", final_keys)
 
     astack_key = get_blender_anim_stack_key(scene, ref_id)
     alayer_key = get_blender_anim_layer_key(scene, ref_id)
-    name = (ref_id.name if ref_id else scene.name).encode()
+    name = (get_blenderID_name(ref_id) if ref_id else scene.name).encode()
 
     if start_zero:
         f_end -= f_start
@@ -2309,11 +1721,14 @@ def fbx_animations_objects(scene_data):
     # Per-NLA strip animstacks.
     if scene_data.settings.bake_anim_use_nla_strips:
         strips = []
-        for obj in scene_data.objects:
+        for ob_obj in scene_data.objects:
             # NLA tracks only for objects, not bones!
-            if not isinstance(obj, Object) or not obj.animation_data:
+            if not ob_obj.is_object:
                 continue
-            for track in obj.animation_data.nla_tracks:
+            ob = ob_obj.bdata  # Back to real Blender Object.
+            if not ob.animation_data:
+                continue
+            for track in ob.animation_data.nla_tracks:
                 if track.mute:
                     continue
                 for strip in track.strips:
@@ -2330,6 +1745,76 @@ def fbx_animations_objects(scene_data):
         for strip in strips:
             strip.mute = False
 
+    # All actions.
+    if scene_data.settings.bake_anim_use_all_actions:
+        def validate_actions(act, path_resolve):
+            for fc in act.fcurves:
+                data_path = fc.data_path
+                if fc.array_index:
+                    data_path = data_path + "[%d]" % fc.array_index
+                try:
+                    path_resolve(data_path)
+                except ValueError:
+                    return False  # Invalid.
+            return True  # Valid.
+
+        def restore_object(ob_to, ob_from):
+            # Restore org state of object (ugh :/ ).
+            props = (
+                'location', 'rotation_quaternion', 'rotation_axis_angle', 'rotation_euler', 'rotation_mode', 'scale',
+                'delta_location', 'delta_rotation_euler', 'delta_rotation_quaternion', 'delta_scale',
+                'lock_location', 'lock_rotation', 'lock_rotation_w', 'lock_rotations_4d', 'lock_scale',
+                'tag', 'layers', 'select', 'track_axis', 'up_axis', 'active_material', 'active_material_index',
+                'matrix_parent_inverse', 'empty_draw_type', 'empty_draw_size', 'empty_image_offset', 'pass_index',
+                'color', 'hide', 'hide_select', 'hide_render', 'use_slow_parent', 'slow_parent_offset',
+                'use_extra_recalc_object', 'use_extra_recalc_data', 'dupli_type', 'use_dupli_frames_speed',
+                'use_dupli_vertices_rotation', 'use_dupli_faces_scale', 'dupli_faces_scale', 'dupli_group',
+                'dupli_frames_start', 'dupli_frames_end', 'dupli_frames_on', 'dupli_frames_off',
+                'draw_type', 'show_bounds', 'draw_bounds_type', 'show_name', 'show_axis', 'show_texture_space',
+                'show_wire', 'show_all_edges', 'show_transparent', 'show_x_ray',
+                'show_only_shape_key', 'use_shape_key_edit_mode', 'active_shape_key_index',
+            )
+            for p in props:
+                setattr(ob_to, p, getattr(ob_from, p))
+
+        for ob_obj in scene_data.objects:
+            # Actions only for objects, not bones!
+            if not ob_obj.is_object:
+                continue
+
+            ob = ob_obj.bdata  # Back to real Blender Object.
+
+            # We can't play with animdata and actions and get back to org state easily.
+            # So we have to add a temp copy of the object to the scene, animate it, and remove it... :/
+            ob_copy = ob.copy()
+
+            if ob.animation_data:
+                org_act = ob.animation_data.action
+            else:
+                org_act = ...
+                ob.animation_data_create()
+            path_resolve = ob.path_resolve
+
+            for act in bpy.data.actions:
+                # For now, *all* paths in the action must be valid for the object, to validate the action.
+                # Unless that action was already assigned to the object!
+                if act != org_act and not validate_actions(act, path_resolve):
+                    continue
+                ob.animation_data.action = act
+                frame_start, frame_end = act.frame_range  # sic!
+                add_anim(animations,
+                         fbx_animations_objects_do(scene_data, (ob, act), frame_start, frame_end, True, {ob_obj}, True))
+                # Ugly! :/
+                ob.animation_data.action = None if org_act is ... else org_act
+                restore_object(ob, ob_copy)
+
+            if org_act is ...:
+                ob.animation_data_clear()
+            else:
+                ob.animation_data.action = org_act
+
+            bpy.data.objects.remove(ob_copy)
+
     # Global (containing everything) animstack.
     if not scene_data.settings.bake_anim_use_nla_strips or not animations:
         add_anim(animations, fbx_animations_objects_do(scene_data, None, scene.frame_start, scene.frame_end, False))
@@ -2342,55 +1827,70 @@ def fbx_data_from_scene(scene, settings):
     Do some pre-processing over scene's data...
     """
     objtypes = settings.object_types
-    objects = settings.context_objects
 
     ##### Gathering data...
 
     # This is rather simple for now, maybe we could end generating templates with most-used values
     # instead of default ones?
-    objects = OrderedDict((obj, get_blenderID_key(obj)) for obj in objects if obj.type in objtypes)
-    data_lamps = OrderedDict((obj.data, get_blenderID_key(obj.data)) for obj in objects if obj.type == 'LAMP')
+    objects = OrderedDict()  # Because we do not have any ordered set...
+    for ob in settings.context_objects:
+        if ob.type not in objtypes:
+            continue
+        ob_obj = ObjectWrapper(ob)
+        objects[ob_obj] = None
+        # Duplis...
+        ob_obj.dupli_list_create(scene, 'RENDER')
+        for dp_obj in ob_obj.dupli_list:
+            objects[dp_obj] = None
+        ob_obj.dupli_list_clear()
+
+    data_lamps = OrderedDict((ob_obj.bdata.data, get_blenderID_key(ob_obj.bdata.data))
+                             for ob_obj in objects if ob_obj.type == 'LAMP')
     # Unfortunately, FBX camera data contains object-level data (like position, orientation, etc.)...
-    data_cameras = OrderedDict((obj, get_blenderID_key(obj.data)) for obj in objects if obj.type == 'CAMERA')
+    data_cameras = OrderedDict((ob_obj, get_blenderID_key(ob_obj.bdata.data))
+                               for ob_obj in objects if ob_obj.type == 'CAMERA')
     # Yep! Contains nothing, but needed!
-    data_empties = OrderedDict((obj, get_blender_empty_key(obj)) for obj in objects if obj.type == 'EMPTY')
+    data_empties = OrderedDict((ob_obj, get_blender_empty_key(ob_obj.bdata))
+                               for ob_obj in objects if ob_obj.type == 'EMPTY')
 
     data_meshes = OrderedDict()
-    for obj in objects:
-        if obj.type not in BLENDER_OBJECT_TYPES_MESHLIKE:
+    for ob_obj in objects:
+        if ob_obj.type not in BLENDER_OBJECT_TYPES_MESHLIKE:
+            continue
+        ob = ob_obj.bdata
+        if ob in data_meshes:  # Happens with dupli instances.
             continue
         use_org_data = True
-        if settings.use_mesh_modifiers or obj.type in BLENDER_OTHER_OBJECT_TYPES:
+        if settings.use_mesh_modifiers or ob.type in BLENDER_OTHER_OBJECT_TYPES:
             use_org_data = False
             tmp_mods = []
-            if obj.type == 'MESH':
+            if ob.type == 'MESH':
                 # No need to create a new mesh in this case, if no modifier is active!
                 use_org_data = True
-                for mod in obj.modifiers:
-                    # For meshes, when anim export is enabled, disable Armature modifiers here!
-                    if mod.type == 'ARMATURE' and settings.bake_anim:
+                for mod in ob.modifiers:
+                    # For meshes, when armature export is enabled, disable Armature modifiers here!
+                    if mod.type == 'ARMATURE' and 'ARMATURE' in settings.object_types:
                         tmp_mods.append((mod, mod.show_render))
                         mod.show_render = False
                     if mod.show_render:
                         use_org_data = False
             if not use_org_data:
-                tmp_me = obj.to_mesh(scene, apply_modifiers=True, settings='RENDER')
-                data_meshes[obj] = (get_blenderID_key(tmp_me), tmp_me, True)
+                tmp_me = ob.to_mesh(scene, apply_modifiers=True, settings='RENDER')
+                data_meshes[ob] = (get_blenderID_key(tmp_me), tmp_me, True)
             # Re-enable temporary disabled modifiers.
             for mod, show_render in tmp_mods:
                 mod.show_render = show_render
         if use_org_data:
-            data_meshes[obj] = (get_blenderID_key(obj.data), obj.data, False)
+            data_meshes[ob] = (get_blenderID_key(ob.data), ob.data, False)
 
     # Armatures!
     data_bones = OrderedDict()
     data_deformers = OrderedDict()
-    bones_to_posebones = dict()
     arm_parents = set()
-    for obj in tuple(objects.keys()):
-        if obj.type not in {'ARMATURE'}:
+    for ob_obj in tuple(objects):
+        if not (ob_obj.is_object and ob_obj.type in {'ARMATURE'}):
             continue
-        fbx_skeleton_from_armature(scene, settings, obj, objects, data_meshes, bones_to_posebones,
+        fbx_skeleton_from_armature(scene, settings, ob_obj, objects, data_meshes,
                                    data_bones, data_deformers, arm_parents)
 
     # Some world settings are embedded in FBX materials...
@@ -2404,11 +1904,9 @@ def fbx_data_from_scene(scene, settings):
     #       *Should* work, as FBX always links its materials to Models (i.e. objects).
     #       XXX However, material indices would probably break...
     data_materials = OrderedDict()
-    for obj in objects:
-        # Only meshes for now!
-        if not isinstance(obj, Object) or obj.type not in BLENDER_OBJECT_TYPES_MESHLIKE:
-            continue
-        for mat_s in obj.material_slots:
+    for ob_obj in objects:
+        # If obj is not a valid object for materials, wrapper will just return an empty tuple...
+        for mat_s in ob_obj.material_slots:
             mat = mat_s.material
             # Note theoretically, FBX supports any kind of materials, even GLSL shaders etc.
             # However, I doubt anything else than Lambert/Phong is really portable!
@@ -2416,9 +1914,9 @@ def fbx_data_from_scene(scene, settings):
             # TODO: Support nodes (*BIG* todo!).
             if mat.type in {'SURFACE'} and not mat.use_nodes:
                 if mat in data_materials:
-                    data_materials[mat][1].append(obj)
+                    data_materials[mat][1].append(ob_obj)
                 else:
-                    data_materials[mat] = (get_blenderID_key(mat), [obj])
+                    data_materials[mat] = (get_blenderID_key(mat), [ob_obj])
 
     # Note FBX textures also hold their mapping info.
     # TODO: Support layers?
@@ -2463,11 +1961,10 @@ def fbx_data_from_scene(scene, settings):
             None, None, None,
             settings, scene, objects, None, 0.0, 0.0,
             data_empties, data_lamps, data_cameras, data_meshes, None,
-            bones_to_posebones, data_bones, data_deformers,
+            data_bones, data_deformers,
             data_world, data_materials, data_textures, data_videos,
         )
         animations, frame_start, frame_end = fbx_animations_objects(tmp_scdata)
-        
 
     ##### Creation of templates...
 
@@ -2542,118 +2039,108 @@ def fbx_data_from_scene(scene, settings):
     connections = []
 
     # Objects (with classical parenting).
-    for obj, obj_key in objects.items():
+    for ob_obj in objects:
         # Bones are handled later.
-        if isinstance(obj, Object):
-            par = obj.parent
-            par_key = 0  # Convention, "root" node (never explicitly written).
-            if par and par in objects:
-                par_type = obj.parent_type
-                if par_type in {'OBJECT', 'BONE'}:
-                    # Meshes parented to armature also have 'OBJECT' par_type, in FBX this is handled separately,
-                    # we do not want an extra object parenting!
-                    if (par, obj) not in arm_parents:
-                        par_key = objects[par]
-                else:
-                    print("Sorry, “{}” parenting type is not supported".format(par_type))
-            connections.append((b"OO", get_fbxuid_from_key(obj_key), get_fbxuid_from_key(par_key), None))
+        if not ob_obj.is_bone:
+            par_obj = ob_obj.parent
+            # Meshes parented to armature are handled separately, yet we want the 'no parent' connection (0).
+            if par_obj and ob_obj.has_valid_parent(objects) and (par_obj, ob_obj) not in arm_parents:
+                connections.append((b"OO", ob_obj.fbx_uuid, par_obj.fbx_uuid, None))
+            else:
+                connections.append((b"OO", ob_obj.fbx_uuid, 0, None))
 
     # Armature & Bone chains.
-    for bo, (bo_key, _bo_data_key, arm) in data_bones.items():
-        par = bo.parent
-        if not par:  # Root bone.
-            par = arm
-        if par not in objects:
+    for bo_obj in data_bones.keys():
+        par_obj = bo_obj.parent
+        if par_obj not in objects:
             continue
-        connections.append((b"OO", get_fbxuid_from_key(bo_key), get_fbxuid_from_key(objects[par]), None))
-
-    # Empties
-    for empty_obj, empty_key in data_empties.items():
-        empty_obj_key = objects[empty_obj]
-        connections.append((b"OO", get_fbxuid_from_key(empty_key), get_fbxuid_from_key(empty_obj_key), None))
-
-    # Cameras
-    for obj_cam, cam_key in data_cameras.items():
-        cam_obj_key = objects[obj_cam]
-        connections.append((b"OO", get_fbxuid_from_key(cam_key), get_fbxuid_from_key(cam_obj_key), None))
+        connections.append((b"OO", bo_obj.fbx_uuid, par_obj.fbx_uuid, None))
 
     # Object data.
-    for obj, obj_key in objects.items():
-        if isinstance(obj, Bone):
-            _bo_key, bo_data_key, _arm = data_bones[obj]
-            assert(_bo_key == obj_key)
-            connections.append((b"OO", get_fbxuid_from_key(bo_data_key), get_fbxuid_from_key(obj_key), None))
-        elif obj.type == 'LAMP':
-            lamp_key = data_lamps[obj.data]
-            connections.append((b"OO", get_fbxuid_from_key(lamp_key), get_fbxuid_from_key(obj_key), None))
-        elif obj.type in BLENDER_OBJECT_TYPES_MESHLIKE:
-            mesh_key, _me, _free = data_meshes[obj]
-            connections.append((b"OO", get_fbxuid_from_key(mesh_key), get_fbxuid_from_key(obj_key), None))
+    for ob_obj in objects:
+        if ob_obj.is_bone:
+            bo_data_key = data_bones[ob_obj]
+            connections.append((b"OO", get_fbx_uuid_from_key(bo_data_key), ob_obj.fbx_uuid, None))
+        else:
+            if ob_obj.type == 'LAMP':
+                lamp_key = data_lamps[ob_obj.bdata.data]
+                connections.append((b"OO", get_fbx_uuid_from_key(lamp_key), ob_obj.fbx_uuid, None))
+            elif ob_obj.type == 'CAMERA':
+                cam_key = data_cameras[ob_obj]
+                connections.append((b"OO", get_fbx_uuid_from_key(cam_key), ob_obj.fbx_uuid, None))
+            elif ob_obj.type == 'EMPTY':
+                empty_key = data_empties[ob_obj]
+                connections.append((b"OO", get_fbx_uuid_from_key(empty_key), ob_obj.fbx_uuid, None))
+            elif ob_obj.type in BLENDER_OBJECT_TYPES_MESHLIKE:
+                mesh_key, _me, _free = data_meshes[ob_obj.bdata]
+                connections.append((b"OO", get_fbx_uuid_from_key(mesh_key), ob_obj.fbx_uuid, None))
 
     # Deformers (armature-to-geometry, only for meshes currently)...
     for arm, deformed_meshes in data_deformers.items():
-        for me, (skin_key, obj, clusters) in deformed_meshes.items():
+        for me, (skin_key, ob_obj, clusters) in deformed_meshes.items():
             # skin -> geometry
-            mesh_key, _me, _free = data_meshes[obj]
+            mesh_key, _me, _free = data_meshes[ob_obj.bdata]
             assert(me == _me)
-            connections.append((b"OO", get_fbxuid_from_key(skin_key), get_fbxuid_from_key(mesh_key), None))
-            for bo, clstr_key in clusters.items():
+            connections.append((b"OO", get_fbx_uuid_from_key(skin_key), get_fbx_uuid_from_key(mesh_key), None))
+            for bo_obj, clstr_key in clusters.items():
                 # cluster -> skin
-                connections.append((b"OO", get_fbxuid_from_key(clstr_key), get_fbxuid_from_key(skin_key), None))
+                connections.append((b"OO", get_fbx_uuid_from_key(clstr_key), get_fbx_uuid_from_key(skin_key), None))
                 # bone -> cluster
-                connections.append((b"OO", get_fbxuid_from_key(objects[bo]), get_fbxuid_from_key(clstr_key), None))
+                connections.append((b"OO", bo_obj.fbx_uuid, get_fbx_uuid_from_key(clstr_key), None))
 
     # Materials
     mesh_mat_indices = OrderedDict()
     _objs_indices = {}
-    for mat, (mat_key, objs) in data_materials.items():
-        for obj in objs:
-            obj_key = objects[obj]
-            connections.append((b"OO", get_fbxuid_from_key(mat_key), get_fbxuid_from_key(obj_key), None))
-            # Get index of this mat for this object.
-            # Mat indices for mesh faces are determined by their order in 'mat to ob' connections.
-            # Only mats for meshes currently...
-            me = obj.data
-            idx = _objs_indices[obj] = _objs_indices.get(obj, -1) + 1
-            mesh_mat_indices.setdefault(me, OrderedDict())[mat] = idx
+    for mat, (mat_key, ob_objs) in data_materials.items():
+        for ob_obj in ob_objs:
+            connections.append((b"OO", get_fbx_uuid_from_key(mat_key), ob_obj.fbx_uuid, None))
+            if ob_obj.is_object:
+                # Get index of this mat for this object.
+                # Mat indices for mesh faces are determined by their order in 'mat to ob' connections.
+                # Only mats for meshes currently...
+                if ob_obj.type not in BLENDER_OBJECT_TYPES_MESHLIKE:
+                    continue
+                me = ob_obj.bdata.data
+                idx = _objs_indices[ob_obj] = _objs_indices.get(ob_obj, -1) + 1
+                mesh_mat_indices.setdefault(me, OrderedDict())[mat] = idx
     del _objs_indices
 
     # Textures
     for tex, (tex_key, mats) in data_textures.items():
         for mat, fbx_mat_props in mats.items():
-            mat_key, _objs = data_materials[mat]
+            mat_key, _ob_objs = data_materials[mat]
             for fbx_prop in fbx_mat_props:
                 # texture -> material properties
-                connections.append((b"OP", get_fbxuid_from_key(tex_key), get_fbxuid_from_key(mat_key), fbx_prop))
+                connections.append((b"OP", get_fbx_uuid_from_key(tex_key), get_fbx_uuid_from_key(mat_key), fbx_prop))
 
     # Images
     for vid, (vid_key, texs) in data_videos.items():
         for tex in texs:
             tex_key, _texs = data_textures[tex]
-            connections.append((b"OO", get_fbxuid_from_key(vid_key), get_fbxuid_from_key(tex_key), None))
+            connections.append((b"OO", get_fbx_uuid_from_key(vid_key), get_fbx_uuid_from_key(tex_key), None))
 
     #Animations
     for astack_key, astack, alayer_key, _name, _fstart, _fend in animations:
         # Animstack itself is linked nowhere!
-        astack_id = get_fbxuid_from_key(astack_key)
+        astack_id = get_fbx_uuid_from_key(astack_key)
         # For now, only one layer!
-        alayer_id = get_fbxuid_from_key(alayer_key)
+        alayer_id = get_fbx_uuid_from_key(alayer_key)
         connections.append((b"OO", alayer_id, astack_id, None))
-        for obj, (alayer_key, acurvenodes) in astack.items():
-            obj_id = get_fbxuid_from_key(objects[obj])
+        for ob_obj, (alayer_key, acurvenodes) in astack.items():
+            ob_id = ob_obj.fbx_uuid
             # Animlayer -> animstack.
-            # alayer_id = get_fbxuid_from_key(alayer_key)
+            # alayer_id = get_fbx_uuid_from_key(alayer_key)
             # connections.append((b"OO", alayer_id, astack_id, None))
             for fbx_prop, (acurvenode_key, acurves, acurvenode_name) in acurvenodes.items():
                 # Animcurvenode -> animalayer.
-                acurvenode_id = get_fbxuid_from_key(acurvenode_key)
+                acurvenode_id = get_fbx_uuid_from_key(acurvenode_key)
                 connections.append((b"OO", acurvenode_id, alayer_id, None))
                 # Animcurvenode -> object property.
-                connections.append((b"OP", acurvenode_id, obj_id, fbx_prop.encode()))
-                for fbx_item, (acurve_key, dafault_value, acurve, acurve_valid) in acurves.items():
+                connections.append((b"OP", acurvenode_id, ob_id, fbx_prop.encode()))
+                for fbx_item, (acurve_key, default_value, acurve, acurve_valid) in acurves.items():
                     if acurve:
                         # Animcurve -> Animcurvenode.
-                        connections.append((b"OP", get_fbxuid_from_key(acurve_key), acurvenode_id, fbx_item.encode()))
+                        connections.append((b"OP", get_fbx_uuid_from_key(acurve_key), acurvenode_id, fbx_item.encode()))
 
     ##### And pack all this!
 
@@ -2661,7 +2148,7 @@ def fbx_data_from_scene(scene, settings):
         templates, templates_users, connections,
         settings, scene, objects, animations, frame_start, frame_end,
         data_empties, data_lamps, data_cameras, data_meshes, mesh_mat_indices,
-        bones_to_posebones, data_bones, data_deformers,
+        data_bones, data_deformers,
         data_world, data_materials, data_textures, data_videos,
     )
 
@@ -2800,7 +2287,7 @@ def fbx_documents_elements(root, scene_data):
 
     elem_data_single_int32(docs, b"Count", 1)
 
-    doc_uid = get_fbxuid_from_key("__FBX_Document__" + name)
+    doc_uid = get_fbx_uuid_from_key("__FBX_Document__" + name)
     doc = elem_data_single_int64(docs, b"Document", doc_uid)
     doc.add_string_unicode(name)
     doc.add_string_unicode(name)
@@ -2839,35 +2326,43 @@ def fbx_objects_elements(root, scene_data):
     """
     objects = elem_empty(root, b"Objects")
 
-    for empty in scene_data.data_empties.keys():
+    for empty in scene_data.data_empties:
         fbx_data_empty_elements(objects, empty, scene_data)
 
-    for lamp in scene_data.data_lamps.keys():
+    for lamp in scene_data.data_lamps:
         fbx_data_lamp_elements(objects, lamp, scene_data)
 
-    for cam in scene_data.data_cameras.keys():
+    for cam in scene_data.data_cameras:
         fbx_data_camera_elements(objects, cam, scene_data)
 
     done_meshes = set()
-    for me_obj in scene_data.data_meshes.keys():
-        fbx_data_mesh_elements(objects, me_obj, scene_data, done_meshes)
+    for me in scene_data.data_meshes:
+        fbx_data_mesh_elements(objects, me, scene_data, done_meshes)
     del done_meshes
 
-    for obj in scene_data.objects.keys():
-        fbx_data_object_elements(objects, obj, scene_data)
-
-    for obj in scene_data.objects.keys():
-        if not isinstance(obj, Object) or obj.type not in {'ARMATURE'}:
+    for ob_obj in scene_data.objects:
+        if ob_obj.is_dupli:
             continue
-        fbx_data_armature_elements(objects, obj, scene_data)
+        fbx_data_object_elements(objects, ob_obj, scene_data)
+        ob_obj.dupli_list_create(scene_data.scene, 'RENDER')
+        for dp_obj in ob_obj.dupli_list:
+            if dp_obj not in scene_data.objects:
+                continue
+            fbx_data_object_elements(objects, dp_obj, scene_data)
+        ob_obj.dupli_list_clear()
 
-    for mat in scene_data.data_materials.keys():
+    for ob_obj in scene_data.objects:
+        if not (ob_obj.is_object and ob_obj.type == 'ARMATURE'):
+            continue
+        fbx_data_armature_elements(objects, ob_obj, scene_data)
+
+    for mat in scene_data.data_materials:
         fbx_data_material_elements(objects, mat, scene_data)
 
-    for tex in scene_data.data_textures.keys():
+    for tex in scene_data.data_textures:
         fbx_data_texture_file_elements(objects, tex, scene_data)
 
-    for vid in scene_data.data_videos.keys():
+    for vid in scene_data.data_videos:
         fbx_data_video_elements(objects, vid, scene_data)
 
     fbx_data_animation_elements(objects, scene_data)
@@ -2907,19 +2402,6 @@ def fbx_takes_elements(root, scene_data):
 
 
 ##### "Main" functions. #####
-FBXSettingsMedia = namedtuple("FBXSettingsMedia", (
-    "path_mode", "base_src", "base_dst", "subdir",
-    "embed_textures", "copy_set",
-))
-FBXSettings = namedtuple("FBXSettings", (
-    "report", "to_axes", "global_matrix", "global_scale",
-    "bake_space_transform", "global_matrix_inv", "global_matrix_inv_transposed",
-    "context_objects", "object_types", "use_mesh_modifiers",
-    "mesh_smooth_type", "use_mesh_edges", "use_tspace", "use_armature_deform_only",
-    "bake_anim", "bake_anim_use_nla_strips", "bake_anim_step", "bake_anim_simplify_factor",
-    "use_metadata", "media_settings", "use_custom_properties",
-))
-
 
 # This func can be called with just the filepath
 def save_single(operator, scene, filepath="",
@@ -2932,6 +2414,7 @@ def save_single(operator, scene, filepath="",
                 mesh_smooth_type='FACE',
                 bake_anim=True,
                 bake_anim_use_nla_strips=True,
+                bake_anim_use_all_actions=True,
                 bake_anim_step=1.0,
                 bake_anim_simplify_factor=1.0,
                 use_metadata=True,
@@ -2943,6 +2426,9 @@ def save_single(operator, scene, filepath="",
                 bake_space_transform=False,
                 **kwargs
                 ):
+
+    # Clear cached ObjectWrappers (just in case...).
+    ObjectWrapper.cache_clear()
 
     if object_types is None:
         object_types = {'EMPTY', 'CAMERA', 'LAMP', 'ARMATURE', 'MESH', 'OTHER'}
@@ -2974,7 +2460,7 @@ def save_single(operator, scene, filepath="",
         bake_space_transform, global_matrix_inv, global_matrix_inv_transposed,
         context_objects, object_types, use_mesh_modifiers,
         mesh_smooth_type, use_mesh_edges, use_tspace, False,
-        bake_anim, bake_anim_use_nla_strips, bake_anim_step, bake_anim_simplify_factor,
+        bake_anim, bake_anim_use_nla_strips, bake_anim_use_all_actions, bake_anim_step, bake_anim_simplify_factor,
         False, media_settings, use_custom_properties,
     )
 
@@ -3012,6 +2498,9 @@ def save_single(operator, scene, filepath="",
 
     # And we are down, we can write the whole thing!
     encode_bin.write(filepath, root, FBX_VERSION)
+
+    # Clear cached ObjectWrappers!
+    ObjectWrapper.cache_clear()
 
     # copy all collected files, if we did not embed them.
     if not media_settings.embed_textures:

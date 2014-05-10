@@ -21,6 +21,7 @@
 bl_info = {
     "name": "Autodesk FBX format",
     "author": "Campbell Barton, Bastien Montagne",
+    "version": (3, 0, 0),
     "blender": (2, 70, 0),
     "location": "File > Import-Export",
     "description": "Export FBX meshes, UV's, vertex colors, materials, "
@@ -265,6 +266,12 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
                      "instead of global scene animation"),
         default=True,
     )
+    bake_anim_use_all_actions = BoolProperty(
+        name="All Actions",
+        description=("Export each action as a separated FBX's AnimStack, "
+                     "instead of global scene animation"),
+        default=True,
+    )
     bake_anim_step = FloatProperty(
         name="Sampling Rate",
         description=("How often to evaluate animated values (in frames)"),
@@ -357,6 +364,7 @@ class ExportFBX(bpy.types.Operator, ExportHelper):
             col = layout.column()
             col.enabled = self.bake_anim
             col.prop(self, "bake_anim_use_nla_strips")
+            col.prop(self, "bake_anim_use_all_actions")
             col.prop(self, "bake_anim_step")
             col.prop(self, "bake_anim_simplify_factor")
         else:
