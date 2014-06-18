@@ -1477,9 +1477,6 @@ def fbx_mat_properties_from_texture(tex):
     Quite obviously, this is a fuzzy and far-from-perfect mapping! Amounts of influence are completely lost, e.g.
     Note tex is actually expected to be a texture slot.
     """
-    # Tex influence does not exists in FBX, so assume influence < 0.5 = no influence... :/
-    INFLUENCE_THRESHOLD = 0.5
-
     # Mapping Blender -> FBX (blend_use_name, blend_fact_name, fbx_name).
     blend_to_fbx = (
         # Lambert & Phong...
@@ -1509,7 +1506,8 @@ def fbx_mat_properties_from_texture(tex):
 
     tex_fbx_props = set()
     for use_map_name, name_factor, fbx_prop_name in blend_to_fbx:
-        if getattr(tex, "use_map_" + use_map_name) and getattr(tex, name_factor + "_factor") >= INFLUENCE_THRESHOLD:
+        # Always export enabled textures, even if they have a null influence...
+        if getattr(tex, "use_map_" + use_map_name):
             tex_fbx_props.add(fbx_prop_name)
 
     return tex_fbx_props
@@ -1965,8 +1963,8 @@ def fbx_data_from_scene(scene, settings):
     data_videos = OrderedDict()
     # For now, do not use world textures, don't think they can be linked to anything FBX wise...
     for mat in data_materials.keys():
-        for tex in mat.texture_slots:
-            if tex is None:
+        for tex, use_tex in zip(mat.texture_slots, mat.use_textures):
+            if tex is None or not use_tex:
                 continue
             # For now, only consider image textures.
             # Note FBX does has support for procedural, but this is not portable at all (opaque blob),
