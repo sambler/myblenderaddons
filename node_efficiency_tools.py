@@ -19,7 +19,7 @@
 bl_info = {
     "name": "Node Wrangler (aka Nodes Efficiency Tools)",
     "author": "Bartek Skorupa, Greg Zaal",
-    "version": (3, 5),
+    "version": (3, 6),
     "blender": (2, 70, 0),
     "location": "Node Editor Properties Panel or Ctrl-Space",
     "description": "Various tools to enhance and speed up node-based workflow",
@@ -459,6 +459,10 @@ def hack_force_update(context, nodes):
         node = nodes.new('ShaderNodeMath')
         node.inputs[0].default_value = 0.0
         nodes.remove(node)
+    elif context.space_data.tree_type == "CompositorNodeTree":
+        node = nodes.new('CompositorNodeMath')
+        node.inputs[0].default_value = 0.0
+        nodes.remove(node)
     return False
 
 
@@ -644,13 +648,18 @@ def draw_rounded_node_border(node, radius=8, colour=[1.0, 1.0, 1.0, 0.7]):
     settings = bpy.context.user_preferences.addons[__name__].preferences
     if settings.bgl_antialiasing:
         bgl.glEnable(bgl.GL_LINE_SMOOTH)
+
+    area_width = bpy.context.area.width - (16*dpifac()) - 1
+    bottom_bar = (16*dpifac()) + 1
     sides = 16
+    radius = radius*dpifac()
     bgl.glColor4f(colour[0], colour[1], colour[2], colour[3])
 
     nlocx = (node.location.x+1)*dpifac()
     nlocy = (node.location.y+1)*dpifac()
     ndimx = node.dimensions.x
     ndimy = node.dimensions.y
+    # This is a stupid way to do this... TODO use while loop
     if node.parent:
         nlocx += node.parent.location.x
         nlocy += node.parent.location.y
@@ -661,92 +670,119 @@ def draw_rounded_node_border(node, radius=8, colour=[1.0, 1.0, 1.0, 0.7]):
                 nlocx += node.parent.parent.parent.location.x
                 nlocy += node.parent.parent.parent.location.y
 
+    if node.hide:
+        nlocx += -1
+        nlocy += 5
+    if node.type == 'REROUTE':
+        #nlocx += 1
+        nlocy -= 1
+        ndimx = 0
+        ndimy = 0
+        radius += 6
 
+    # Top left corner
     bgl.glBegin(bgl.GL_TRIANGLE_FAN)
-    mx, my = bpy.context.region.view2d.view_to_region(nlocx, nlocy)
+    mx, my = bpy.context.region.view2d.view_to_region(nlocx, nlocy, clip=False)
     bgl.glVertex2f(mx,my)
     for i in range(sides+1):
         if (4<=i<=8):
-            if mx != 12000 and my != 12000:  # nodes that go over the view border give 12000 as coords
+            if my > bottom_bar and mx < area_width:
                 cosine = radius * cos(i * 2 * pi / sides) + mx
                 sine = radius * sin(i * 2 * pi / sides) + my
                 bgl.glVertex2f(cosine, sine)
     bgl.glEnd()
 
+    # Top right corner
     bgl.glBegin(bgl.GL_TRIANGLE_FAN)
-    mx, my = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy)
+    mx, my = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy, clip=False)
     bgl.glVertex2f(mx,my)
     for i in range(sides+1):
         if (0<=i<=4):
-            if mx != 12000 and my != 12000:
+            if my > bottom_bar and mx < area_width:
                 cosine = radius * cos(i * 2 * pi / sides) + mx
                 sine = radius * sin(i * 2 * pi / sides) + my
                 bgl.glVertex2f(cosine, sine)
-
     bgl.glEnd()
+
+    # Bottom left corner
     bgl.glBegin(bgl.GL_TRIANGLE_FAN)
-    mx, my = bpy.context.region.view2d.view_to_region(nlocx, nlocy - ndimy)
+    mx, my = bpy.context.region.view2d.view_to_region(nlocx, nlocy - ndimy, clip=False)
     bgl.glVertex2f(mx,my)
     for i in range(sides+1):
         if (8<=i<=12):
-            if mx != 12000 and my != 12000:
+            if my > bottom_bar and mx < area_width:
                 cosine = radius * cos(i * 2 * pi / sides) + mx
                 sine = radius * sin(i * 2 * pi / sides) + my
                 bgl.glVertex2f(cosine, sine)
     bgl.glEnd()
 
+    # Bottom right corner
     bgl.glBegin(bgl.GL_TRIANGLE_FAN)
-    mx, my = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy - ndimy)
+    mx, my = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy - ndimy, clip=False)
     bgl.glVertex2f(mx,my)
     for i in range(sides+1):
         if (12<=i<=16):
-            if mx != 12000 and my != 12000:
+            if my > bottom_bar and mx < area_width:
                 cosine = radius * cos(i * 2 * pi / sides) + mx
                 sine = radius * sin(i * 2 * pi / sides) + my
                 bgl.glVertex2f(cosine, sine)
     bgl.glEnd()
 
 
+    # Left edge
     bgl.glBegin(bgl.GL_QUADS)
-    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx, nlocy)
-    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx, nlocy - ndimy)
-    if m1x != 12000 and m1y != 12000 and m2x != 12000 and m2y != 12000:
+    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx, nlocy, clip=False)
+    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx, nlocy - ndimy, clip=False)
+    m1y = max(m1y, bottom_bar)
+    m2y = max(m2y, bottom_bar)
+    if m1x < area_width and m2x < area_width:
         bgl.glVertex2f(m2x-radius,m2y)  # draw order is important, start with bottom left and go anti-clockwise
         bgl.glVertex2f(m2x,m2y)
         bgl.glVertex2f(m1x,m1y)
         bgl.glVertex2f(m1x-radius,m1y)
     bgl.glEnd()
 
+    # Top edge
     bgl.glBegin(bgl.GL_QUADS)
-    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx, nlocy)
-    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy)
-    if m1x != 12000 and m1y != 12000 and m2x != 12000 and m2y != 12000:
+    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx, nlocy, clip=False)
+    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy, clip=False)
+    m1x = min(m1x, area_width)
+    m2x = min(m2x, area_width)
+    if m1y > bottom_bar and m2y > bottom_bar:
         bgl.glVertex2f(m1x,m2y)  # draw order is important, start with bottom left and go anti-clockwise
         bgl.glVertex2f(m2x,m2y)
         bgl.glVertex2f(m2x,m1y+radius)
         bgl.glVertex2f(m1x,m1y+radius)
     bgl.glEnd()
 
+    # Right edge
     bgl.glBegin(bgl.GL_QUADS)
-    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy)
-    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy - ndimy)
-    if m1x != 12000 and m1y != 12000 and m2x != 12000 and m2y != 12000:
+    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy, clip=False)
+    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy - ndimy, clip=False)
+    m1y = max(m1y, bottom_bar)
+    m2y = max(m2y, bottom_bar)
+    if m1x < area_width and m2x < area_width:
         bgl.glVertex2f(m2x,m2y)  # draw order is important, start with bottom left and go anti-clockwise
         bgl.glVertex2f(m2x+radius,m2y)
         bgl.glVertex2f(m1x+radius,m1y)
         bgl.glVertex2f(m1x,m1y)
     bgl.glEnd()
 
+    # Bottom edge
     bgl.glBegin(bgl.GL_QUADS)
-    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx, nlocy-ndimy)
-    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy-ndimy)
-    if m1x != 12000 and m1y != 12000 and m2x != 12000 and m2y != 12000:
+    m1x, m1y = bpy.context.region.view2d.view_to_region(nlocx, nlocy-ndimy, clip=False)
+    m2x, m2y = bpy.context.region.view2d.view_to_region(nlocx + ndimx, nlocy-ndimy, clip=False)
+    m1x = min(m1x, area_width)
+    m2x = min(m2x, area_width)
+    if m1y > bottom_bar and m2y > bottom_bar:
         bgl.glVertex2f(m1x,m2y)  # draw order is important, start with bottom left and go anti-clockwise
         bgl.glVertex2f(m2x,m2y)
         bgl.glVertex2f(m2x,m1y-radius)
         bgl.glVertex2f(m1x,m1y-radius)
     bgl.glEnd()
 
+
+    # Restore defaults
     bgl.glDisable(bgl.GL_BLEND)
     if settings.bgl_antialiasing:
         bgl.glDisable(bgl.GL_LINE_SMOOTH)
@@ -780,10 +816,11 @@ def draw_callback_mixnodes(self, context, mode):
         n1 = nodes[context.scene.NWLazySource]
         n2 = nodes[context.scene.NWLazyTarget]
 
-        draw_rounded_node_border(n1, radius=6, colour=col_outer)  # outline
-        draw_rounded_node_border(n1, radius=5, colour=col_inner)  # inner
-        draw_rounded_node_border(n2, radius=6, colour=col_outer)  # outline
-        draw_rounded_node_border(n2, radius=5, colour=col_inner)  # inner
+        if n1 != n2:
+            draw_rounded_node_border(n1, radius=6, colour=col_outer)  # outline
+            draw_rounded_node_border(n1, radius=5, colour=col_inner)  # inner
+            draw_rounded_node_border(n2, radius=6, colour=col_outer)  # outline
+            draw_rounded_node_border(n2, radius=5, colour=col_inner)  # inner
 
         draw_line(m1x, m1y, m2x, m2y, 4, col_outer)  # line outline
         draw_line(m1x, m1y, m2x, m2y, 2, col_inner)  # line inner
@@ -1339,7 +1376,12 @@ class NWEmissionViewer(Operator, NWBase):
                 if (active.name != "Emission Viewer") and (active.type not in output_types) and not in_group:
                     if active.select:
                         if active.type not in shader_types:
-                            valid = True
+                            for outp in active.outputs:
+                                if outp.type == 'SHADER':  # Group nodes that have shader outputs
+                                    valid = False
+                                    break
+                                else:
+                                    valid = True
             if valid:
                 # get material_output node
                 materialout_exists = False
@@ -2646,7 +2688,9 @@ class NWLinkToOutputNode(Operator, NWBase):
 
             out_input_index = 0
             if tree_type == 'ShaderNodeTree':
-                if active.outputs[output_index].type != 'SHADER':  # connect to displacement if not a shader
+                if active.outputs[output_index].name == 'Volume':
+                    out_input_index = 1
+                elif active.outputs[output_index].type != 'SHADER':  # connect to displacement if not a shader
                     out_input_index = 2
             links.new(active.outputs[output_index], output_node.inputs[out_input_index])
 
