@@ -54,6 +54,9 @@ FBX_GEOMETRY_VCOLOR_VERSION = 101
 FBX_GEOMETRY_UV_VERSION = 101
 FBX_GEOMETRY_MATERIAL_VERSION = 101
 FBX_GEOMETRY_LAYER_VERSION = 100
+FBX_GEOMETRY_SHAPE_VERSION = 100
+FBX_DEFORMER_SHAPE_VERSION = 100
+FBX_DEFORMER_SHAPECHANNEL_VERSION = 100
 FBX_POSE_BIND_VERSION = 100
 FBX_DEFORMER_SKIN_VERSION = 101
 FBX_DEFORMER_CLUSTER_VERSION = 100
@@ -62,6 +65,7 @@ FBX_TEXTURE_VERSION = 202
 FBX_ANIM_KEY_VERSION = 4008
 
 FBX_NAME_CLASS_SEP = b"\x00\x01"
+FBX_ANIM_PROPSGROUP_NAME = "d"
 
 FBX_KTIME = 46186158000  # This is the number of "ktimes" in one second (yep, precision over the nanosecond...)
 
@@ -159,22 +163,31 @@ UNITS = {
 }
 
 
-def units_convert(val, u_from, u_to):
-    """Convert value."""
+def units_convertor(u_from, u_to):
+    """Return a convertor between specified units."""
     conv = UNITS[u_to] / UNITS[u_from]
-    return val * conv
+    return lambda v: v * conv
 
 
-def units_convert_iter(it, u_from, u_to):
-    """Convert value."""
-    conv = UNITS[u_to] / UNITS[u_from]
-    return (v * conv for v in it)
+def units_convertor_iter(u_from, u_to):
+    """Return an iterable convertor between specified units."""
+    conv = units_convertor(u_from, u_to)
+    def convertor(it):
+        for v in it:
+            yield(conv(v))
+    return convertor
 
 
-def matrix_to_array(mat):
+def matrix4_to_array(mat):
     """Concatenate matrix's columns into a single, flat tuple"""
     # blender matrix is row major, fbx is col major so transpose on write
     return tuple(f for v in mat.transposed() for f in v)
+
+
+def array_to_matrix4(arr):
+    """Convert a single 16-len tuple into a valid 4D Blender matrix"""
+    # Blender matrix is row major, fbx is col major so transpose on read
+    return Matrix(tuple(zip(*[iter(arr)]*4))).transposed()
 
 
 def similar_values(v1, v2, e=1e-6):
@@ -182,6 +195,16 @@ def similar_values(v1, v2, e=1e-6):
     if v1 == v2:
         return True
     return ((abs(v1 - v2) / max(abs(v1), abs(v2))) <= e)
+
+
+def similar_values_iter(v1, v2, e=1e-6):
+    """Return True if iterables v1 and v2 are nearly the same."""
+    if v1 == v2:
+        return True
+    for v1, v2 in zip(v1, v2):
+        if (abs(v1 - v2) / max(abs(v1), abs(v2))) > e:
+            return False
+    return True
 
 
 ##### UIDs code. #####
@@ -266,14 +289,25 @@ def get_blender_empty_key(obj):
     return "|".join((get_blenderID_key(obj), "Empty"))
 
 
+def get_blender_mesh_shape_key(me):
+    """Return main shape deformer's key."""
+    return "|".join((get_blenderID_key(me), "Shape"))
+
+
+def get_blender_mesh_shape_channel_key(me, shape):
+    """Return shape channel and geometry shape keys."""
+    return ("|".join((get_blenderID_key(me), "Shape", get_blenderID_key(shape))),
+            "|".join((get_blenderID_key(me), "Geometry", get_blenderID_key(shape))))
+
+
 def get_blender_bone_key(armature, bone):
     """Return bone's keys (Model and NodeAttribute)."""
     return "|".join((get_blenderID_key((armature, bone)), "Data"))
 
 
-def get_blender_armature_bindpose_key(armature, mesh):
-    """Return armature's bindpose key."""
-    return "|".join((get_blenderID_key(armature), get_blenderID_key(mesh), "BindPose"))
+def get_blender_bindpose_key(obj, mesh):
+    """Return object's bindpose key."""
+    return "|".join((get_blenderID_key(obj), get_blenderID_key(mesh), "BindPose"))
 
 
 def get_blender_armature_skin_key(armature, mesh):
@@ -489,13 +523,13 @@ def elem_props_template_init(templates, template_type):
     """
     Init a writing template of given type, for *one* element's properties.
     """
-    ret = None
-    if template_type in templates:
-        tmpl = templates[template_type]
+    ret = OrderedDict()
+    tmpl = templates.get(template_type)
+    if tmpl is not None:
         written = tmpl.written[0]
         props = tmpl.properties
         ret = OrderedDict((name, [val, ptype, anim, written]) for name, (val, ptype, anim) in props.items())
-    return ret or OrderedDict()
+    return ret
 
 
 def elem_props_template_set(template, elem, ptype_name, name, value, animatable=False):
@@ -523,7 +557,7 @@ def elem_props_template_finalize(template, elem):
     """
     Finalize one element's template/props.
     Issue is, some templates might be "needed" by different types (e.g. NodeAttribute is for lights, cameras, etc.),
-    but values for only *one* subtype can be written as template. So we have to be sure we write those for ths other
+    but values for only *one* subtype can be written as template. So we have to be sure we write those for the other
     subtypes in each and every elements, if they are not overriden by that element.
     Yes, hairy, FBX that is to say. When they could easily support several subtypes per template... :(
     """
@@ -547,11 +581,12 @@ def fbx_templates_generate(root, fbx_templates):
 
     templates = OrderedDict()
     for type_name, prop_type_name, properties, nbr_users, _written in fbx_templates.values():
-        if type_name not in templates:
+        tmpl = templates.get(type_name)
+        if tmpl is None:
             templates[type_name] = [OrderedDict(((prop_type_name, (properties, nbr_users)),)), nbr_users]
         else:
-            templates[type_name][0][prop_type_name] = (properties, nbr_users)
-            templates[type_name][1] += nbr_users
+            tmpl[0][prop_type_name] = (properties, nbr_users)
+            tmpl[1] += nbr_users
 
     for type_name, (subprops, nbr_users) in templates.items():
         template = elem_data_single_string(root, b"ObjectType", type_name)
@@ -578,7 +613,141 @@ def fbx_templates_generate(root, fbx_templates):
             elem = elem_data_single_string(template, b"PropertyTemplate", prop_type_name)
             props = elem_properties(elem)
             for name, (value, ptype, animatable) in properties.items():
-                elem_props_set(props, ptype, name, value, animatable=animatable)
+                try:
+                    elem_props_set(props, ptype, name, value, animatable=animatable)
+                except Exception as e:
+                    print("Failed to write template prop (%r)" % e)
+                    print(props, ptype, name, value, animatable)
+
+
+##### FBX animation helpers. #####
+
+
+class AnimationCurveNodeWrapper:
+    """
+    This class provides a same common interface for all (FBX-wise) AnimationCurveNode and AnimationCurve elements,
+    and easy API to handle those.
+    """
+    __slots__ = ('elem_keys', '_keys', 'default_values', 'fbx_group', 'fbx_gname', 'fbx_props')
+
+    kinds = {
+        'LCL_TRANSLATION': ("Lcl Translation", "T", ("X", "Y", "Z")),
+        'LCL_ROTATION': ("Lcl Rotation", "R", ("X", "Y", "Z")),
+        'LCL_SCALING': ("Lcl Scaling", "S", ("X", "Y", "Z")),
+        'SHAPE_KEY': ("DeformPercent", "DeformPercent", ("DeformPercent",)),
+    }
+
+    def __init__(self, elem_key, kind, default_values=...):
+        """
+        bdata might be an Object, DupliObject, Bone or PoseBone.
+        If Bone or PoseBone, armature Object must be provided.
+        """
+        self.elem_keys = [elem_key]
+        assert(kind in self.kinds)
+        self.fbx_group = [self.kinds[kind][0]]
+        self.fbx_gname = [self.kinds[kind][1]]
+        self.fbx_props = [self.kinds[kind][2]]
+        self._keys = []  # (frame, values, write_flags)
+        if default_values is not ...:
+            assert(len(default_values) == len(self.fbx_props[0]))
+            self.default_values = default_values
+        else:
+            self.default_values = (0.0) * len(self.fbx_props[0])
+
+    def __bool__(self):
+        # We are 'True' if we do have some validated keyframes...
+        return self._keys and True in ((True in k[2]) for k in self._keys)
+
+    def add_group(self, elem_key, fbx_group, fbx_gname, fbx_props):
+        """
+        Add another whole group stuff (curvenode, animated item/prop + curvnode/curve identifiers).
+        E.g. Shapes animations is written twice, houra!
+        """
+        assert(len(fbx_props) == len(self.fbx_props[0]))
+        self.elem_keys.append(elem_key)
+        self.fbx_group.append(fbx_group)
+        self.fbx_gname.append(fbx_gname)
+        self.fbx_props.append(fbx_props)
+
+    def add_keyframe(self, frame, values):
+        """
+        Add a new keyframe to all curves of the group.
+        """
+        assert(len(values) == len(self.fbx_props[0]))
+        self._keys.append((frame, values, [True] * len(values)))  # write everything by default.
+
+    def simplfy(self, fac, step):
+        """
+        Simplifies sampled curves by only enabling samples when:
+            * their values differ significantly from the previous sample ones, or
+            * their values differ significantly from the previous validated sample ones, or
+            * the previous validated samples are far enough from current ones in time.
+        """
+        if not self._keys:
+            return
+
+        # So that, with default factor and step values (1), we get:
+        max_frame_diff = step * fac * 10  # max step of 10 frames.
+        value_diff_fac = fac / 1000  # min value evolution: 0.1% of whole range.
+        min_significant_diff = 1.0e-6
+        keys = self._keys
+
+        extremums = tuple((min(values), max(values)) for values in zip(*(k[1] for k in keys)))
+        min_diffs = tuple(max((mx - mn) * value_diff_fac, min_significant_diff) for mn, mx in extremums)
+
+        p_currframe, p_key, p_key_write = keys[0]
+        p_keyed = [(p_currframe - max_frame_diff, val) for val in p_key]
+        are_keyed = [False] * len(p_key)
+        for currframe, key, key_write in keys:
+            for idx, (val, p_val) in enumerate(zip(key, p_key)):
+                key_write[idx] = False
+                p_keyedframe, p_keyedval = p_keyed[idx]
+                if val == p_val:
+                    # Never write keyframe when value is exactly the same as prev one!
+                    continue
+                if abs(val - p_val) >= min_diffs[idx]:
+                    # If enough difference from previous sampled value, key this value *and* the previous one!
+                    key_write[idx] = True
+                    p_key_write[idx] = True
+                    p_keyed[idx] = (currframe, val)
+                    are_keyed[idx] = True
+                else:
+                    frame_diff = currframe - p_keyedframe
+                    val_diff = abs(val - p_keyedval)
+                    if ((val_diff >= min_diffs[idx]) or
+                        ((val_diff >= min_significant_diff) and (frame_diff >= max_frame_diff))):
+                        # Else, if enough difference from previous keyed value
+                        # (or any significant difference and max gap between keys is reached),
+                        # key this value only!
+                        key_write[idx] = True
+                        p_keyed[idx] = (currframe, val)
+                        are_keyed[idx] = True
+            p_currframe, p_key, p_key_write = currframe, key, key_write
+        # If we did key something, ensure first and last sampled values are keyed as well.
+        for idx, is_keyed in enumerate(are_keyed):
+            if is_keyed:
+                keys[0][2][idx] = keys[-1][2][idx] = True
+
+    def get_final_data(self, scene, ref_id, force_keep=False):
+        """
+        Yield final anim data for this 'curvenode' (for all curvenodes defined).
+        force_keep is to force to keep a curve even if it only has one valid keyframe.
+        """
+        curves = [[] for k in self._keys[0][1]]
+        for currframe, key, key_write in self._keys:
+            for curve, val, wrt in zip(curves, key, key_write):
+                if wrt:
+                    curve.append((currframe, val))
+
+        for elem_key, fbx_group, fbx_gname, fbx_props in zip(self.elem_keys, self.fbx_group, self.fbx_gname, self.fbx_props):
+            group_key = get_blender_anim_curve_node_key(scene, ref_id, elem_key, fbx_group)
+            group = OrderedDict()
+            for c, def_val, fbx_item in zip(curves, self.default_values, fbx_props):
+                fbx_item = FBX_ANIM_PROPSGROUP_NAME + "|" + fbx_item
+                curve_key = get_blender_anim_curve_key(scene, ref_id, elem_key, fbx_group, fbx_item)
+                # (curve key, default value, keyframes, write flag).
+                group[fbx_item] = (curve_key, def_val, c, True if (len(c) > 1 or (len(c) > 0 and force_keep)) else False)
+            yield elem_key, group_key, group, fbx_group, fbx_gname
 
 
 ##### FBX objects generators. #####
@@ -608,8 +777,8 @@ class MetaObjectWrapper(type):
         cache = getattr(cls, "_cache", None)
         if cache is None:
             cache = cls._cache = {}
-        if key in cache:
-            instance = cache[key]
+        instance = cache.get(key)
+        if instance is not None:
             # Duplis hack: since duplis are not persistent in Blender (we have to re-create them to get updated
             # info like matrix...), we *always* need to reset that matrix when calling ObjectWrapper() (all
             # other data is supposed valid during whole cache live, so we can skip resetting it).
@@ -910,6 +1079,6 @@ FBXData = namedtuple("FBXData", (
     "templates", "templates_users", "connections",
     "settings", "scene", "objects", "animations", "frame_start", "frame_end",
     "data_empties", "data_lamps", "data_cameras", "data_meshes", "mesh_mat_indices",
-    "data_bones", "data_deformers",
+    "data_bones", "data_deformers_skin", "data_deformers_shape",
     "data_world", "data_materials", "data_textures", "data_videos",
 ))
