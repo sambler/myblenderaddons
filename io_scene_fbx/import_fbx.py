@@ -52,6 +52,10 @@ fbx_elem_nil = None
 # Units convertors...
 convert_deg_to_rad_iter = units_convertor_iter("degree", "radian")
 
+MAT_CONVERT_BONE = fbx_utils.MAT_CONVERT_BONE.inverted()
+MAT_CONVERT_LAMP = fbx_utils.MAT_CONVERT_LAMP.inverted()
+MAT_CONVERT_CAMERA = fbx_utils.MAT_CONVERT_CAMERA.inverted()
+
 
 def elem_find_first(elem, id_search, default=None):
     for fbx_item in elem.elems:
@@ -260,35 +264,77 @@ def elem_props_get_visibility(elem, elem_prop_id, default=None):
 
 # ------
 # Object
+from collections import namedtuple
 
-def blen_read_object(fbx_tmpl, fbx_obj, object_data):
-    elem_name, elem_class = elem_split_name_class(fbx_obj)
-    elem_name_utf8 = elem_name.decode('utf-8')
 
+FBXTransformData = namedtuple("FBXTransformData", (
+    "loc",
+    "rot", "rot_ofs", "rot_piv", "pre_rot", "pst_rot", "rot_ord", "rot_alt_mat",
+    "sca", "sca_ofs", "sca_piv",
+))
+
+
+object_tdata_cache = {}
+
+
+def blen_read_object_transform_do(transform_data):
+    from mathutils import Matrix, Euler
+
+    # translation
+    lcl_translation = Matrix.Translation(transform_data.loc)
+
+    # rotation
+    to_rot = lambda rot, rot_ord: Euler(convert_deg_to_rad_iter(rot), rot_ord).to_matrix().to_4x4()
+    lcl_rot = to_rot(transform_data.rot, transform_data.rot_ord) * transform_data.rot_alt_mat
+    pre_rot = to_rot(transform_data.pre_rot, transform_data.rot_ord)
+    pst_rot = to_rot(transform_data.pst_rot, transform_data.rot_ord)
+
+    rot_ofs = Matrix.Translation(transform_data.rot_ofs)
+    rot_piv = Matrix.Translation(transform_data.rot_piv)
+    sca_ofs = Matrix.Translation(transform_data.sca_ofs)
+    sca_piv = Matrix.Translation(transform_data.sca_piv)
+
+    # scale
+    lcl_scale = Matrix()
+    lcl_scale[0][0], lcl_scale[1][1], lcl_scale[2][2] = transform_data.sca
+
+    return (
+        lcl_translation *
+        rot_ofs *
+        rot_piv *
+        pre_rot *
+        lcl_rot *
+        pst_rot *
+        rot_piv.inverted() *
+        sca_ofs *
+        sca_piv *
+        lcl_scale *
+        sca_piv.inverted()
+    )
+
+
+# XXX This might be weak, now that we can add vgroups from both bones and shapes, name collisions become
+#     more likely, will have to make this more robust!!!
+def add_vgroup_to_objects(vg_indices, vg_weights, vg_name, objects):
+    assert(len(vg_indices) == len(vg_weights))
+    if vg_indices:
+        for obj in objects:
+            # We replace/override here...
+            vg = obj.vertex_groups.get(vg_name)
+            if vg is None:
+                vg = obj.vertex_groups.new(vg_name)
+            for i, w in zip(vg_indices, vg_weights):
+                vg.add((i,), w, 'REPLACE')
+
+
+def blen_read_object_transform_preprocess(fbx_props, fbx_obj, rot_alt_mat):
+    # This is quite involved, 'fbxRNode.cpp' from openscenegraph used as a reference
     const_vector_zero_3d = 0.0, 0.0, 0.0
     const_vector_one_3d = 1.0, 1.0, 1.0
 
-    # Object data must be created already
-    obj = bpy.data.objects.new(name=elem_name_utf8, object_data=object_data)
-
-    fbx_props = (elem_find_first(fbx_obj, b'Properties70'),
-                 elem_find_first(fbx_tmpl, b'Properties70', fbx_elem_nil))
-    assert(fbx_props[0] is not None)
-
-    # ----
-    # Misc Attributes
-
-    obj.color[0:3] = elem_props_get_color_rgb(fbx_props, b'Color', (0.8, 0.8, 0.8))
-    obj.hide = not bool(elem_props_get_visibility(fbx_props, b'Visibility', 1.0))
-
-    # ----
-    # Transformation
-
-    # This is quite involved, 'fbxRNode.cpp' from openscenegraph used as a reference
-
-    loc = elem_props_get_vector_3d(fbx_props, b'Lcl Translation', const_vector_zero_3d)
-    rot = elem_props_get_vector_3d(fbx_props, b'Lcl Rotation', const_vector_zero_3d)
-    sca = elem_props_get_vector_3d(fbx_props, b'Lcl Scaling', const_vector_one_3d)
+    loc = list(elem_props_get_vector_3d(fbx_props, b'Lcl Translation', const_vector_zero_3d))
+    rot = list(elem_props_get_vector_3d(fbx_props, b'Lcl Rotation', const_vector_zero_3d))
+    sca = list(elem_props_get_vector_3d(fbx_props, b'Lcl Scaling', const_vector_one_3d))
 
     rot_ofs = elem_props_get_vector_3d(fbx_props, b'RotationOffset', const_vector_zero_3d)
     rot_piv = elem_props_get_vector_3d(fbx_props, b'RotationPivot', const_vector_zero_3d)
@@ -314,49 +360,223 @@ def blen_read_object(fbx_tmpl, fbx_obj, object_data):
         pst_rot = const_vector_zero_3d
         rot_ord = 'XYZ'
 
-    from mathutils import Matrix, Euler
+    return FBXTransformData(loc,
+                            rot, rot_ofs, rot_piv, pre_rot, pst_rot, rot_ord, rot_alt_mat,
+                            sca, sca_ofs, sca_piv)
+
+
+def blen_read_object(fbx_tmpl, fbx_obj, object_data):
+    elem_name_utf8 = elem_name_ensure_class(fbx_obj)
+
+    # Object data must be created already
+    obj = bpy.data.objects.new(name=elem_name_utf8, object_data=object_data)
+
+    fbx_props = (elem_find_first(fbx_obj, b'Properties70'),
+                 elem_find_first(fbx_tmpl, b'Properties70', fbx_elem_nil))
+    assert(fbx_props[0] is not None)
+
+    # ----
+    # Misc Attributes
+
+    obj.color[0:3] = elem_props_get_color_rgb(fbx_props, b'Color', (0.8, 0.8, 0.8))
+    obj.hide = not bool(elem_props_get_visibility(fbx_props, b'Visibility', 1.0))
+
+    # ----
+    # Transformation
+
+    from mathutils import Matrix
     from math import pi
 
-    # translation
-    lcl_translation = Matrix.Translation(loc)
-
-    # rotation
+    # rotation corrections
     if obj.type == 'CAMERA':
-        rot_alt_mat = Matrix.Rotation(pi / -2.0, 4, 'Y')
+        rot_alt_mat = MAT_CONVERT_CAMERA
     elif obj.type == 'LAMP':
-        rot_alt_mat = Matrix.Rotation(pi / -2.0, 4, 'X')
+        rot_alt_mat = MAT_CONVERT_LAMP
     else:
         rot_alt_mat = Matrix()
 
-    # rotation
-    lcl_rot = Euler(convert_deg_to_rad_iter(rot), rot_ord).to_matrix().to_4x4() * rot_alt_mat
-    pre_rot = Euler(convert_deg_to_rad_iter(pre_rot), rot_ord).to_matrix().to_4x4()
-    pst_rot = Euler(convert_deg_to_rad_iter(pst_rot), rot_ord).to_matrix().to_4x4()
-
-    rot_ofs = Matrix.Translation(rot_ofs)
-    rot_piv = Matrix.Translation(rot_piv)
-    sca_ofs = Matrix.Translation(sca_ofs)
-    sca_piv = Matrix.Translation(sca_piv)
-
-    # scale
-    lcl_scale = Matrix()
-    lcl_scale[0][0], lcl_scale[1][1], lcl_scale[2][2] = sca
-
-    obj.matrix_basis = (
-        lcl_translation *
-        rot_ofs *
-        rot_piv *
-        pre_rot *
-        lcl_rot *
-        pst_rot *
-        rot_piv.inverted() *
-        sca_ofs *
-        sca_piv *
-        lcl_scale *
-        sca_piv.inverted()
-        )
+    transform_data = object_tdata_cache.get(obj)
+    if transform_data is None:
+        transform_data = blen_read_object_transform_preprocess(fbx_props, fbx_obj, rot_alt_mat)
+        object_tdata_cache[obj] = transform_data
+    obj.matrix_basis = blen_read_object_transform_do(transform_data)
 
     return obj
+
+
+# --------
+# Armature
+
+def blen_read_armatures_add_bone(bl_obj, bl_arm, bones, b_uuid, matrices, fbx_tmpl_model):
+    from mathutils import Matrix, Vector
+
+    b_item, bsize, p_uuid, clusters = bones[b_uuid]
+    fbx_bdata, bl_bname = b_item
+    if bl_bname is not None:
+        return bl_arm.edit_bones[bl_bname]  # Have already been created...
+
+    p_ebo = None
+    if p_uuid is not None:
+        # Recurse over parents!
+        p_ebo = blen_read_armatures_add_bone(bl_obj, bl_arm, bones, p_uuid, matrices, fbx_tmpl_model)
+
+    if clusters:
+        # Note in some cases, one bone can have several clusters (kind of LoD?), in Blender we'll always
+        # use only the first, for now.
+        fbx_cdata, meshes, objects = clusters[0]
+        objects = {blen_o for fbx_o, blen_o in objects}
+
+        # We assume matrices in cluster are rest pose of bones (they are in Global space!).
+        # TransformLink is matrix of bone, in global space.
+        # TransformAssociateModel is matrix of armature, in global space (at bind time).
+        elm = elem_find_first(fbx_cdata, b'Transform', default=None)
+        mmat_bone = array_to_matrix4(elm.props[0]) if elm is not None else None
+        elm = elem_find_first(fbx_cdata, b'TransformLink', default=None)
+        bmat_glob = array_to_matrix4(elm.props[0]) if elm is not None else Matrix()
+        elm = elem_find_first(fbx_cdata, b'TransformAssociateModel', default=None)
+        amat_glob = array_to_matrix4(elm.props[0]) if elm is not None else Matrix()
+
+        mmat_glob = bmat_glob * mmat_bone
+
+        # We seek for matrix of bone in armature space...
+        bmat_arm = amat_glob.inverted() * bmat_glob
+
+        # Bone correction, works here...
+        bmat_loc = (p_ebo.matrix.inverted() * bmat_arm) if p_ebo else bmat_arm
+        bmat_loc = bmat_loc * MAT_CONVERT_BONE
+        bmat_arm = (p_ebo.matrix * bmat_loc) if p_ebo else bmat_loc
+    else:
+        # Armature bound to no mesh...
+        fbx_cdata, meshes, objects = (None, (), ())
+        mmat_bone = None
+        amat_glob = bl_obj.matrix_world
+
+        fbx_props = (elem_find_first(fbx_bdata, b'Properties70'),
+                     elem_find_first(fbx_tmpl_model, b'Properties70', fbx_elem_nil))
+        assert(fbx_props[0] is not None)
+
+        # Bone correction, works here...
+        transform_data = blen_read_object_transform_preprocess(fbx_props, fbx_bdata, MAT_CONVERT_BONE)
+        bmat_loc = blen_read_object_transform_do(transform_data)
+        # Bring back matrix in armature space.
+        bmat_arm = (p_ebo.matrix * bmat_loc) if p_ebo else bmat_loc
+
+    # ----
+    # Now, create the (edit)bone.
+    bone_name = elem_name_ensure_class(fbx_bdata, b'Model')
+
+    ebo = bl_arm.edit_bones.new(name=bone_name)
+    bone_name = ebo.name  # Might differ from FBX bone name!
+    b_item[1] = bone_name  # since ebo is only valid in Edit mode... :/
+
+    # So that our bone gets its final length, but still Y-aligned in armature space.
+    ebo.tail = Vector((0.0, 1.0, 0.0)) * bsize
+    # And rotate/move it to its final "rest pose".
+    ebo.matrix = bmat_arm.normalized()
+
+    # Connection to parent.
+    if p_ebo is not None:
+        ebo.parent = p_ebo
+        if similar_values_iter(p_ebo.tail, ebo.head):
+            ebo.use_connect = True
+
+    if fbx_cdata is not None:
+        # ----
+        # Add a new vgroup to the meshes (their objects, actually!).
+        # Quite obviously, only one mesh is expected...
+        indices = elem_prop_first(elem_find_first(fbx_cdata, b'Indexes', default=None), default=())
+        weights = elem_prop_first(elem_find_first(fbx_cdata, b'Weights', default=None), default=())
+        add_vgroup_to_objects(indices, weights, bone_name, objects)
+
+    # ----
+    # If we get a valid mesh matrix (in bone space), store armature and mesh global matrices, we need to set temporarily
+    # both objects to those matrices when actually binding them via the modifier.
+    # Note we assume all bones were bound with the same mesh/armature (global) matrix, we do not support otherwise
+    # in Blender anyway!
+    if mmat_bone is not None:
+        for obj in objects:
+            if obj in matrices:
+                continue
+            matrices[obj] = (amat_glob, mmat_glob)
+
+    return ebo
+
+
+def blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, global_matrix):
+    from mathutils import Matrix
+
+    if global_matrix is None:
+        global_matrix = Matrix()
+
+    for a_item, bones in armatures:
+        fbx_adata, bl_adata = a_item
+        matrices = {}
+
+        # ----
+        # Armature data.
+        elem_name_utf8 = elem_name_ensure_class(fbx_adata, b'Model')
+        bl_arm = bpy.data.armatures.new(name=elem_name_utf8)
+
+        # Need to create the object right now, since we can only add bones in Edit mode... :/
+        assert(a_item[1] is None)
+
+        if fbx_adata.props[2] in {b'LimbNode', b'Root'}:
+            # rootbone-as-armature case...
+            fbx_bones_to_fake_object[fbx_adata.props[0]] = bl_adata = blen_read_object(fbx_tmpl, fbx_adata, bl_arm)
+            # reset transform.
+            bl_adata.matrix_basis = Matrix()
+        else:
+            bl_adata = a_item[1] = blen_read_object(fbx_tmpl, fbx_adata, bl_arm)
+
+        # Instantiate in scene.
+        obj_base = scene.objects.link(bl_adata)
+        obj_base.select = True
+
+        # Switch to Edit mode.
+        scene.objects.active = bl_adata
+        bpy.ops.object.mode_set(mode='EDIT')
+
+        for b_uuid in bones:
+            blen_read_armatures_add_bone(bl_adata, bl_arm, bones, b_uuid, matrices, fbx_tmpl)
+
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        # Bind armature to objects.
+        arm_mat_back = bl_adata.matrix_basis.copy()
+        for ob_me, (amat, mmat) in matrices.items():
+            # bring global armature & mesh matrices into *Blender* global space.
+            amat = global_matrix * amat
+            mmat = global_matrix * mmat
+
+            bl_adata.matrix_basis = amat
+            me_mat_back = ob_me.matrix_basis.copy()
+            ob_me.matrix_basis = mmat
+
+            mod = ob_me.modifiers.new(elem_name_utf8, 'ARMATURE')
+            mod.object = bl_adata
+
+            ob_me.parent = bl_adata
+            ob_me.matrix_basis = me_mat_back
+        bl_adata.matrix_basis = arm_mat_back
+
+        # Set Pose transformations...
+        for b_item, _b_size, _p_uuid, _clusters in bones.values():
+            fbx_bdata, bl_bname = b_item
+            fbx_props = (elem_find_first(fbx_bdata, b'Properties70'),
+                         elem_find_first(fbx_tmpl, b'Properties70', fbx_elem_nil))
+            assert(fbx_props[0] is not None)
+
+            pbo = b_item[1] = bl_adata.pose.bones[bl_bname]
+            transform_data = object_tdata_cache.get(pbo)
+            if transform_data is None:
+                # Bone correction, gives a mess as result. :(
+                transform_data = blen_read_object_transform_preprocess(fbx_props, fbx_bdata, MAT_CONVERT_BONE)
+                object_tdata_cache[pbo] = transform_data
+            mat = blen_read_object_transform_do(transform_data)
+            if pbo.parent:
+                # Bring back matrix in armature space.
+                mat = pbo.parent.matrix * mat
+            pbo.matrix = mat
 
 
 # ----
@@ -756,6 +976,8 @@ def blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, global_matri
     assert(len(vgweights) == len(indices) == len(dvcos))
     create_vg = bool(set(vgweights) - {1.0})
 
+    keyblocks = []
+
     for me, objects in meshes:
         vcos = tuple((idx, me.vertices[idx].co + Vector(dvco)) for idx, dvco in zip(indices, dvcos))
         objects = list({blen_o for fbx_o, blen_o in objects})
@@ -775,6 +997,10 @@ def blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, global_matri
         if create_vg:
             add_vgroup_to_objects(indices, vgweights, elem_name_utf8, objects)
             kb.vertex_group = elem_name_utf8
+
+        keyblocks.append(kb)
+
+    return keyblocks
 
 
 # --------
@@ -1194,14 +1420,133 @@ def load(operator, context, filepath="",
     def connection_filter_reverse(fbx_uuid, fbx_id):
         return connection_filter_ex(fbx_uuid, fbx_id, fbx_connection_map_reverse)
 
+    # Armatures pre-processing!
+    fbx_objects_ignore = set()
+    fbx_objects_parent_ignore = set()
+    # Arg! In some case, root bone is used as armature as well, in Blender we have to 'insert'
+    # an armature object between them, so to handle possible parents of root bones we need a mapping
+    # from root bone uuid to Blender's object...
+    fbx_bones_to_fake_object = dict()
+    armatures = []
+    def _():
+        nonlocal fbx_objects_ignore, fbx_objects_parent_ignore
+        for a_uuid, a_item in fbx_table_nodes.items():
+            root_bone = False
+            fbx_adata, bl_adata = a_item = fbx_table_nodes.get(a_uuid, (None, None))
+            if fbx_adata is None or fbx_adata.id != b'Model':
+                continue
+            elif fbx_adata.props[2] != b'Null':
+                if fbx_adata.props[2] not in {b'LimbNode', b'Root'}:
+                    continue
+                # In some cases, armatures have no root 'Null' object, we have to consider all root bones
+                # as armatures in this case. :/
+                root_bone = True
+                for p_uuid, p_ctype in fbx_connection_map.get(a_uuid, ()):
+                    if p_ctype.props[0] != b'OO':
+                        continue
+                    fbx_pdata, bl_pdata = p_item = fbx_table_nodes.get(p_uuid, (None, None))
+                    if (fbx_pdata and fbx_pdata.id == b'Model' and fbx_pdata.props[2] in {b'LimbNode', b'Root', b'Null'}):
+                        # Not a root bone...
+                        root_bone = False
+                if not root_bone:
+                    continue
+                fbx_bones_to_fake_object[a_uuid] = None
+
+            bones = {}
+            todo_uuids = set() if root_bone else {a_uuid}
+            init_uuids = {a_uuid} if root_bone else set()
+            done_uuids = set()
+            while todo_uuids or init_uuids:
+                if init_uuids:
+                    p_uuid = None
+                    uuids = [(uuid, None) for uuid in init_uuids]
+                    init_uuids = None
+                else:
+                    p_uuid = todo_uuids.pop()
+                    uuids = fbx_connection_map_reverse.get(p_uuid, ())
+                # bone -> cluster -> skin -> mesh.
+                # XXX Note: only LimbNode for now (there are also Limb's :/ ).
+                for b_uuid, b_ctype in uuids:
+                    if b_ctype and b_ctype.props[0] != b'OO':
+                        continue
+                    fbx_bdata, bl_bdata = b_item = fbx_table_nodes.get(b_uuid, (None, None))
+                    if (fbx_bdata is None or fbx_bdata.id != b'Model' or
+                        fbx_bdata.props[2] not in {b'LimbNode', b'Root'}):
+                        continue
+
+                    # Find bone's size.
+                    size = 1.0
+                    for t_uuid, t_ctype in fbx_connection_map_reverse.get(b_uuid, ()):
+                        if t_ctype.props[0] != b'OO':
+                            continue
+                        fbx_tdata, _bl_tdata = fbx_table_nodes.get(t_uuid, (None, None))
+                        if fbx_tdata is None or fbx_tdata.id != b'NodeAttribute' or fbx_tdata.props[2] != b'LimbNode':
+                            continue
+                        fbx_props = (elem_find_first(fbx_tdata, b'Properties70'),)
+                        size = elem_props_get_number(fbx_props, b'Size', default=size)
+                        break  # Only one bone data per bone!
+
+                    clusters = []
+                    for c_uuid, c_ctype in fbx_connection_map.get(b_uuid, ()):
+                        if c_ctype.props[0] != b'OO':
+                            continue
+                        fbx_cdata, _bl_cdata = fbx_table_nodes.get(c_uuid, (None, None))
+                        if fbx_cdata is None or fbx_cdata.id != b'Deformer' or fbx_cdata.props[2] != b'Cluster':
+                            continue
+                        meshes = set()
+                        objects = []
+                        for s_uuid, s_ctype in fbx_connection_map.get(c_uuid, ()):
+                            if s_ctype.props[0] != b'OO':
+                                continue
+                            fbx_sdata, _bl_sdata = fbx_table_nodes.get(s_uuid, (None, None))
+                            if fbx_sdata is None or fbx_sdata.id != b'Deformer' or fbx_sdata.props[2] != b'Skin':
+                                continue
+                            for m_uuid, m_ctype in fbx_connection_map.get(s_uuid, ()):
+                                if m_ctype.props[0] != b'OO':
+                                    continue
+                                fbx_mdata, bl_mdata = fbx_table_nodes.get(m_uuid, (None, None))
+                                if fbx_mdata is None or fbx_mdata.id != b'Geometry' or fbx_mdata.props[2] != b'Mesh':
+                                    continue
+                                # Blenmeshes are assumed already created at that time!
+                                assert(isinstance(bl_mdata, bpy.types.Mesh))
+                                # And we have to find all objects using this mesh!
+                                for o_uuid, o_ctype in fbx_connection_map.get(m_uuid, ()):
+                                    if o_ctype.props[0] != b'OO':
+                                        continue
+                                    fbx_odata, bl_odata = o_item = fbx_table_nodes.get(o_uuid, (None, None))
+                                    if fbx_odata is None or fbx_odata.id != b'Model' or fbx_odata.props[2] != b'Mesh':
+                                        continue
+                                    # bl_odata is still None, objects have not yet been created...
+                                    objects.append(o_item)
+                                meshes.add(bl_mdata)
+                            # Skin deformers are only here to connect clusters to meshes, for us, nothing else to do.
+                        clusters.append((fbx_cdata, meshes, objects))
+                    # For now, we assume there is only one cluster & skin per bone (at least for a given armature)!
+                    # XXX This is not true, some apps export several clusters (kind of LoD), we only use first one!
+                    # assert(len(clusters) <= 1)
+                    bones[b_uuid] = (b_item, size, p_uuid if (p_uuid != a_uuid or root_bone) else None, clusters)
+                    fbx_objects_parent_ignore.add(b_uuid)
+                    done_uuids.add(p_uuid)
+                    todo_uuids.add(b_uuid)
+            if bones:
+                # in case we have no Null parent, rootbone will be a_item too...
+                armatures.append((a_item, bones))
+                fbx_objects_ignore.add(a_uuid)
+        fbx_objects_ignore |= fbx_objects_parent_ignore
+        # We need to handle parenting at object-level for rootbones-as-armature case :/
+        fbx_objects_parent_ignore -= set(fbx_bones_to_fake_object.keys())
+    _(); del _
+
     def _():
         fbx_tmpl = fbx_template_get((b'Model', b'KFbxNode'))
 
         # Link objects, keep first, this also creates objects
-        objects = []
         for fbx_uuid, fbx_item in fbx_table_nodes.items():
+            if fbx_uuid in fbx_objects_ignore:
+                # armatures and bones, handled separately.
+                continue
             fbx_obj, blen_data = fbx_item
-            if fbx_obj.id != b'Model':
+            if fbx_obj.id != b'Model' or fbx_obj.props[2] in {b'Root', b'LimbNode'}:
                 continue
 
             # Create empty object or search for object data
@@ -1235,39 +1580,110 @@ def load(operator, context, filepath="",
                 # instance in scene
                 obj_base = scene.objects.link(obj)
                 obj_base.select = True
+    _(); del _
 
-                objects.append(obj)
+    # Now that we have objects...
 
+    # I) We can handle shapes.
+    blend_shape_channels = {}  # We do not need Shapes themselves, but keyblocks, for anim.
+    def _():
+        fbx_tmpl = fbx_template_get((b'Geometry', b'KFbxShape'))
+
+        for s_uuid, s_item in fbx_table_nodes.items():
+            fbx_sdata, bl_sdata = s_item = fbx_table_nodes.get(s_uuid, (None, None))
+            if fbx_sdata is None or fbx_sdata.id != b'Geometry' or fbx_sdata.props[2] != b'Shape':
+                continue
+
+            # shape -> blendshapechannel -> blendshape -> mesh.
+            for bc_uuid, bc_ctype in fbx_connection_map.get(s_uuid, ()):
+                if bc_ctype.props[0] != b'OO':
+                    continue
+                fbx_bcdata, _bl_bcdata = fbx_table_nodes.get(bc_uuid, (None, None))
+                if fbx_bcdata is None or fbx_bcdata.id != b'Deformer' or fbx_bcdata.props[2] != b'BlendShapeChannel':
+                    continue
+                meshes = []
+                objects = []
+                for bs_uuid, bs_ctype in fbx_connection_map.get(bc_uuid, ()):
+                    if bs_ctype.props[0] != b'OO':
+                        continue
+                    fbx_bsdata, _bl_bsdata = fbx_table_nodes.get(bs_uuid, (None, None))
+                    if fbx_bsdata is None or fbx_bsdata.id != b'Deformer' or fbx_bsdata.props[2] != b'BlendShape':
+                        continue
+                    for m_uuid, m_ctype in fbx_connection_map.get(bs_uuid, ()):
+                        if m_ctype.props[0] != b'OO':
+                            continue
+                        fbx_mdata, bl_mdata = fbx_table_nodes.get(m_uuid, (None, None))
+                        if fbx_mdata is None or fbx_mdata.id != b'Geometry' or fbx_mdata.props[2] != b'Mesh':
+                            continue
+                        # Blenmeshes are assumed already created at that time!
+                        assert(isinstance(bl_mdata, bpy.types.Mesh))
+                        # And we have to find all objects using this mesh!
+                        objects = []
+                        for o_uuid, o_ctype in fbx_connection_map.get(m_uuid, ()):
+                            if o_ctype.props[0] != b'OO':
+                                continue
+                            fbx_odata, bl_odata = o_item = fbx_table_nodes.get(o_uuid, (None, None))
+                            if fbx_odata is None or fbx_odata.id != b'Model' or fbx_odata.props[2] != b'Mesh':
+                                continue
+                            # bl_odata is still None, objects have not yet been created...
+                            objects.append(o_item)
+                        meshes.append((bl_mdata, objects))
+                    # BlendShape deformers are only here to connect BlendShapeChannels to meshes, nothing else to do.
+
+                # keyblocks is a list of tuples (mesh, keyblock) matching that shape/blendshapechannel, for animation.
+                keyblocks = blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, global_matrix)
+                blend_shape_channels[bc_uuid] = keyblocks
+    _(); del _
+
+    # II) We can finish armatures processing.
+    def _():
+        fbx_tmpl = fbx_template_get((b'Model', b'KFbxNode'))
+
+        blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, global_matrix)
     _(); del _
 
     def _():
         # Parent objects, after we created them...
         for fbx_uuid, fbx_item in fbx_table_nodes.items():
+            if fbx_uuid in fbx_objects_parent_ignore:
+                # Ignore bones, but not armatures here!
+                continue
             fbx_obj, blen_data = fbx_item
             if fbx_obj.id != b'Model':
                 continue
-            if fbx_item[1] is None:
+            # Handle rootbone-as-armature case :/
+            t_data = fbx_bones_to_fake_object.get(fbx_uuid)
+            if t_data is not None:
+                blen_data = t_data
+            elif blen_data is None:
                 continue  # no object loaded.. ignore
 
             for (fbx_lnk,
                  fbx_lnk_item,
                  fbx_lnk_type) in connection_filter_forward(fbx_uuid, b'Model'):
 
-                fbx_item[1].parent = fbx_lnk_item
+                blen_data.parent = fbx_lnk_item
     _(); del _
 
     def _():
         if global_matrix is not None:
             # Apply global matrix last (after parenting)
             for fbx_uuid, fbx_item in fbx_table_nodes.items():
+                if fbx_uuid in fbx_objects_parent_ignore:
+                    # Ignore bones, but not armatures here!
+                    continue
                 fbx_obj, blen_data = fbx_item
                 if fbx_obj.id != b'Model':
                     continue
-                if fbx_item[1] is None:
+                # Handle rootbone-as-armature case :/
+                t_data = fbx_bones_to_fake_object.get(fbx_uuid)
+                if t_data is not None:
+                    blen_data = t_data
+                elif blen_data is None:
                     continue  # no object loaded.. ignore
 
-                if fbx_item[1].parent is None:
-                    fbx_item[1].matrix_basis = global_matrix * fbx_item[1].matrix_basis
+                if blen_data.parent is None:
+                    blen_data.matrix_basis = global_matrix * blen_data.matrix_basis
     _(); del _
 
     def _():
@@ -1297,14 +1713,8 @@ def load(operator, context, filepath="",
 
             # We have to validate mesh polygons' mat_idx, see T41015!
             # Some FBX seem to have an extra 'default' material which is not defined in FBX file.
-            max_idx = max(0, len(mesh.materials) - 1)
-            has_invalid_indexes = False
-            for p in mesh.polygons:
-                if p.material_index > max_idx:
-                    has_invalid_indexes = True
-                    p.material_index = 0
-            if has_invalid_indexes:
-                print("WARNING: mesh '%s' had invalid material indices, those were rest to first material" % mesh.name)
+            if mesh.validate_material_indices():
+                print("WARNING: mesh '%s' had invalid material indices, those were reset to first material" % mesh.name)
     _(); del _
 
     def _():
