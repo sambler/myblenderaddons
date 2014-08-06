@@ -89,7 +89,7 @@ from .fbx_utils import (
     # Objects.
     ObjectWrapper, fbx_name_class,
     # Top level.
-    FBXSettingsMedia, FBXSettings, FBXData,
+    FBXExportSettingsMedia, FBXExportSettings, FBXExportData,
 )
 
 # Units convertors!
@@ -102,7 +102,7 @@ convert_rad_to_deg = units_convertor("radian", "degree")
 convert_rad_to_deg_iter = units_convertor_iter("radian", "degree")
 
 
-##### Templates #####
+# ##### Templates #####
 # TODO: check all those "default" values, they should match Blender's default as much as possible, I guess?
 
 def fbx_template_def_globalsettings(scene, settings, override_defaults=None, nbr_users=0):
@@ -513,7 +513,7 @@ def fbx_template_def_animcurve(scene, settings, override_defaults=None, nbr_user
     return FBXTemplate(b"AnimationCurve", b"", props, nbr_users, [False])
 
 
-##### Generators for connection elements. #####
+# ##### Generators for connection elements. #####
 
 def elem_connection(elem, c_type, uid_src, uid_dst, prop_dst=None):
     e = elem_data_single_string(elem, b"C", c_type)
@@ -523,19 +523,23 @@ def elem_connection(elem, c_type, uid_src, uid_dst, prop_dst=None):
         e.add_string(prop_dst)
 
 
-##### FBX objects generators. #####
+# ##### FBX objects generators. #####
 
 def fbx_data_element_custom_properties(props, bid):
     """
     Store custom properties of blender ID bid (any mapping-like object, in fact) into FBX properties props.
     """
     for k, v in bid.items():
+        list_val = getattr(v, "to_list", lambda: None)()
+
         if isinstance(v, str):
             elem_props_set(props, "p_string", k.encode(), v, custom=True)
         elif isinstance(v, int):
             elem_props_set(props, "p_integer", k.encode(), v, custom=True)
-        if isinstance(v, float):
+        elif isinstance(v, float):
             elem_props_set(props, "p_double", k.encode(), v, custom=True)
+        elif list_val and len(list_val) == 3:
+            elem_props_set(props, "p_vector", k.encode(), list_val, custom=True)
 
 
 def fbx_data_empty_elements(root, empty, scene_data):
@@ -948,7 +952,7 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
     def _nortuples_gen(raw_nors, m):
         # Great, now normals are also expected 4D!
         # XXX Back to 3D normals for now!
-        #gen = zip(*(iter(raw_nors),) * 3 + (_infinite_gen(1.0),))
+        # gen = zip(*(iter(raw_nors),) * 3 + (_infinite_gen(1.0),))
         gen = zip(*(iter(raw_nors),) * 3)
         return gen if m is None else (m * Vector(v) for v in gen)
 
@@ -967,14 +971,14 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
         ln2idx = tuple(set(t_ln))
         elem_data_single_float64_array(lay_nor, b"Normals", chain(*ln2idx))
         # Normal weights, no idea what it is.
-        #t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(ln2idx)
-        #elem_data_single_float64_array(lay_nor, b"NormalsW", t_lnw)
+        # t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(ln2idx)
+        # elem_data_single_float64_array(lay_nor, b"NormalsW", t_lnw)
 
         ln2idx = {nor: idx for idx, nor in enumerate(ln2idx)}
         elem_data_single_int32_array(lay_nor, b"NormalsIndex", (ln2idx[n] for n in t_ln))
 
         del ln2idx
-        #del t_lnw
+        # del t_lnw
     else:
         lay_nor = elem_data_single_int32(geom, b"LayerElementNormal", 0)
         elem_data_single_int32(lay_nor, b"Version", FBX_GEOMETRY_NORMAL_VERSION)
@@ -983,8 +987,8 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
         elem_data_single_string(lay_nor, b"ReferenceInformationType", b"Direct")
         elem_data_single_float64_array(lay_nor, b"Normals", chain(*t_ln))
         # Normal weights, no idea what it is.
-        #t_ln = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
-        #elem_data_single_float64_array(lay_nor, b"NormalsW", t_ln)
+        # t_ln = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
+        # elem_data_single_float64_array(lay_nor, b"NormalsW", t_ln)
     del t_ln
 
     # tspace
@@ -993,7 +997,7 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
         tspacenumber = len(me.uv_layers)
         if tspacenumber:
             t_ln = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops) * 3
-            #t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
+            # t_lnw = array.array(data_types.ARRAY_FLOAT64, (0.0,)) * len(me.loops)
             for idx, uvlayer in enumerate(me.uv_layers):
                 name = uvlayer.name
                 me.calc_tangents(name)
@@ -1007,7 +1011,7 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
                 elem_data_single_string(lay_nor, b"ReferenceInformationType", b"Direct")
                 elem_data_single_float64_array(lay_nor, b"Binormals", chain(*_nortuples_gen(t_ln, geom_mat_no)))
                 # Binormal weights, no idea what it is.
-                #elem_data_single_float64_array(lay_nor, b"BinormalsW", t_lnw)
+                # elem_data_single_float64_array(lay_nor, b"BinormalsW", t_lnw)
 
                 # Loop tangents.
                 # NOTE: this is not supported by importer currently.
@@ -1019,10 +1023,10 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
                 elem_data_single_string(lay_nor, b"ReferenceInformationType", b"Direct")
                 elem_data_single_float64_array(lay_nor, b"Tangents", chain(*_nortuples_gen(t_ln, geom_mat_no)))
                 # Tangent weights, no idea what it is.
-                #elem_data_single_float64_array(lay_nor, b"TangentsW", t_lnw)
+                # elem_data_single_float64_array(lay_nor, b"TangentsW", t_lnw)
 
             del t_ln
-            #del t_lnw
+            # del t_lnw
             me.free_tangents()
 
     me.free_normals_split()
@@ -1591,7 +1595,7 @@ def fbx_data_animation_elements(root, scene_data):
                 elem_props_template_finalize(acn_tmpl, acn_props)
 
 
-##### Top-level FBX data container. #####
+# ##### Top-level FBX data container. #####
 
 def fbx_mat_properties_from_texture(tex):
     """
@@ -1609,13 +1613,13 @@ def fbx_mat_properties_from_texture(tex):
         ("emit", "emit", b"EmissiveFactor"),
         ("diffuse", "diffuse", b"EmissiveColor"),  # Uses diffuse color in Blender!
         ("ambient", "ambient", b"AmbientFactor"),
-        #("", "", b"AmbientColor"),  # World stuff in Blender, for now ignore...
+        # ("", "", b"AmbientColor"),  # World stuff in Blender, for now ignore...
         ("normal", "normal", b"NormalMap"),
         # Note: unsure about those... :/
-        #("", "", b"Bump"),
-        #("", "", b"BumpFactor"),
-        #("", "", b"DisplacementColor"),
-        #("", "", b"DisplacementFactor"),
+        # ("", "", b"Bump"),
+        # ("", "", b"BumpFactor"),
+        # ("", "", b"DisplacementColor"),
+        # ("", "", b"DisplacementFactor"),
         # Phong only.
         ("specular", "specular", b"SpecularFactor"),
         ("color_spec", "specular_color", b"SpecularColor"),
@@ -1782,8 +1786,9 @@ def fbx_animations_do(scene_data, ref_id, f_start, f_end, start_zero, objects=No
     for channel_key, (anim_shape, me, shape) in animdata_shapes.items():
         final_keys = OrderedDict()
         anim_shape.simplfy(simplify_fac, bake_step)
-        if anim_shape:
-            for elem_key, group_key, group, fbx_group, fbx_gname in anim_shape.get_final_data(scene, ref_id, force_keep):
+        if not anim_shape:
+            continue
+        for elem_key, group_key, group, fbx_group, fbx_gname in anim_shape.get_final_data(scene, ref_id, force_keep):
                 anim_data = animations.get(elem_key)
                 if anim_data is None:
                     anim_data = animations[elem_key] = ("dummy_unused_key", OrderedDict())
@@ -1888,6 +1893,8 @@ def fbx_animations(scene_data):
             # We can't play with animdata and actions and get back to org state easily.
             # So we have to add a temp copy of the object to the scene, animate it, and remove it... :/
             ob_copy = ob.copy()
+            # Great, have to handle bones as well if needed...
+            pbones_matrices = [pbo.matrix_basis.copy() for pbo in ob.pose.bones] if ob.type == 'ARMATURE' else ...
 
             if ob.animation_data:
                 org_act = ob.animation_data.action
@@ -1906,9 +1913,15 @@ def fbx_animations(scene_data):
                 add_anim(animations,
                          fbx_animations_do(scene_data, (ob, act), frame_start, frame_end, True, {ob_obj}, True))
                 # Ugly! :/
+                if pbones_matrices is not ...:
+                    for pbo, mat in zip(ob.pose.bones, pbones_matrices):
+                        pbo.matrix_basis = mat.copy()
                 ob.animation_data.action = None if org_act is ... else org_act
                 restore_object(ob, ob_copy)
 
+            if pbones_matrices is not ...:
+                for pbo, mat in zip(ob.pose.bones, pbones_matrices):
+                    pbo.matrix_basis = mat.copy()
             if org_act is ...:
                 ob.animation_data_clear()
             else:
@@ -1932,7 +1945,7 @@ def fbx_data_from_scene(scene, settings):
     """
     objtypes = settings.object_types
 
-    ##### Gathering data...
+    # ##### Gathering data...
 
     # This is rather simple for now, maybe we could end generating templates with most-used values
     # instead of default ones?
@@ -2003,8 +2016,8 @@ def fbx_data_from_scene(scene, settings):
                     # Note: Maybe this is a bit too simplistic, should we use real shape base here? Though FBX does not
                     #       have this at all... Anyway, this should cover most common cases imho.
                     continue
-                shape_verts_co.extend(sv.co - v.co);
-                shape_verts_idx.append(idx);
+                shape_verts_co.extend(sv.co - v.co)
+                shape_verts_idx.append(idx)
             if not shape_verts_co:
                 continue
             channel_key, geom_key = get_blender_mesh_shape_channel_key(me, shape)
@@ -2063,7 +2076,7 @@ def fbx_data_from_scene(scene, settings):
             # Note FBX does has support for procedural, but this is not portable at all (opaque blob),
             # so not useful for us.
             # TODO I think ENVIRONMENT_MAP should be usable in FBX as well, but for now let it aside.
-            #if tex.texture.type not in {'IMAGE', 'ENVIRONMENT_MAP'}:
+            # if tex.texture.type not in {'IMAGE', 'ENVIRONMENT_MAP'}:
             if tex.texture.type not in {'IMAGE'}:
                 continue
             img = tex.texture.image
@@ -2090,7 +2103,8 @@ def fbx_data_from_scene(scene, settings):
     frame_end = scene.frame_end
     if settings.bake_anim:
         # From objects & bones only for a start.
-        tmp_scdata = FBXData(  # Kind of hack, we need a temp scene_data for object's space handling to bake animations...
+        # Kind of hack, we need a temp scene_data for object's space handling to bake animations...
+        tmp_scdata = FBXExportData(
             None, None, None,
             settings, scene, objects, None, 0.0, 0.0,
             data_empties, data_lamps, data_cameras, data_meshes, None,
@@ -2099,7 +2113,7 @@ def fbx_data_from_scene(scene, settings):
         )
         animations, frame_start, frame_end = fbx_animations(tmp_scdata)
 
-    ##### Creation of templates...
+    # ##### Creation of templates...
 
     templates = OrderedDict()
     templates[b"GlobalSettings"] = fbx_template_def_globalsettings(scene, settings, nbr_users=1)
@@ -2176,7 +2190,7 @@ def fbx_data_from_scene(scene, settings):
 
     templates_users = sum(tmpl.nbr_users for tmpl in templates.values())
 
-    ##### Creation of connections...
+    # ##### Creation of connections...
 
     connections = []
 
@@ -2272,7 +2286,7 @@ def fbx_data_from_scene(scene, settings):
             tex_key, _texs = data_textures[tex]
             connections.append((b"OO", get_fbx_uuid_from_key(vid_key), get_fbx_uuid_from_key(tex_key), None))
 
-    #Animations
+    # Animations
     for astack_key, astack, alayer_key, _name, _fstart, _fend in animations:
         # Animstack itself is linked nowhere!
         astack_id = get_fbx_uuid_from_key(astack_key)
@@ -2295,9 +2309,9 @@ def fbx_data_from_scene(scene, settings):
                         # Animcurve -> Animcurvenode.
                         connections.append((b"OP", get_fbx_uuid_from_key(acurve_key), acurvenode_id, fbx_item.encode()))
 
-    ##### And pack all this!
+    # ##### And pack all this!
 
-    return FBXData(
+    return FBXExportData(
         templates, templates_users, connections,
         settings, scene, objects, animations, frame_start, frame_end,
         data_empties, data_lamps, data_cameras, data_meshes, mesh_mat_indices,
@@ -2316,14 +2330,14 @@ def fbx_scene_data_cleanup(scene_data):
             bpy.data.meshes.remove(me)
 
 
-##### Top-level FBX elements generators. #####
+# ##### Top-level FBX elements generators. #####
 
 def fbx_header_elements(root, scene_data, time=None):
     """
     Write boiling code of FBX root.
     time is expected to be a datetime.datetime object, or None (using now() in this case).
     """
-    ##### Start of FBXHeaderExtension element.
+    # ##### Start of FBXHeaderExtension element.
     header_ext = elem_empty(root, b"FBXHeaderExtension")
 
     elem_data_single_int32(header_ext, b"FBXHeaderVersion", FBX_HEADER_VERSION)
@@ -2378,7 +2392,7 @@ def fbx_header_elements(root, scene_data, time=None):
     lastsaved("p_string", b"ApplicationVersion", "2.70")
     lastsaved("p_datetime", b"DateTime_GMT", "01/01/1970 00:00:00.000")
 
-    ##### End of FBXHeaderExtension element.
+    # ##### End of FBXHeaderExtension element.
 
     # FileID is replaced by dummy value currently...
     elem_data_single_bytes(root, b"FileId", b"FooBar")
@@ -2391,7 +2405,7 @@ def fbx_header_elements(root, scene_data, time=None):
 
     elem_data_single_string_unicode(root, b"Creator", "Blender version %s" % bpy.app.version_string)
 
-    ##### Start of GlobalSettings element.
+    # ##### Start of GlobalSettings element.
     global_settings = elem_empty(root, b"GlobalSettings")
     scene = scene_data.scene
 
@@ -2427,7 +2441,7 @@ def fbx_header_elements(root, scene_data, time=None):
     elem_props_set(props, "p_timestamp", b"TimeSpanStop", FBX_KTIME)
     elem_props_set(props, "p_double", b"CustomFrameRate", fbx_fps)
 
-    ##### End of GlobalSettings element.
+    # ##### End of GlobalSettings element.
 
 
 def fbx_documents_elements(root, scene_data):
@@ -2438,7 +2452,7 @@ def fbx_documents_elements(root, scene_data):
     """
     name = scene_data.scene.name
 
-    ##### Start of Documents element.
+    # ##### Start of Documents element.
     docs = elem_empty(root, b"Documents")
 
     elem_data_single_int32(docs, b"Count", 1)
@@ -2557,7 +2571,7 @@ def fbx_takes_elements(root, scene_data):
         take_ref_time.add_int64(end_ktime)
 
 
-##### "Main" functions. #####
+# ##### "Main" functions. #####
 
 # This func can be called with just the filepath
 def save_single(operator, scene, filepath="",
@@ -2602,7 +2616,7 @@ def save_single(operator, scene, filepath="",
     if embed_textures and path_mode != 'COPY':
         embed_textures = False
 
-    media_settings = FBXSettingsMedia(
+    media_settings = FBXExportSettingsMedia(
         path_mode,
         os.path.dirname(bpy.data.filepath),  # base_src
         os.path.dirname(filepath),  # base_dst
@@ -2612,7 +2626,7 @@ def save_single(operator, scene, filepath="",
         set(),  # copy_set
     )
 
-    settings = FBXSettings(
+    settings = FBXExportSettings(
         operator.report, (axis_up, axis_forward), global_matrix, global_scale,
         bake_space_transform, global_matrix_inv, global_matrix_inv_transposed,
         context_objects, object_types, use_mesh_modifiers,

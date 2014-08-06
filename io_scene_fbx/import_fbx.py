@@ -44,6 +44,7 @@ from .fbx_utils import (
     array_to_matrix4,
     similar_values,
     similar_values_iter,
+    FBXImportSettings
 )
 
 # global singleton, assign on execution
@@ -274,7 +275,61 @@ FBXTransformData = namedtuple("FBXTransformData", (
 ))
 
 
-object_tdata_cache = {}
+def blen_read_custom_properties(fbx_obj, blen_obj, settings):
+    # There doesn't seem to be a way to put user properties into templates, so this only get the object properties:
+    fbx_obj_props = elem_find_first(fbx_obj, b'Properties70')
+    if fbx_obj_props:
+        for fbx_prop in fbx_obj_props.elems:
+            assert(fbx_prop.id == b'P')
+
+            if b'U' in fbx_prop.props[3]:
+                if fbx_prop.props[0] == b'UDP3DSMAX':
+                    # Special case for 3DS Max user properties:
+                    assert(fbx_prop.props[1] == b'KString')
+                    assert(fbx_prop.props_type[4] == data_types.STRING)
+                    items = fbx_prop.props[4].decode('utf-8')
+                    for item in items.split('\r\n'):
+                        if item:
+                            prop_name, prop_value = item.split('=', 1)
+                            blen_obj[prop_name.strip()] = prop_value.strip()
+                else:
+                    prop_name = fbx_prop.props[0].decode('utf-8')
+                    prop_type = fbx_prop.props[1]
+                    if prop_type in {b'Vector', b'Vector3D', b'Color', b'ColorRGB'}:
+                        assert(fbx_prop.props_type[4:7] == bytes((data_types.FLOAT64,)) * 3)
+                        blen_obj[prop_name] = fbx_prop.props[4:7]
+                    elif prop_type in {b'Vector4', b'ColorRGBA'}:
+                        assert(fbx_prop.props_type[4:8] == bytes((data_types.FLOAT64,)) * 4)
+                        blen_obj[prop_name] = fbx_prop.props[4:8]
+                    elif prop_type == b'Vector2D':
+                        assert(fbx_prop.props_type[4:6] == bytes((data_types.FLOAT64,)) * 2)
+                        blen_obj[prop_name] = fbx_prop.props[4:6]
+                    elif prop_type in {b'Integer', b'int'}:
+                        assert(fbx_prop.props_type[4] == data_types.INT32)
+                        blen_obj[prop_name] = fbx_prop.props[4]
+                    elif prop_type == b'KString':
+                        assert(fbx_prop.props_type[4] == data_types.STRING)
+                        blen_obj[prop_name] = fbx_prop.props[4].decode('utf-8')
+                    elif prop_type in {b'Number', b'double', b'Double'}:
+                        assert(fbx_prop.props_type[4] == data_types.FLOAT64)
+                        blen_obj[prop_name] = fbx_prop.props[4]
+                    elif prop_type in {b'Float', b'float'}:
+                        assert(fbx_prop.props_type[4] == data_types.FLOAT32)
+                        blen_obj[prop_name] = fbx_prop.props[4]
+                    elif prop_type in {b'Bool', b'bool'}:
+                        assert(fbx_prop.props_type[4] == data_types.INT32)
+                        blen_obj[prop_name] = fbx_prop.props[4] != 0
+                    elif prop_type in {b'Enum', b'enum'}:
+                        assert(fbx_prop.props_type[4:6] == bytes((data_types.INT32, data_types.STRING)))
+                        val = fbx_prop.props[4]
+                        if settings.use_custom_props_enum_as_string:
+                            enum_items = fbx_prop.props[5].decode('utf-8').split('~')
+                            assert(val >= 0 and val < len(enum_items))
+                            blen_obj[prop_name] = enum_items[val]
+                        else:
+                            blen_obj[prop_name] = val
+                    else:
+                        print ("WARNING: User property type '%s' is not supported" % prop_type.decode('utf-8'))
 
 
 def blen_read_object_transform_do(transform_data):
@@ -365,11 +420,12 @@ def blen_read_object_transform_preprocess(fbx_props, fbx_obj, rot_alt_mat):
                             sca, sca_ofs, sca_piv)
 
 
-def blen_read_object(fbx_tmpl, fbx_obj, object_data):
+def blen_read_object(fbx_tmpl, fbx_obj, object_data, settings):
     elem_name_utf8 = elem_name_ensure_class(fbx_obj)
 
     # Object data must be created already
     obj = bpy.data.objects.new(name=elem_name_utf8, object_data=object_data)
+    object_tdata_cache = settings.object_tdata_cache
 
     fbx_props = (elem_find_first(fbx_obj, b'Properties70'),
                  elem_find_first(fbx_tmpl, b'Properties70', fbx_elem_nil))
@@ -400,6 +456,9 @@ def blen_read_object(fbx_tmpl, fbx_obj, object_data):
         transform_data = blen_read_object_transform_preprocess(fbx_props, fbx_obj, rot_alt_mat)
         object_tdata_cache[obj] = transform_data
     obj.matrix_basis = blen_read_object_transform_do(transform_data)
+
+    if settings.use_custom_props:
+        blen_read_custom_properties(fbx_obj, obj, settings)
 
     return obj
 
@@ -502,11 +561,12 @@ def blen_read_armatures_add_bone(bl_obj, bl_arm, bones, b_uuid, matrices, fbx_tm
     return ebo
 
 
-def blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, global_matrix, arm_parents):
+def blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, arm_parents, settings):
     from mathutils import Matrix
 
-    if global_matrix is None:
-        global_matrix = Matrix()
+    global_matrix = settings.global_matrix
+    assert(global_matrix is not None)
+    object_tdata_cache = settings.object_tdata_cache
 
     for a_item, bones in armatures:
         fbx_adata, bl_adata = a_item
@@ -522,11 +582,12 @@ def blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, gl
 
         if fbx_adata.props[2] in {b'LimbNode', b'Root'}:
             # rootbone-as-armature case...
-            fbx_bones_to_fake_object[fbx_adata.props[0]] = bl_adata = blen_read_object(fbx_tmpl, fbx_adata, bl_arm)
+            bl_adata = blen_read_object(fbx_tmpl, fbx_adata, bl_arm, settings)
+            fbx_bones_to_fake_object[fbx_adata.props[0]] = bl_adata
             # reset transform.
             bl_adata.matrix_basis = Matrix()
         else:
-            bl_adata = a_item[1] = blen_read_object(fbx_tmpl, fbx_adata, bl_arm)
+            bl_adata = a_item[1] = blen_read_object(fbx_tmpl, fbx_adata, bl_arm, settings)
 
         # Instantiate in scene.
         obj_base = scene.objects.link(bl_adata)
@@ -534,12 +595,15 @@ def blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, gl
 
         # Switch to Edit mode.
         scene.objects.active = bl_adata
+        is_hidden = bl_adata.hide
+        bl_adata.hide = False  # Can't switch to Edit mode hidden objects...
         bpy.ops.object.mode_set(mode='EDIT')
 
         for b_uuid in bones:
             blen_read_armatures_add_bone(bl_adata, bl_arm, bones, b_uuid, matrices, fbx_tmpl)
 
         bpy.ops.object.mode_set(mode='OBJECT')
+        bl_adata.hide = is_hidden
 
         # Bind armature to objects.
         arm_mat_back = bl_adata.matrix_basis.copy()
@@ -598,39 +662,34 @@ def blen_read_animations_curves_iter(fbx_curves, blen_start_offset, fbx_start_of
                     elem_prop_first(elem_find_first(c[2], b'KeyTime')),
                     elem_prop_first(elem_find_first(c[2], b'KeyValueFloat')),
                     c]
-                    for c in fbx_curves)
+                   for c in fbx_curves)
 
-    while True:
-        tmin = min(curves, key=lambda e: e[1][e[0]])
-        curr_fbxktime = tmin[1][tmin[0]]
+    allkeys = sorted({item for sublist in curves for item in sublist[1]})
+    for curr_fbxktime in allkeys:
         curr_values = []
-        do_break = True
         for item in curves:
             idx, times, values, fbx_curve = item
-            if idx != -1:
-                do_break = False
-            if times[idx] > curr_fbxktime:
-                if idx == 0:
-                    curr_values.append((values[idx], fbx_curve))
-                else:
-                    # Interpolate between this key and the previous one.
-                    ifac = (curr_fbxktime - times[idx - 1]) / (times[idx] - times[idx - 1])
-                    curr_values.append(((values[idx] - values[idx - 1]) * ifac + values[idx - 1], fbx_curve))
-            else:
-                curr_values.append((values[idx], fbx_curve))
+
+            if times[idx] < curr_fbxktime:
                 if idx >= 0:
                     idx += 1
                     if idx >= len(times):
                         # We have reached our last element for this curve, stay on it from now on...
                         idx = -1
                     item[0] = idx
+
+            if times[idx] >= curr_fbxktime:
+                if idx == 0:
+                    curr_values.append((values[idx], fbx_curve))
+                else:
+                    # Interpolate between this key and the previous one.
+                    ifac = (curr_fbxktime - times[idx - 1]) / (times[idx] - times[idx - 1])
+                    curr_values.append(((values[idx] - values[idx - 1]) * ifac + values[idx - 1], fbx_curve))
         curr_blenkframe = (curr_fbxktime - fbx_start_offset) * timefac + blen_start_offset
         yield (curr_blenkframe, curr_values)
-        if do_break:
-            break
 
 
-def blen_read_animations_action_item(action, item, cnodes, global_matrix, force_global, fps):
+def blen_read_animations_action_item(action, item, cnodes, force_global, fps, settings):
     """
     'Bake' loc/rot/scale into the action, taking into account global_matrix if no parent is present.
     """
@@ -638,6 +697,8 @@ def blen_read_animations_action_item(action, item, cnodes, global_matrix, force_
     from mathutils import Euler, Matrix
     from itertools import chain
 
+    global_matrix = settings.global_matrix
+    object_tdata_cache = settings.object_tdata_cache
     blen_curves = []
     fbx_curves = []
     props = []
@@ -646,7 +707,7 @@ def blen_read_animations_action_item(action, item, cnodes, global_matrix, force_
         props = [(item.path_from_id("value"), 1, "Key")]
     else:  # Object or PoseBone:
         if item not in object_tdata_cache:
-            print("ERROR! object '%s' has no transform data, while being animated!" % ob.name)
+            print("ERROR! object '%s' has no transform data, while being animated!" % item.name)
             return
 
         # We want to create actions for objects, but for bones we 'reuse' armatures' actions!
@@ -734,7 +795,7 @@ def blen_read_animations_action_item(action, item, cnodes, global_matrix, force_
         fc.update()
 
 
-def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, global_matrix, force_global_objects):
+def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, force_global_objects, settings):
     """
     Recreate an action per stack/layer/object combinations.
     Note actions are not linked to objects, this is up to the user!
@@ -752,8 +813,8 @@ def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, global
                     action_name = "|".join((id_data.name, stack_name, layer_name))
                     actions[key] = action = bpy.data.actions.new(action_name)
                     action.use_fake_user = True
-                blen_read_animations_action_item(action, item, cnodes, global_matrix,
-                                                 item in force_global_objects, scene.render.fps)
+                blen_read_animations_action_item(action, item, cnodes,
+                                                 item in force_global_objects, scene.render.fps, settings)
 
 
 # ----
@@ -1053,7 +1114,7 @@ def blen_read_geom_layer_normal(fbx_obj, mesh):
         )
 
 
-def blen_read_geom(fbx_tmpl, fbx_obj):
+def blen_read_geom(fbx_tmpl, fbx_obj, settings):
     # TODO, use 'fbx_tmpl'
     elem_name_utf8 = elem_name_ensure_class(fbx_obj, b'Geometry')
 
@@ -1137,10 +1198,13 @@ def blen_read_geom(fbx_tmpl, fbx_obj):
         for p in mesh.polygons:
             p.use_smooth = True
 
+    if settings.use_custom_props:
+        blen_read_custom_properties(fbx_obj, mesh, settings)
+
     return mesh
 
 
-def blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, global_matrix):
+def blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, settings):
     from mathutils import Vector
 
     elem_name_utf8 = elem_name_ensure_class(fbx_sdata, b'Geometry')
@@ -1150,7 +1214,12 @@ def blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, global_matri
     weight = elem_prop_first(elem_find_first(fbx_bcdata, b'DeformPercent'), default=100.0) / 100.0
     vgweights = tuple(vgw / 100.0 for vgw in elem_prop_first(elem_find_first(fbx_bcdata, b'FullWeights'), default=()))
 
-    assert(len(vgweights) == len(indices) == len(dvcos))
+    # Special case, in case all weights are the same, FullWeight can have only one element - *sigh!*
+    nbr_indices = len(indices)
+    if len(vgweights) == 1 and nbr_indices > 1:
+        vgweights = (vgweights[0],) * nbr_indices
+
+    assert(len(vgweights) == nbr_indices == len(dvcos))
     create_vg = bool(set(vgweights) - {1.0})
 
     keyblocks = []
@@ -1183,9 +1252,10 @@ def blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, global_matri
 # --------
 # Material
 
-def blen_read_material(fbx_tmpl, fbx_obj, cycles_material_wrap_map, use_cycles):
+def blen_read_material(fbx_tmpl, fbx_obj, settings):
     elem_name_utf8 = elem_name_ensure_class(fbx_obj, b'Material')
 
+    cycles_material_wrap_map = settings.cycles_material_wrap_map
     ma = bpy.data.materials.new(name=elem_name_utf8)
 
     const_color_white = 1.0, 1.0, 1.0
@@ -1202,7 +1272,7 @@ def blen_read_material(fbx_tmpl, fbx_obj, cycles_material_wrap_map, use_cycles):
     ma_refl_factor = elem_props_get_number(fbx_props, b'ReflectionFactor', 0.0)
     ma_refl_color = elem_props_get_color_rgb(fbx_props, b'ReflectionColor', const_color_white)
 
-    if use_cycles:
+    if settings.use_cycles:
         from . import cycles_shader_compat
         # viewport color
         ma.diffuse_color = ma_diff
@@ -1229,18 +1299,22 @@ def blen_read_material(fbx_tmpl, fbx_obj, cycles_material_wrap_map, use_cycles):
             ma.raytrace_mirror.reflect_factor = ma_refl_factor
             ma.mirror_color = ma_refl_color
 
+    if settings.use_custom_props:
+        blen_read_custom_properties(fbx_obj, ma, settings)
+
     return ma
 
 
 # -------
 # Texture
 
-def blen_read_texture(fbx_tmpl, fbx_obj, basedir, image_cache,
-                      use_image_search):
+def blen_read_texture(fbx_tmpl, fbx_obj, basedir, settings):
     import os
     from bpy_extras import image_utils
 
     elem_name_utf8 = elem_name_ensure_class(fbx_obj, b'Texture')
+
+    image_cache = settings.image_cache
 
     filepath = elem_find_first_string(fbx_obj, b'FileName')
     if os.sep == '/':
@@ -1256,12 +1330,15 @@ def blen_read_texture(fbx_tmpl, fbx_obj, basedir, image_cache,
         filepath,
         dirname=basedir,
         place_holder=True,
-        recursive=use_image_search,
+        recursive=settings.use_image_search,
         )
 
     image_cache[filepath] = image
     # name can be ../a/b/c
     image.name = os.path.basename(elem_name_utf8)
+
+    if settings.use_custom_props:
+        blen_read_custom_properties(fbx_obj, image, settings)
 
     return image
 
@@ -1353,12 +1430,15 @@ def load(operator, context, filepath="",
          use_cycles=True,
          use_image_search=False,
          use_alpha_decals=False,
-         decal_offset=0.0):
+         decal_offset=0.0,
+         use_custom_props=True,
+         use_custom_props_enum_as_string=True):
 
     global fbx_elem_nil
     fbx_elem_nil = FBXElem('', (), (), ())
 
-    import os, time
+    import os
+    import time
     from bpy_extras.io_utils import axis_conversion
     from mathutils import Matrix
 
@@ -1394,6 +1474,7 @@ def load(operator, context, filepath="",
 
     basedir = os.path.dirname(filepath)
 
+    object_tdata_cache = {}
     cycles_material_wrap_map = {}
     image_cache = {}
     if not use_cycles:
@@ -1409,8 +1490,7 @@ def load(operator, context, filepath="",
 
     scene = context.scene
 
-
-    #### Get some info from GlobalSettings.
+    # #### Get some info from GlobalSettings.
 
     fbx_settings = elem_find_first(elem_root, b'GlobalSettings')
     fbx_settings_props = elem_find_first(fbx_settings, b'Properties70')
@@ -1442,8 +1522,16 @@ def load(operator, context, filepath="",
     scene.render.fps = round(real_fps)
     scene.render.fps_base = scene.render.fps / real_fps
 
+    # store global settings that need to be accessed during conversion
+    settings = FBXImportSettings(
+        operator.report, (axis_up, axis_forward), global_matrix, global_scale,
+        use_cycles, use_image_search,
+        use_alpha_decals, decal_offset,
+        use_custom_props, use_custom_props_enum_as_string,
+        object_tdata_cache, cycles_material_wrap_map, image_cache,
+    )
 
-    #### And now, the "real" data.
+    # #### And now, the "real" data.
 
     fbx_defs = elem_find_first(elem_root, b'Definitions')  # can be None
     fbx_nodes = elem_find_first(elem_root, b'Objects')
@@ -1523,7 +1611,7 @@ def load(operator, context, filepath="",
                 continue
             if fbx_obj.props[-1] == b'Mesh':
                 assert(blen_data is None)
-                fbx_item[1] = blen_read_geom(fbx_tmpl, fbx_obj)
+                fbx_item[1] = blen_read_geom(fbx_tmpl, fbx_obj, settings)
     _(); del _
 
     # ----
@@ -1537,8 +1625,7 @@ def load(operator, context, filepath="",
             if fbx_obj.id != b'Material':
                 continue
             assert(blen_data is None)
-            fbx_item[1] = blen_read_material(fbx_tmpl, fbx_obj,
-                                             cycles_material_wrap_map, use_cycles)
+            fbx_item[1] = blen_read_material(fbx_tmpl, fbx_obj, settings)
     _(); del _
 
     # ----
@@ -1550,8 +1637,7 @@ def load(operator, context, filepath="",
             fbx_obj, blen_data = fbx_item
             if fbx_obj.id != b'Texture':
                 continue
-            fbx_item[1] = blen_read_texture(fbx_tmpl, fbx_obj, basedir, image_cache,
-                                            use_image_search)
+            fbx_item[1] = blen_read_texture(fbx_tmpl, fbx_obj, basedir, settings)
     _(); del _
 
     # ----
@@ -1605,6 +1691,7 @@ def load(operator, context, filepath="",
     # from root bone uuid to Blender's object...
     fbx_bones_to_fake_object = dict()
     armatures = []
+
     def _():
         nonlocal fbx_objects_ignore, fbx_objects_parent_ignore
         for a_uuid, a_item in fbx_table_nodes.items():
@@ -1622,7 +1709,8 @@ def load(operator, context, filepath="",
                     if p_ctype.props[0] != b'OO':
                         continue
                     fbx_pdata, bl_pdata = p_item = fbx_table_nodes.get(p_uuid, (None, None))
-                    if (fbx_pdata and fbx_pdata.id == b'Model' and fbx_pdata.props[2] in {b'LimbNode', b'Root', b'Null'}):
+                    if (fbx_pdata and fbx_pdata.id == b'Model' and
+                        fbx_pdata.props[2] in {b'LimbNode', b'Root', b'Null'}):
                         # Not a root bone...
                         root_bone = False
                 if not root_bone:
@@ -1660,7 +1748,8 @@ def load(operator, context, filepath="",
                         if fbx_tdata is None or fbx_tdata.id != b'NodeAttribute' or fbx_tdata.props[2] != b'LimbNode':
                             continue
                         fbx_props = (elem_find_first(fbx_tdata, b'Properties70'),)
-                        size = elem_props_get_number(fbx_props, b'Size', default=size)
+                        if fbx_props[0] is not None:  # Some bones have no Properties70 at all...
+                            size = elem_props_get_number(fbx_props, b'Size', default=size)
                         break  # Only one bone data per bone!
 
                     clusters = []
@@ -1750,7 +1839,7 @@ def load(operator, context, filepath="",
                     break
             if ok:
                 # create when linking since we need object data
-                obj = blen_read_object(fbx_tmpl, fbx_obj, fbx_lnk_item)
+                obj = blen_read_object(fbx_tmpl, fbx_obj, fbx_lnk_item, settings)
                 assert(fbx_item[1] is None)
                 fbx_item[1] = obj
 
@@ -1763,6 +1852,7 @@ def load(operator, context, filepath="",
 
     # I) We can handle shapes.
     blend_shape_channels = {}  # We do not need Shapes themselves, but keyblocks, for anim.
+
     def _():
         fbx_tmpl = fbx_template_get((b'Geometry', b'KFbxShape'))
 
@@ -1808,20 +1898,23 @@ def load(operator, context, filepath="",
                     # BlendShape deformers are only here to connect BlendShapeChannels to meshes, nothing else to do.
 
                 # keyblocks is a list of tuples (mesh, keyblock) matching that shape/blendshapechannel, for animation.
-                keyblocks = blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, global_matrix)
+                keyblocks = blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene, settings)
                 blend_shape_channels[bc_uuid] = keyblocks
     _(); del _
 
     # II) We can finish armatures processing.
     arm_parents = set()
     force_global_objects = set()
+
     def _():
         fbx_tmpl = fbx_template_get((b'Model', b'KFbxNode'))
 
-        blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, global_matrix, arm_parents)
+        blen_read_armatures(fbx_tmpl, armatures, fbx_bones_to_fake_object, scene, arm_parents, settings)
     _(); del _
 
     def _():
+        from bpy.types import PoseBone
+
         # Parent objects, after we created them...
         for fbx_uuid, fbx_item in fbx_table_nodes.items():
             if fbx_uuid in fbx_objects_parent_ignore:
@@ -1841,7 +1934,12 @@ def load(operator, context, filepath="",
                  fbx_lnk_item,
                  fbx_lnk_type) in connection_filter_forward(fbx_uuid, b'Model'):
 
-                blen_data.parent = fbx_lnk_item
+                if isinstance(fbx_lnk_item, PoseBone):
+                    blen_data.parent = fbx_lnk_item.id_data  # get the armature the bone belongs to
+                    blen_data.parent_bone = fbx_lnk_item.name
+                    blen_data.parent_type = 'BONE'
+                else:
+                    blen_data.parent = fbx_lnk_item
     _(); del _
 
     def _():
@@ -1958,7 +2056,7 @@ def load(operator, context, filepath="",
                 curvenodes[acn_uuid][ac_uuid] = (fbx_acitem, channel)
 
         # And now that we have sorted all this, apply animations!
-        blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, global_matrix, force_global_objects)
+        blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, force_global_objects, settings)
 
     _(); del _
 
@@ -2028,6 +2126,14 @@ def load(operator, context, filepath="",
                     tex = bpy.data.textures.new(name=image.name, type='IMAGE')
                     tex.image = image
                     texture_cache[image] = tex
+
+                    # copy custom properties from image object to texture
+                    for key, value in image.items():
+                        tex[key] = value
+
+                    # delete custom properties on the image object
+                    for key in image.keys():
+                        del image[key]
 
                 mtex = material.texture_slots.add()
                 mtex.texture = tex
@@ -2110,7 +2216,7 @@ def load(operator, context, filepath="",
                         else:
                             print("WARNING: material link %r ignored" % lnk_type)
 
-                        material_images.setdefault(material, {})[lnk_type] = image
+                        material_images.setdefault(material, {})[lnk_type] = (image, tex_map)
                 else:
                     if fbx_lnk_type.props[0] == b'OP':
                         lnk_type = fbx_lnk_type.props[3]
@@ -2152,7 +2258,7 @@ def load(operator, context, filepath="",
                         else:
                             print("WARNING: material link %r ignored" % lnk_type)
 
-                        material_images.setdefault(material, {})[lnk_type] = image
+                        material_images.setdefault(material, {})[lnk_type] = (image, tex_map)
 
         # Check if the diffuse image has an alpha channel,
         # if so, use the alpha channel.
@@ -2163,7 +2269,7 @@ def load(operator, context, filepath="",
             if fbx_obj.id != b'Material':
                 continue
             material = fbx_table_nodes[fbx_uuid][1]
-            image = material_images.get(material, {}).get(b'DiffuseColor')
+            image, tex_map = material_images.get(material, {}).get(b'DiffuseColor', (None, None))
             # do we have alpha?
             if image and image.depth == 32:
                 if use_alpha_decals:
@@ -2175,7 +2281,7 @@ def load(operator, context, filepath="",
                         ma_wrap.alpha_image_set_from_diffuse()
                 else:
                     if not any((True for mtex in material.texture_slots if mtex and mtex.use_map_alpha)):
-                        mtex = material_mtex_new(material, image)
+                        mtex = material_mtex_new(material, image, tex_map)
 
                         material.use_transparency = True
                         material.transparency_method = 'RAYTRACE'

@@ -323,8 +323,10 @@ class AddTree(bpy.types.Operator):
         min=0.0,
         max=1.0,
         default=1.0, update=update_tree)
-    leaves = IntProperty(name='Leaves',
+    leaves = FloatProperty(name='Leaves',
         description='Maximum number of leaves per branch (Leaves)',
+        min=0,
+        max=50,
         default=25, update=update_tree)
     leafScale = FloatProperty(name='Leaf Scale',
         description='The scaling applied to the whole leaf (LeafScale)',
