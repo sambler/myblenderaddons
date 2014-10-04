@@ -946,7 +946,7 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
 
     # Loop normals.
     tspacenumber = 0
-    if (write_normals):
+    if write_normals:
         # NOTE: this is not supported by importer currently.
         # XXX Official docs says normals should use IndexToDirect,
         #     but this does not seem well supported by apps currently...
@@ -1116,9 +1116,10 @@ def fbx_data_mesh_elements(root, me_obj, scene_data, done_meshes):
 
     layer = elem_data_single_int32(geom, b"Layer", 0)
     elem_data_single_int32(layer, b"Version", FBX_GEOMETRY_LAYER_VERSION)
-    lay_nor = elem_empty(layer, b"LayerElement")
-    elem_data_single_string(lay_nor, b"Type", b"LayerElementNormal")
-    elem_data_single_int32(lay_nor, b"TypedIndex", 0)
+    if write_normals:
+        lay_nor = elem_empty(layer, b"LayerElement")
+        elem_data_single_string(lay_nor, b"Type", b"LayerElementNormal")
+        elem_data_single_int32(lay_nor, b"TypedIndex", 0)
     if tspacenumber:
         lay_binor = elem_empty(layer, b"LayerElement")
         elem_data_single_string(lay_binor, b"Type", b"LayerElementBinormal")
@@ -1676,7 +1677,7 @@ def fbx_skeleton_from_armature(scene, settings, arm_obj, objects, data_meshes,
     data_bones.update((bo, get_blender_bone_key(arm_obj.bdata, bo.bdata)) for bo in bones)
 
     for ob_obj in objects:
-        if not (ob_obj.is_object and ob_obj.type == 'MESH' and ob_obj.parent == arm_obj):
+        if not ob_obj.is_deformed_by_armature(arm_obj):
             continue
 
         # Always handled by an Armature modifier...
@@ -2031,7 +2032,7 @@ def fbx_data_from_scene(scene, settings):
                     # Note: Maybe this is a bit too simplistic, should we use real shape base here? Though FBX does not
                     #       have this at all... Anyway, this should cover most common cases imho.
                     continue
-                shape_verts_co.extend(sv_co - v_co)
+                shape_verts_co.extend(Vector(sv_co) - Vector(v_co))
                 shape_verts_idx.append(idx)
             if not shape_verts_co:
                 continue
@@ -2800,8 +2801,25 @@ def save(operator, context,
                 scene = bpy.data.scenes.new(name="FBX_Temp")
                 scene.layers = [True] * 20
                 # bpy.data.scenes.active = scene # XXX, cant switch
+                src_scenes = {}  # Count how much each 'source' scenes are used.
                 for ob_base in data.objects:
+                    for src_sce in ob_base.users_scene:
+                        if src_sce not in src_scenes:
+                            src_scenes[src_sce] = 0
+                        src_scenes[src_sce] += 1
                     scene.objects.link(ob_base)
+
+                # Find the 'most used' source scene, and use its unit settings. This is somewhat weak, but should work
+                # fine in most cases, and avoids stupid issues like T41931.
+                best_src_scene = None
+                best_src_scene_users = 0
+                for sce, nbr_users in src_scenes.items():
+                    if (nbr_users) > best_src_scene_users:
+                        best_src_scene_users = nbr_users
+                        best_src_scene = sce
+                scene.unit_settings.system = best_src_scene.unit_settings.system
+                scene.unit_settings.system_rotation = best_src_scene.unit_settings.system_rotation
+                scene.unit_settings.scale_length = best_src_scene.unit_settings.scale_length
 
                 scene.update()
                 # TODO - BUMMER! Armatures not in the group wont animate the mesh
