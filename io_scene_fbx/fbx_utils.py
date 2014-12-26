@@ -995,11 +995,18 @@ class ObjectWrapper(metaclass=MetaObjectWrapper):
 
         if self._tag in {'DP', 'OB'} and parent:
             # To get *real* local matrix of a child object, we also need to take into account its inverted par mat!
-            matrix = self.bdata.matrix_parent_inverse * matrix
+            # In fact, this is wrong - since we do not store that matrix in FBX at all, we shall not use it here...
+            #~ matrix = self.bdata.matrix_parent_inverse * matrix
             if parent._tag == 'BO':
+                # In bone parent case, local matrix is in ***armature*** space!!!!!!!!!!!!
+                # So we need to bring it back into parent bone space.
+                matrix = parent._ref.pose.bones[parent.name].matrix.inverted_safe() * matrix
+
                 # In bone parent case, we get transformation in **bone tip** space (sigh).
                 # Have to bring it back into bone root, which is FBX expected value.
-                matrix = Matrix.Translation((0, (parent.bdata.tail - parent.bdata.head).length, 0)) * matrix
+                # Actually, since we parent back to bone space above, we do not need that
+                # correction here it seems...
+                #~ matrix = Matrix.Translation((0, (parent.bdata.tail - parent.bdata.head).length, 0)) * matrix
 
         # Our matrix is in local space, time to bring it in its final desired space.
         if parent:
@@ -1078,7 +1085,7 @@ class ObjectWrapper(metaclass=MetaObjectWrapper):
     def is_deformed_by_armature(self, arm_obj):
         if not (self.is_object and self.type == 'MESH'):
             return False
-        if self.parent == arm_obj:
+        if self.parent == arm_obj and self.bdata.parent_type == 'ARMATURE':
             return True
         for mod in self.bdata.modifiers:
             if mod.type == 'ARMATURE' and mod.object == arm_obj.bdata:
