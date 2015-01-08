@@ -33,6 +33,7 @@ if "bpy" in locals():
         importlib.reload(fbx_utils)
 
 import bpy
+from mathutils import Matrix, Euler, Vector
 
 # -----
 # Utils
@@ -269,9 +270,9 @@ from collections import namedtuple
 
 
 FBXTransformData = namedtuple("FBXTransformData", (
-    "loc",
-    "rot", "rot_ofs", "rot_piv", "pre_rot", "pst_rot", "rot_ord", "rot_alt_mat",
-    "sca", "sca_ofs", "sca_piv",
+    "loc", "geom_loc", 
+    "rot", "rot_ofs", "rot_piv", "pre_rot", "pst_rot", "rot_ord", "rot_alt_mat", "geom_rot",
+    "sca", "sca_ofs", "sca_piv", "geom_sca",
 ))
 
 
@@ -333,16 +334,57 @@ def blen_read_custom_properties(fbx_obj, blen_obj, settings):
 
 
 def blen_read_object_transform_do(transform_data):
-    from mathutils import Matrix, Euler
+    # This is a nightmare. FBX SDK uses Maya way to compute the transformation matrix of a node - utterly simple:
+    #
+    #     WorldTransform = ParentWorldTransform * T * Roff * Rp * Rpre * R * Rpost * Rp-1 * Soff * Sp * S * Sp-1
+    #
+    # Where all those terms are 4 x 4 matrices that contain:
+    #     WorldTransform: Transformation matrix of the node in global space.
+    #     ParentWorldTransform: Transformation matrix of the parent node in global space.
+    #     T: Translation
+    #     Roff: Rotation offset
+    #     Rp: Rotation pivot
+    #     Rpre: Pre-rotation
+    #     R: Rotation
+    #     Rpost: Post-rotation
+    #     Rp-1: Inverse of the rotation pivot
+    #     Soff: Scaling offset
+    #     Sp: Scaling pivot
+    #     S: Scaling
+    #     Sp-1: Inverse of the scaling pivot
+    #
+    # But it was still too simple, and FBX notion of compatibility is... quite specific. So we also have to
+    # support 3DSMax way:
+    #
+    #     WorldTransform = ParentWorldTransform * T * R * S * OT * OR * OS
+    #
+    # Where all those terms are 4 x 4 matrices that contain:
+    #     WorldTransform: Transformation matrix of the node in global space
+    #     ParentWorldTransform: Transformation matrix of the parent node in global space
+    #     T: Translation
+    #     R: Rotation
+    #     S: Scaling
+    #     OT: Geometric transform translation
+    #     OR: Geometric transform rotation
+    #     OS: Geometric transform translation
+    #
+    # Notes:
+    #     Geometric transformations ***are not inherited***: ParentWorldTransform does not contain the OT, OR, OS
+    #     of WorldTransform's parent node.
+    #
+    # Taken from http://download.autodesk.com/us/fbx/20112/FBX_SDK_HELP/
+    #            index.html?url=WS1a9193826455f5ff1f92379812724681e696651.htm,topicNumber=d0e7429
 
     # translation
     lcl_translation = Matrix.Translation(transform_data.loc)
+    geom_loc = Matrix.Translation(transform_data.geom_loc)
 
     # rotation
     to_rot = lambda rot, rot_ord: Euler(convert_deg_to_rad_iter(rot), rot_ord).to_matrix().to_4x4()
     lcl_rot = to_rot(transform_data.rot, transform_data.rot_ord) * transform_data.rot_alt_mat
     pre_rot = to_rot(transform_data.pre_rot, transform_data.rot_ord)
     pst_rot = to_rot(transform_data.pst_rot, transform_data.rot_ord)
+    geom_rot = to_rot(transform_data.geom_rot, transform_data.rot_ord)
 
     rot_ofs = Matrix.Translation(transform_data.rot_ofs)
     rot_piv = Matrix.Translation(transform_data.rot_piv)
@@ -352,8 +394,10 @@ def blen_read_object_transform_do(transform_data):
     # scale
     lcl_scale = Matrix()
     lcl_scale[0][0], lcl_scale[1][1], lcl_scale[2][2] = transform_data.sca
+    geom_scale = Matrix();
+    geom_scale[0][0], geom_scale[1][1], geom_scale[2][2] = transform_data.geom_sca
 
-    return (
+    base_mat = (
         lcl_translation *
         rot_ofs *
         rot_piv *
@@ -366,6 +410,9 @@ def blen_read_object_transform_do(transform_data):
         lcl_scale *
         sca_piv.inverted_safe()
     )
+    geom_mat = geom_loc * geom_rot * geom_scale
+    # We return mat without 'geometric transforms' too, because it is to be used for children, sigh...
+    return (base_mat * geom_mat, base_mat, geom_mat)
 
 
 # XXX This might be weak, now that we can add vgroups from both bones and shapes, name collisions become
@@ -390,6 +437,10 @@ def blen_read_object_transform_preprocess(fbx_props, fbx_obj, rot_alt_mat, use_p
     loc = list(elem_props_get_vector_3d(fbx_props, b'Lcl Translation', const_vector_zero_3d))
     rot = list(elem_props_get_vector_3d(fbx_props, b'Lcl Rotation', const_vector_zero_3d))
     sca = list(elem_props_get_vector_3d(fbx_props, b'Lcl Scaling', const_vector_one_3d))
+
+    geom_loc = list(elem_props_get_vector_3d(fbx_props, b'GeometricTranslation', const_vector_zero_3d))
+    geom_rot = list(elem_props_get_vector_3d(fbx_props, b'GeometricRotation', const_vector_zero_3d))
+    geom_sca = list(elem_props_get_vector_3d(fbx_props, b'GeometricScaling', const_vector_one_3d))
 
     rot_ofs = elem_props_get_vector_3d(fbx_props, b'RotationOffset', const_vector_zero_3d)
     rot_piv = elem_props_get_vector_3d(fbx_props, b'RotationPivot', const_vector_zero_3d)
@@ -419,9 +470,9 @@ def blen_read_object_transform_preprocess(fbx_props, fbx_obj, rot_alt_mat, use_p
         pst_rot = const_vector_zero_3d
         rot_ord = 'XYZ'
 
-    return FBXTransformData(loc,
-                            rot, rot_ofs, rot_piv, pre_rot, pst_rot, rot_ord, rot_alt_mat,
-                            sca, sca_ofs, sca_piv)
+    return FBXTransformData(loc, geom_loc,
+                            rot, rot_ofs, rot_piv, pre_rot, pst_rot, rot_ord, rot_alt_mat, geom_rot,
+                            sca, sca_ofs, sca_piv, geom_sca)
 
 
 # ---------
@@ -470,10 +521,10 @@ def blen_read_animations_curves_iter(fbx_curves, blen_start_offset, fbx_start_of
 
 def blen_read_animations_action_item(action, item, cnodes, fps):
     """
-    'Bake' loc/rot/scale into the action, taking any pre_ and post_ matrix into account to transform from fbx into blender space.
+    'Bake' loc/rot/scale into the action,
+    taking any pre_ and post_ matrix into account to transform from fbx into blender space.
     """
     from bpy.types import Object, PoseBone, ShapeKey
-    from mathutils import Euler, Matrix
     from itertools import chain
 
     fbx_curves = []
@@ -548,7 +599,7 @@ def blen_read_animations_action_item(action, item, cnodes, fps):
                     transform_data.rot[channel] = v
                 elif fbxprop == b'Lcl Scaling':
                     transform_data.sca[channel] = v
-            mat = blen_read_object_transform_do(transform_data)
+            mat, _, _ = blen_read_object_transform_do(transform_data)
 
             # compensate for changes in the local matrix during processing
             if item.anim_compensation_matrix:
@@ -631,37 +682,73 @@ def blen_read_geom_layerinfo(fbx_layer):
         )
 
 
+def blen_read_geom_array_setattr(generator, blen_data, blen_attr, fbx_data, stride, item_size, descr, xform):
+    """Generic fbx_layer to blen_data setter, generator is expected to yield tuples (ble_idx, fbx_idx)."""
+    if xform is not None:
+        for blen_idx, fbx_idx in generator:
+            if fbx_idx == -1:
+                continue
+            setattr(blen_data[blen_idx], blen_attr,
+                    xform(fbx_data[fbx_idx] if (item_size == 1) else fbx_data[fbx_idx:fbx_idx + item_size]))
+    else:
+        for blen_idx, fbx_idx in generator:
+            if fbx_idx == -1:
+                continue
+            setattr(blen_data[blen_idx], blen_attr,
+                    fbx_data[fbx_idx] if (item_size == 1) else fbx_data[fbx_idx:fbx_idx + item_size])
+
+
+# generic generators.
+def blen_read_geom_array_gen_direct(fbx_data, stride):
+    fbx_data_len = len(fbx_data)
+    return zip(*(range(fbx_data_len // stride), range(0, fbx_data_len, stride)))
+
+
+def blen_read_geom_array_gen_indextodirect(fbx_layer_index, stride):
+    return ((bi, fi * stride) for bi, fi in enumerate(fbx_layer_index))
+
+
+def blen_read_geom_array_gen_direct_looptovert(mesh, fbx_data, stride):
+    fbx_data_len = len(fbx_data) // stride
+    loops = mesh.loops
+    for p in mesh.polygons:
+        for lidx in p.loop_indices:
+            vidx = loops[lidx].vertex_index
+            if vidx < fbx_data_len:
+                yield lidx, vidx * stride
+
+
+# generic error printers.
+def blen_read_geom_array_error_mapping(descr, fbx_layer_mapping):
+    print("warning layer %r mapping type unsupported: %r" % (descr, fbx_layer_mapping))
+
+
+def blen_read_geom_array_error_ref(descr, fbx_layer_ref):
+    print("warning layer %r ref type unsupported: %r" % (descr, fbx_layer_ref))
+
+
 def blen_read_geom_array_mapped_vert(
-        mesh, blen_data, blend_attr,
+        mesh, blen_data, blen_attr,
         fbx_layer_data, fbx_layer_index,
         fbx_layer_mapping, fbx_layer_ref,
         stride, item_size, descr,
-        xform=None
+        xform=None,
         ):
-    # TODO, generic mapping apply function
     if fbx_layer_mapping == b'ByVertice':
         if fbx_layer_ref == b'Direct':
             assert(fbx_layer_index is None)
-            # TODO, more generic support for mapping types
-            if xform is None:
-                for i, blen_data_item in enumerate(blen_data):
-                    setattr(blen_data_item, blend_attr,
-                            fbx_layer_data[(i * stride): (i * stride) + item_size])
-            else:
-                for i, blen_data_item in enumerate(blen_data):
-                    setattr(blen_data_item, blend_attr,
-                            xform(fbx_layer_data[(i * stride): (i * stride) + item_size]))
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
-        else:
-            print("warning layer %r ref type unsupported: %r" % (descr, fbx_layer_ref))
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
     else:
-        print("warning layer %r mapping type unsupported: %r" % (descr, fbx_layer_mapping))
+        blen_read_geom_array_error_mapping(descr, fbx_layer_mapping)
 
     return False
 
 
 def blen_read_geom_array_mapped_edge(
-        mesh, blen_data, blend_attr,
+        mesh, blen_data, blen_attr,
         fbx_layer_data, fbx_layer_index,
         fbx_layer_mapping, fbx_layer_ref,
         stride, item_size, descr,
@@ -669,35 +756,18 @@ def blen_read_geom_array_mapped_edge(
         ):
     if fbx_layer_mapping == b'ByEdge':
         if fbx_layer_ref == b'Direct':
-            if stride == 1:
-                if xform is None:
-                    for i, blen_data_item in enumerate(blen_data):
-                        setattr(blen_data_item, blend_attr,
-                                fbx_layer_data[i])
-                else:
-                    for i, blen_data_item in enumerate(blen_data):
-                        setattr(blen_data_item, blend_attr,
-                                xform(fbx_layer_data[i]))
-            else:
-                if xform is None:
-                    for i, blen_data_item in enumerate(blen_data):
-                        setattr(blen_data_item, blend_attr,
-                                fbx_layer_data[(i * stride): (i * stride) + item_size])
-                else:
-                    for i, blen_data_item in enumerate(blen_data):
-                        setattr(blen_data_item, blend_attr,
-                                xform(fbx_layer_data[(i * stride): (i * stride) + item_size]))
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
-        else:
-            print("warning layer %r ref type unsupported: %r" % (descr, fbx_layer_ref))
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
     else:
-        print("warning layer %r mapping type unsupported: %r" % (descr, fbx_layer_mapping))
+        blen_read_geom_array_error_mapping(descr, fbx_layer_mapping)
 
     return False
 
 
 def blen_read_geom_array_mapped_polygon(
-        mesh, blen_data, blend_attr,
+        mesh, blen_data, blen_attr,
         fbx_layer_data, fbx_layer_index,
         fbx_layer_mapping, fbx_layer_ref,
         stride, item_size, descr,
@@ -705,63 +775,50 @@ def blen_read_geom_array_mapped_polygon(
         ):
     if fbx_layer_mapping == b'ByPolygon':
         if fbx_layer_ref == b'IndexToDirect':
-            if stride == 1:
-                for i, blen_data_item in enumerate(blen_data):
-                    setattr(blen_data_item, blend_attr,
-                            fbx_layer_data[i])
+            # XXX Looks like we often get no fbx_layer_index in this case, shall not happen but happens...
+            #     We fallback to 'Direct' mapping in this case.
+            #~ assert(fbx_layer_index is not None)
+            if fbx_layer_index is None:
+                blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
+                                            blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             else:
-                for i, blen_data_item in enumerate(blen_data):
-                    setattr(blen_data_item, blend_attr,
-                            fbx_layer_data[(i * stride): (i * stride) + item_size])
+                blen_read_geom_array_setattr(blen_read_geom_array_gen_indextodirect(fbx_layer_index, stride),
+                                             blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
         elif fbx_layer_ref == b'Direct':
-            # looks like direct may have different meanings!
-            assert(stride == 1)
-            if xform is None:
-                for i in range(len(fbx_layer_data)):
-                    setattr(blen_data[i], blend_attr, fbx_layer_data[i])
-            else:
-                for i in range(len(fbx_layer_data)):
-                    setattr(blen_data[i], blend_attr, xform(fbx_layer_data[i]))
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
-        else:
-            print("warning layer %r ref type unsupported: %r" % (descr, fbx_layer_ref))
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
     else:
-        print("warning layer %r mapping type unsupported: %r" % (descr, fbx_layer_mapping))
+        blen_read_geom_array_error_mapping(descr, fbx_layer_mapping)
 
     return False
 
 
 def blen_read_geom_array_mapped_polyloop(
-        mesh, blen_data, blend_attr,
+        mesh, blen_data, blen_attr,
         fbx_layer_data, fbx_layer_index,
         fbx_layer_mapping, fbx_layer_ref,
         stride, item_size, descr,
+        xform=None,
         ):
     if fbx_layer_mapping == b'ByPolygonVertex':
         if fbx_layer_ref == b'IndexToDirect':
             assert(fbx_layer_index is not None)
-            for i, j in enumerate(fbx_layer_index):
-                if j != -1:
-                    setattr(blen_data[i], blend_attr,
-                            fbx_layer_data[(j * stride): (j * stride) + item_size])
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_indextodirect(fbx_layer_index, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
-        else:
-            print("warning layer %r ref type unsupported: %r" % (descr, fbx_layer_ref))
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
     elif fbx_layer_mapping == b'ByVertice':
         if fbx_layer_ref == b'Direct':
             assert(fbx_layer_index is None)
-            loops = mesh.loops
-            polygons = mesh.polygons
-            for p in polygons:
-                for i in p.loop_indices:
-                    j = loops[i].vertex_index
-                    setattr(blen_data[i], blend_attr,
-                            fbx_layer_data[(j * stride): (j * stride) + item_size])
-        else:
-            print("warning layer %r ref type unsupported: %r" % (descr, fbx_layer_ref))
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_direct_looptovert(mesh, fbx_layer_data, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+            return True
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
     else:
-        print("warning layer %r mapping type unsupported: %r" % (descr, fbx_layer_mapping))
+        blen_read_geom_array_error_mapping(descr, fbx_layer_mapping)
 
     return False
 
@@ -925,7 +982,6 @@ def blen_read_geom_layer_normal(fbx_obj, mesh, xform=None):
 
 
 def blen_read_geom(fbx_tmpl, fbx_obj, settings):
-    from mathutils import Matrix, Vector
     from itertools import chain
     import array
 
@@ -1040,8 +1096,6 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
 
 
 def blen_read_shape(fbx_tmpl, fbx_sdata, fbx_bcdata, meshes, scene):
-    from mathutils import Vector
-
     elem_name_utf8 = elem_name_ensure_class(fbx_sdata, b'Geometry')
     indices = elem_prop_first(elem_find_first(fbx_sdata, b'Indexes'), default=())
     dvcos = tuple(co for co in zip(*[iter(elem_prop_first(elem_find_first(fbx_sdata, b'Vertices'), default=()))] * 3))
@@ -1253,13 +1307,14 @@ def blen_read_light(fbx_tmpl, fbx_obj, global_scale):
 # ### Import Utility class
 class FbxImportHelperNode:
     """
-    Temporary helper node to store a hierarchy of fbxNode objects before building
-    Objects, Armatures and Bones. It tries to keep the correction data in one place so it can be applied consistently to the imported data.
+    Temporary helper node to store a hierarchy of fbxNode objects before building Objects, Armatures and Bones.
+    It tries to keep the correction data in one place so it can be applied consistently to the imported data.
     """
 
-    __slots__ = ('_parent', 'anim_compensation_matrix', 'armature_setup', 'bind_matrix', 'bl_bone', 'bl_data', 'bl_obj', 'bone_child_matrix',
-                 'children', 'clusters', 'fbx_elem', 'fbx_name', 'fbx_transform_data', 'fbx_type', 'has_bone_children', 'ignore', 'is_armature',
-                 'is_bone', 'is_root', 'matrix', 'meshes', 'post_matrix', 'pre_matrix')
+    __slots__ = ('_parent', 'anim_compensation_matrix', 'armature_setup', 'bind_matrix',
+                 'bl_bone', 'bl_data', 'bl_obj', 'bone_child_matrix', 'children', 'clusters',
+                 'fbx_elem', 'fbx_name', 'fbx_transform_data', 'fbx_type', 'has_bone_children', 'ignore', 'is_armature',
+                 'is_bone', 'is_root', 'matrix', 'matrix_as_parent', 'matrix_geom', 'meshes', 'post_matrix', 'pre_matrix')
 
     def __init__(self, fbx_elem, bl_data, fbx_transform_data, is_bone):
         self.fbx_name = elem_name_ensure_class(fbx_elem, b'Model') if fbx_elem else 'Unknown'
@@ -1276,7 +1331,10 @@ class FbxImportHelperNode:
         self.ignore = False                     # True for leaf-bones added to the end of some bone chains to set the lengths.
         self.pre_matrix = None                  # correction matrix that needs to be applied before the FBX transform
         self.bind_matrix = None                 # for bones this is the matrix used to bind to the skin
-        self.matrix = blen_read_object_transform_do(fbx_transform_data) if fbx_transform_data else None
+        if fbx_transform_data:
+            self.matrix, self.matrix_as_parent, self.matrix_geom = blen_read_object_transform_do(fbx_transform_data)
+        else:
+            self.matrix, self.matrix_as_parent, self.matrix_geom = (None, None, None)
         self.post_matrix = None                 # correction matrix that needs to be applied after the FBX transform
         self.bone_child_matrix = None           # Objects attached to a bone end not the beginning, this matrix corrects for that
         self.anim_compensation_matrix = None    # a mesh moved in the hierarchy may have a different local matrix. This compensates animations for this.
@@ -1331,7 +1389,6 @@ class FbxImportHelperNode:
 
     def find_correction_matrix(self, settings, parent_correction_inv=None):
         from bpy_extras.io_utils import axis_conversion
-        from mathutils import Matrix, Vector
 
         if self.parent and (self.parent.is_root or self.parent.do_bake_transform(settings)):
             self.pre_matrix = settings.global_matrix
@@ -1344,7 +1401,7 @@ class FbxImportHelperNode:
         if self.is_bone:
             if settings.automatic_bone_orientation:
                 # find best orientation to align bone with
-                bone_children = [child for child in self.children if child.is_bone]
+                bone_children = tuple(child for child in self.children if child.is_bone)
                 if len(bone_children) == 0:
                     # no children, inherit the correction from parent (if possible)
                     if self.parent and self.parent.is_bone:
@@ -1362,7 +1419,8 @@ class FbxImportHelperNode:
                             best_axis = Vector((0, 1 if vec[1] >= 0 else -1, 0))
                     else:
                         # get the child directions once because they may be checked several times
-                        child_locs = [loc.normalized() for loc in [bind_matrix.to_translation() for bind_matrix in [child.bind_matrix for child in bone_children]] if loc.magnitude > 0.0]
+                        child_locs = (child.bind_matrix.to_translation() for child in bone_children)
+                        child_locs = tuple(loc.normalized() for loc in child_locs if loc.magnitude > 0.0)
 
                         # I'm not sure which one I like better...
                         if False:
@@ -1459,9 +1517,7 @@ class FbxImportHelperNode:
                 armature.parent = self
 
         for child in self.children:
-            if child.is_armature:
-                continue
-            if child.is_bone:
+            if child.is_armature or child.is_bone:
                 continue
             child.find_armatures()
 
@@ -1495,17 +1551,19 @@ class FbxImportHelperNode:
         for child in self.children:
             child.find_fake_bones(in_armature)
 
-    def get_world_matrix(self):
-        from mathutils import Matrix
+    def get_world_matrix_as_parent(self):
+        matrix = self.parent.get_world_matrix_as_parent() if self.parent else Matrix()
+        if self.matrix_as_parent:
+            matrix = matrix * self.matrix_as_parent
+        return matrix
 
-        matrix = self.parent.get_world_matrix() if self.parent else Matrix()
+    def get_world_matrix(self):
+        matrix = self.parent.get_world_matrix_as_parent() if self.parent else Matrix()
         if self.matrix:
             matrix = matrix * self.matrix
         return matrix
 
     def get_matrix(self):
-        from mathutils import Matrix
-
         matrix = self.matrix if self.matrix else Matrix()
         if self.pre_matrix:
             matrix = self.pre_matrix * matrix
@@ -1514,8 +1572,6 @@ class FbxImportHelperNode:
         return matrix
 
     def get_bind_matrix(self):
-        from mathutils import Matrix
-
         matrix = self.bind_matrix if self.bind_matrix else Matrix()
         if self.pre_matrix:
             matrix = self.pre_matrix * matrix
@@ -1524,8 +1580,6 @@ class FbxImportHelperNode:
         return matrix
 
     def make_bind_pose_local(self, parent_matrix=None):
-        from mathutils import Matrix
-
         if parent_matrix is None:
             parent_matrix = Matrix()
 
@@ -1565,8 +1619,6 @@ class FbxImportHelperNode:
                 child.collect_armature_meshes()
 
     def build_skeleton(self, arm, parent_matrix, parent_bone_size=1):
-        from mathutils import Vector, Matrix
-
         # ----
         # Now, create the (edit)bone.
         bone = arm.bl_data.edit_bones.new(name=self.fbx_name)
@@ -1588,7 +1640,8 @@ class FbxImportHelperNode:
             bone_size = parent_bone_size
 
         # So that our bone gets its final length, but still Y-aligned in armature space.
-        # 0-length bones are automatically collapsed into their parent when you leave edit mode, so this enforces a minimum length
+        # 0-length bones are automatically collapsed into their parent when you leave edit mode,
+        # so this enforces a minimum length.
         bone_tail = Vector((0.0, 1.0, 0.0)) * max(0.01, bone_size)
         bone.tail = bone_tail
 
@@ -1597,7 +1650,8 @@ class FbxImportHelperNode:
 
         bone.matrix = bone_matrix
 
-        # correction for children attached to a bone. Fbx expects to attach to the head of a bone, while blender attaches to the tail.
+        # Correction for children attached to a bone. FBX expects to attach to the head of a bone,
+        # while Blender attaches to the tail.
         self.bone_child_matrix = Matrix.Translation(-bone_tail)
 
         for child in self.children:
@@ -1637,8 +1691,6 @@ class FbxImportHelperNode:
         return obj
 
     def build_skeleton_children(self, fbx_tmpl, settings, scene):
-        from mathutils import Matrix
-
         if self.is_bone:
             for child in self.children:
                 if child.ignore:
@@ -1650,7 +1702,8 @@ class FbxImportHelperNode:
                     child_obj.parent_type = 'BONE'
                     child_obj.matrix_parent_inverse = Matrix()
 
-                    # Blender attaches to the end of a bone, while FBX attaches to the start. bone_child_matrix corrects for that.
+                    # Blender attaches to the end of a bone, while FBX attaches to the start.
+                    # bone_child_matrix corrects for that.
                     if child.pre_matrix:
                         child.pre_matrix = self.bone_child_matrix * child.pre_matrix
                     else:
@@ -1697,13 +1750,13 @@ class FbxImportHelperNode:
                 w.append(weight)
 
     def set_bone_weights(self):
-        ignored_children = [child for child in self.children if child.is_bone and child.ignore and len(child.clusters) > 0]
+        ignored_children = tuple(child for child in self.children
+                                       if child.is_bone and child.ignore and len(child.clusters) > 0)
 
         if len(ignored_children) > 0:
             # If we have an ignored child bone we need to merge their weights into the current bone weights.
-            # (This can happen both intentionally and accidentally when skinning a model. Either way, they
-            # need to be moved into a parent bone or they cause animation glitches.)
-
+            # This can happen both intentionally and accidentally when skinning a model. Either way, they
+            # need to be moved into a parent bone or they cause animation glitches.
             for fbx_cluster, meshes in self.clusters:
                 combined_weights = {}
                 self.merge_weights(combined_weights, fbx_cluster)
@@ -1741,14 +1794,10 @@ class FbxImportHelperNode:
                 add_vgroup_to_objects(indices, weights, self.bl_bone, [node.bl_obj for node in meshes])
 
         for child in self.children:
-            if child.ignore:
-                continue
-            if child.is_bone:
+            if child.is_bone and not child.ignore:
                 child.set_bone_weights()
 
     def build_hierarchy(self, fbx_tmpl, settings, scene):
-        from mathutils import Matrix
-
         if self.is_armature:
             # create when linking since we need object data
             elem_name_utf8 = self.fbx_name
@@ -1807,23 +1856,28 @@ class FbxImportHelperNode:
 
             # Add armature modifiers to the meshes
             if self.meshes:
-                arm_mat_back = arm.matrix_basis.copy()
                 for mesh in self.meshes:
-                    (amat, mmat) = mesh.armature_setup
+                    (mmat, amat) = mesh.armature_setup
+                    me_obj = mesh.bl_obj
 
                     # bring global armature & mesh matrices into *Blender* global space.
-                    amat = settings.global_matrix * amat
+                    # Note: Usage of matrix_geom (local 'diff' transform) here is quite brittle.
+                    #       Among other things, why in hell isn't it taken into account by bindpose & co???
+                    #       Probably because org app (max) handles it completely aside from any parenting stuff,
+                    #       which we obviously cannot do in Blender. :/
+                    amat = settings.global_matrix * (amat if amat is not None else self.bind_matrix)
+                    if self.matrix_geom:
+                        amat = amat * self.matrix_geom
                     mmat = settings.global_matrix * mmat
+                    if mesh.matrix_geom:
+                        mmat = mmat * mesh.matrix_geom
 
-                    arm.matrix_basis = amat
-                    me_mat_back = mesh.bl_obj.matrix_basis.copy()
-                    mesh.bl_obj.matrix_basis = mmat
+                    # Now that we have armature and mesh in there (global) bind 'state' (matrix),
+                    # we can compute inverse parenting matrix of the mesh.
+                    me_obj.matrix_parent_inverse = amat.inverted_safe() * mmat * me_obj.matrix_basis.inverted_safe()
 
                     mod = mesh.bl_obj.modifiers.new(elem_name_utf8, 'ARMATURE')
                     mod.object = arm
-
-                    mesh.bl_obj.matrix_basis = me_mat_back
-                arm.matrix_basis = arm_mat_back
 
             # Add bone weights to the deformers
             for child in self.children:
@@ -1848,7 +1902,7 @@ class FbxImportHelperNode:
             return obj
         else:
             for child in self.children:
-                child_obj = child.build_hierarchy(fbx_tmpl, settings, scene)
+                child.build_hierarchy(fbx_tmpl, settings, scene)
 
 
 def is_ascii(filepath, size):
@@ -1886,7 +1940,6 @@ def load(operator, context, filepath="",
     import os
     import time
     from bpy_extras.io_utils import axis_conversion
-    from mathutils import Matrix
 
     from . import parse_fbx
     from .fbx_utils import RIGHT_HAND_AXES, FBX_FRAMERATES
@@ -2147,15 +2200,14 @@ def load(operator, context, filepath="",
         return connection_filter_ex(fbx_uuid, fbx_id, fbx_connection_map_reverse)
 
     # -- temporary helper hierarchy to build armatures and objects from
-    fbx_helper_nodes = {}  # lookup from uuid to helper node. Used to build parent-child relations and later to look up animated nodes.
+    # lookup from uuid to helper node. Used to build parent-child relations and later to look up animated nodes.
+    fbx_helper_nodes = {}
 
     def _():
-        from mathutils import Matrix
-
-        # We build an intermediate hierarchy
-        # - used to calculate and store bone orientation correction matrices. The same matrices will be reused for animation.
-        # - find/insert armature nodes
-        # - filter leaf bones
+        # We build an intermediate hierarchy used to:
+        # - Calculate and store bone orientation correction matrices. The same matrices will be reused for animation.
+        # - Find/insert armature nodes.
+        # - Filter leaf bones.
 
         # create scene root
         fbx_helper_nodes[0] = root_helper = FbxImportHelperNode(None, None, None, False)
@@ -2164,7 +2216,7 @@ def load(operator, context, filepath="",
         # add fbx nodes
         fbx_tmpl = fbx_template_get((b'Model', b'KFbxNode'))
         for a_uuid, a_item in fbx_table_nodes.items():
-            fbx_obj, bl_data = a_item = fbx_table_nodes.get(a_uuid, (None, None))  # why this double lookup?
+            fbx_obj, bl_data = a_item
             if fbx_obj is None or fbx_obj.id != b'Model':
                 continue
 
@@ -2212,12 +2264,13 @@ def load(operator, context, filepath="",
         if settings.ignore_leaf_bones:
             root_helper.mark_leaf_bones()
 
-        # What a mess! Some bones have several BindPoses, some have none, clusters contain a bind pose as well, and you can have several clusters per bone!
+        # What a mess! Some bones have several BindPoses, some have none, clusters contain a bind pose as well,
+        # and you can have several clusters per bone!
         # Maybe some conversion can be applied to put them all into the same frame of reference?
 
         # get the bind pose from pose elements
         for a_uuid, a_item in fbx_table_nodes.items():
-            fbx_obj, bl_data = a_item = fbx_table_nodes.get(a_uuid, (None, None))  # why this double lookup?
+            fbx_obj, bl_data = a_item
             if fbx_obj is None:
                 continue
             if fbx_obj.id != b'Pose':
@@ -2234,7 +2287,7 @@ def load(operator, context, filepath="",
                 bone = fbx_helper_nodes.get(node)
                 if bone and matrix:
                     # Store the matrix in the helper node.
-                    # There may be several bind pose matrices for the same node, but in my tests they seem to be identical.
+                    # There may be several bind pose matrices for the same node, but in tests they seem to be identical.
                     bone.bind_matrix = matrix  # global space
 
         # get clusters and bind pose
@@ -2249,21 +2302,21 @@ def load(operator, context, filepath="",
                     continue
 
                 # Get the bind pose from the cluster:
-                transform_elem = elem_find_first(fbx_cluster, b'Transform', default=None)
-                transform = array_to_matrix4(transform_elem.props[0]) if transform_elem else Matrix()
+                tx_mesh_elem = elem_find_first(fbx_cluster, b'Transform', default=None)
+                tx_mesh = array_to_matrix4(tx_mesh_elem.props[0]) if tx_mesh_elem else Matrix()
 
-                transform_link_elem = elem_find_first(fbx_cluster, b'TransformLink', default=None)
-                transform_link = array_to_matrix4(transform_link_elem.props[0]) if transform_link_elem else None
+                tx_bone_elem = elem_find_first(fbx_cluster, b'TransformLink', default=None)
+                tx_bone = array_to_matrix4(tx_bone_elem.props[0]) if tx_bone_elem else None
 
-                transform_associate_model_elem = elem_find_first(fbx_cluster, b'TransformAssociateModel', default=None)
-                transform_associate_model = array_to_matrix4(transform_associate_model_elem.props[0]) if transform_associate_model_elem else Matrix()
+                tx_arm_elem = elem_find_first(fbx_cluster, b'TransformAssociateModel', default=None)
+                tx_arm = array_to_matrix4(tx_arm_elem.props[0]) if tx_arm_elem else None
 
-                mesh_matrix = transform
-                armature_matrix = transform_associate_model
+                mesh_matrix = tx_mesh
+                armature_matrix = tx_arm
 
-                if transform_link:
-                    mesh_matrix = transform_link * mesh_matrix
-                    helper_node.bind_matrix = transform_link  # overwrite the bind matrix
+                if tx_bone:
+                    mesh_matrix = tx_bone * mesh_matrix
+                    helper_node.bind_matrix = tx_bone  # overwrite the bind matrix
 
                 # Get the meshes driven by this cluster: (Shouldn't that be only one?)
                 meshes = set()
@@ -2285,10 +2338,11 @@ def load(operator, context, filepath="",
                             mesh_node = fbx_helper_nodes[object_uuid]
                             if mesh_node:
                                 # ----
-                                # If we get a valid mesh matrix (in bone space), store armature and mesh global matrices, we need to set temporarily
-                                # both objects to those matrices when actually binding them via the modifier.
-                                # Note we assume all bones were bound with the same mesh/armature (global) matrix, we do not support otherwise
-                                # in Blender anyway!
+                                # If we get a valid mesh matrix (in bone space), store armature and
+                                # mesh global matrices, we need them to compute mesh's matrix_parent_inverse
+                                # when actually binding them via the modifier.
+                                # Note we assume all bones were bound with the same mesh/armature (global) matrix,
+                                # we do not support otherwise in Blender anyway!
                                 mesh_node.armature_setup = (mesh_matrix, armature_matrix)
                                 meshes.add(mesh_node)
 
