@@ -17,11 +17,11 @@
 # ##### END GPL LICENSE BLOCK #####
 
 bl_info = {
-    "name": "Node Wrangler (aka Nodes Efficiency Tools)",
+    "name": "Node Wrangler",
     "author": "Bartek Skorupa, Greg Zaal, Sebastian Koenig",
-    "version": (3, 19),
+    "version": (3, 21),
     "blender": (2, 72, 0),
-    "location": "Node Editor Properties Panel or Ctrl-Space",
+    "location": "Node Editor Toolbar or Ctrl-Space",
     "description": "Various tools to enhance and speed up node-based workflow",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"
@@ -2370,7 +2370,7 @@ class NWClearLabel(Operator, NWBase):
 
 
 class NWModifyLabels(Operator, NWBase):
-    """Modify Labels of all selected nodes."""
+    """Modify Labels of all selected nodes"""
     bl_idname = "node.nw_modify_labels"
     bl_label = "Modify Labels"
     bl_options = {'REGISTER', 'UNDO'}
@@ -3168,8 +3168,9 @@ def drawlayout(context, layout, mode='non-panel'):
 class NodeWranglerPanel(Panel, NWBase):
     bl_idname = "NODE_PT_nw_node_wrangler"
     bl_space_type = 'NODE_EDITOR'
-    bl_region_type = 'UI'
     bl_label = "Node Wrangler"
+    bl_region_type = "TOOLS"
+    bl_category = "Node Wrangler"
 
     prepend = StringProperty(
         name='prepend',
