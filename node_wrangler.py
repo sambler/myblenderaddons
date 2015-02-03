@@ -19,7 +19,7 @@
 bl_info = {
     "name": "Node Wrangler",
     "author": "Bartek Skorupa, Greg Zaal, Sebastian Koenig",
-    "version": (3, 21),
+    "version": (3, 22),
     "blender": (2, 72, 0),
     "location": "Node Editor Toolbar or Ctrl-Space",
     "description": "Various tools to enhance and speed up node-based workflow",
@@ -604,7 +604,8 @@ def hack_force_update(context, nodes):
 
 
 def dpifac():
-    return bpy.context.user_preferences.system.dpi/72
+    retinafac = (2 if bpy.context.user_preferences.system.virtual_pixel_mode == 'DOUBLE' else 1)
+    return bpy.context.user_preferences.system.dpi/(72/retinafac)
 
 
 def is_end_node(node):
@@ -1491,20 +1492,29 @@ class NWEmissionViewer(Operator, NWBase):
     @classmethod
     def poll(cls, context):
         is_cycles = context.scene.render.engine == 'CYCLES'
-        valid = False
         if nw_check(context):
             space = context.space_data
-            if space.tree_type == 'ShaderNodeTree' and is_cycles and\
-                (context.active_node.type != "OUTPUT_MATERIAL" or context.active_node.type != "OUTPUT_WORLD"):
-                valid = True
-        return valid
+            if space.tree_type == 'ShaderNodeTree' and is_cycles:
+                if context.active_node:
+                    if context.active_node.type != "OUTPUT_MATERIAL" or context.active_node.type != "OUTPUT_WORLD":
+                        return True
+                else:
+                    return True
+        return False
 
     def invoke(self, context, event):
-        shader_type = context.space_data.shader_type
+        space = context.space_data
+        shader_type = space.shader_type
         if shader_type == 'OBJECT':
-            shader_output_type = "OUTPUT_MATERIAL"
-            shader_output_ident = "ShaderNodeOutputMaterial"
-            shader_viewer_ident = "ShaderNodeEmission"
+            if space.id not in [lamp for lamp in bpy.data.lamps]:  # cannot use bpy.data.lamps directly as iterable
+                shader_output_type = "OUTPUT_MATERIAL"
+                shader_output_ident = "ShaderNodeOutputMaterial"
+                shader_viewer_ident = "ShaderNodeEmission"
+            else:
+                shader_output_type = "OUTPUT_LAMP"
+                shader_output_ident = "ShaderNodeOutputLamp"
+                shader_viewer_ident = "ShaderNodeEmission"
+
         elif shader_type == 'WORLD':
             shader_output_type = "OUTPUT_WORLD"
             shader_output_ident = "ShaderNodeOutputWorld"
@@ -1515,7 +1525,7 @@ class NWEmissionViewer(Operator, NWBase):
         select_node = bpy.ops.node.select(mouse_x=mlocx, mouse_y=mlocy, extend=False)
         if 'FINISHED' in select_node:  # only run if mouse click is on a node
             nodes, links = get_nodes_links(context)
-            in_group = context.active_node != context.space_data.node_tree.nodes.active
+            in_group = context.active_node != space.node_tree.nodes.active
             active = nodes.active
             output_types = [x[1] for x in shaders_output_nodes_props]
             valid = False
@@ -1527,28 +1537,32 @@ class NWEmissionViewer(Operator, NWBase):
                             break
             if valid:
                 # get material_output node, store selection, deselect all
-                materialout_exists = False
                 materialout = None  # placeholder node
                 selection = []
                 for node in nodes:
                     if node.type == shader_output_type:
-                        materialout_exists = True
                         materialout = node
                     if node.select:
                         selection.append(node.name)
                     node.select = False
                 if not materialout:
-                    materialout = nodes.new(shader_output_ident)
+                    # get right-most location
                     sorted_by_xloc = (sorted(nodes, key=lambda x: x.location.x))
                     max_xloc_node = sorted_by_xloc[-1]
                     if max_xloc_node.name == 'Emission Viewer':
                         max_xloc_node = sorted_by_xloc[-2]
-                    materialout.location.x = max_xloc_node.location.x + max_xloc_node.dimensions.x + 80
+
+                    # get average y location
                     sum_yloc = 0
                     for node in nodes:
                         sum_yloc += node.location.y
-                    # put material output at average y location
-                    materialout.location.y = sum_yloc / len(nodes)
+
+                    new_locx = max_xloc_node.location.x + max_xloc_node.dimensions.x + 80
+                    new_locy = sum_yloc / len(nodes)
+
+                    materialout = nodes.new(shader_output_ident)
+                    materialout.location.x = new_locx
+                    materialout.location.y = new_locy
                     materialout.select = False
                 # Analyze outputs, add "Emission Viewer" if needed, make links
                 out_i = None
