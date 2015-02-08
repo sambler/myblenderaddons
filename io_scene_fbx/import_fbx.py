@@ -81,11 +81,20 @@ def elem_find_first_string(elem, id_search):
     return None
 
 
-def elem_find_first_bytes(elem, id_search, decode=True):
+def elem_find_first_string_as_bytes(elem, id_search):
     fbx_item = elem_find_first(elem, id_search)
     if fbx_item is not None:
         assert(len(fbx_item.props) == 1)
         assert(fbx_item.props_type[0] == data_types.STRING)
+        return fbx_item.props[0]  # Keep it as bytes as requested...
+    return None
+
+
+def elem_find_first_bytes(elem, id_search, decode=True):
+    fbx_item = elem_find_first(elem, id_search)
+    if fbx_item is not None:
+        assert(len(fbx_item.props) == 1)
+        assert(fbx_item.props_type[0] == data_types.BYTES)
         return fbx_item.props[0]
     return None
 
@@ -113,6 +122,13 @@ def elem_name_ensure_class(elem, clss=...):
     return elem_name.decode('utf-8')
 
 
+def elem_name_ensure_classes(elem, clss=...):
+    elem_name, elem_class = elem_split_name_class(elem)
+    if clss is not ...:
+        assert(elem_class in clss)
+    return elem_name.decode('utf-8')
+
+
 def elem_split_name_class_nodeattr(elem):
     assert(elem.props_type[-2] == data_types.STRING)
     elem_name, elem_class = elem.props[-2].split(b'\x00\x01')
@@ -135,7 +151,9 @@ def elem_prop_first(elem, default=None):
 # Support for
 # Properties70: { ... P:
 def elem_props_find_first(elem, elem_prop_id):
-
+    if elem is None:
+        # When properties are not found... Should never happen, but happens - as usual.
+        return None
     # support for templates (tuple of elems)
     if type(elem) is not FBXElem:
         assert(type(elem) is tuple)
@@ -677,8 +695,8 @@ def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene):
 def blen_read_geom_layerinfo(fbx_layer):
     return (
         elem_find_first_string(fbx_layer, b'Name'),
-        elem_find_first_bytes(fbx_layer, b'MappingInformationType'),
-        elem_find_first_bytes(fbx_layer, b'ReferenceInformationType'),
+        elem_find_first_string_as_bytes(fbx_layer, b'MappingInformationType'),
+        elem_find_first_string_as_bytes(fbx_layer, b'ReferenceInformationType'),
         )
 
 
@@ -699,6 +717,10 @@ def blen_read_geom_array_setattr(generator, blen_data, blen_attr, fbx_data, stri
 
 
 # generic generators.
+def blen_read_geom_array_gen_allsame(data_len):
+    return zip(*(range(data_len), (0,) * data_len))
+
+
 def blen_read_geom_array_gen_direct(fbx_data, stride):
     fbx_data_len = len(fbx_data)
     return zip(*(range(fbx_data_len // stride), range(0, fbx_data_len, stride)))
@@ -741,6 +763,13 @@ def blen_read_geom_array_mapped_vert(
                                          blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
         blen_read_geom_array_error_ref(descr, fbx_layer_ref)
+    elif fbx_layer_mapping == b'AllSame':
+        if fbx_layer_ref == b'IndexToDirect':
+            assert(fbx_layer_index is None)
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_allsame(len(blen_data)),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+            return True
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
     else:
         blen_read_geom_array_error_mapping(descr, fbx_layer_mapping)
 
@@ -757,6 +786,13 @@ def blen_read_geom_array_mapped_edge(
     if fbx_layer_mapping == b'ByEdge':
         if fbx_layer_ref == b'Direct':
             blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+            return True
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
+    elif fbx_layer_mapping == b'AllSame':
+        if fbx_layer_ref == b'IndexToDirect':
+            assert(fbx_layer_index is None)
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_allsame(len(blen_data)),
                                          blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
         blen_read_geom_array_error_ref(descr, fbx_layer_ref)
@@ -780,13 +816,20 @@ def blen_read_geom_array_mapped_polygon(
             #~ assert(fbx_layer_index is not None)
             if fbx_layer_index is None:
                 blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
-                                            blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+                                             blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             else:
                 blen_read_geom_array_setattr(blen_read_geom_array_gen_indextodirect(fbx_layer_index, stride),
                                              blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
         elif fbx_layer_ref == b'Direct':
             blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+            return True
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
+    elif fbx_layer_mapping == b'AllSame':
+        if fbx_layer_ref == b'IndexToDirect':
+            assert(fbx_layer_index is None)
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_allsame(len(blen_data)),
                                          blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
         blen_read_geom_array_error_ref(descr, fbx_layer_ref)
@@ -805,8 +848,18 @@ def blen_read_geom_array_mapped_polyloop(
         ):
     if fbx_layer_mapping == b'ByPolygonVertex':
         if fbx_layer_ref == b'IndexToDirect':
-            assert(fbx_layer_index is not None)
-            blen_read_geom_array_setattr(blen_read_geom_array_gen_indextodirect(fbx_layer_index, stride),
+            # XXX Looks like we often get no fbx_layer_index in this case, shall not happen but happens...
+            #     We fallback to 'Direct' mapping in this case.
+            #~ assert(fbx_layer_index is not None)
+            if fbx_layer_index is None:
+                blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
+                                             blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+            else:
+                blen_read_geom_array_setattr(blen_read_geom_array_gen_indextodirect(fbx_layer_index, stride),
+                                             blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+            return True
+        elif fbx_layer_ref == b'Direct':
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_direct(fbx_layer_data, stride),
                                          blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
         blen_read_geom_array_error_ref(descr, fbx_layer_ref)
@@ -814,6 +867,13 @@ def blen_read_geom_array_mapped_polyloop(
         if fbx_layer_ref == b'Direct':
             assert(fbx_layer_index is None)
             blen_read_geom_array_setattr(blen_read_geom_array_gen_direct_looptovert(mesh, fbx_layer_data, stride),
+                                         blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
+            return True
+        blen_read_geom_array_error_ref(descr, fbx_layer_ref)
+    elif fbx_layer_mapping == b'AllSame':
+        if fbx_layer_ref == b'IndexToDirect':
+            assert(fbx_layer_index is None)
+            blen_read_geom_array_setattr(blen_read_geom_array_gen_allsame(len(blen_data)),
                                          blen_data, blen_attr, fbx_layer_data, stride, item_size, descr, xform)
             return True
         blen_read_geom_array_error_ref(descr, fbx_layer_ref)
@@ -833,10 +893,6 @@ def blen_read_geom_layer_material(fbx_obj, mesh):
      fbx_layer_mapping,
      fbx_layer_ref,
      ) = blen_read_geom_layerinfo(fbx_layer)
-
-    if fbx_layer_mapping == b'AllSame':
-        # only to quiet warning
-        return
 
     layer_id = b'Materials'
     fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, layer_id))
@@ -969,16 +1025,15 @@ def blen_read_geom_layer_normal(fbx_obj, mesh, xform=None):
 
     layer_id = b'Normals'
     fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, layer_id))
+    fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'NormalsIndex'))
 
-    blen_data = mesh.vertices
-
-    return blen_read_geom_array_mapped_vert(
-        mesh, blen_data, "normal",
-        fbx_layer_data, None,
-        fbx_layer_mapping, fbx_layer_ref,
-        3, 3, layer_id,
-        xform
-        )
+    # try loops, then vertices.
+    tries = ((mesh.loops, blen_read_geom_array_mapped_polyloop),
+             (mesh.vertices, blen_read_geom_array_mapped_vert))
+    for blen_data, func in tries:
+        if func(mesh, blen_data, "normal",
+                fbx_layer_data, fbx_layer_index, fbx_layer_mapping, fbx_layer_ref, 3, 3, layer_id, xform):
+            return True
 
 
 def blen_read_geom(fbx_tmpl, fbx_obj, settings):
@@ -1073,6 +1128,9 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
     # must be after edge, face loading.
     ok_smooth = blen_read_geom_layer_smooth(fbx_obj, mesh)
 
+    # Note: we store 'temp' normals in loops, since validate() may alter final mesh,
+    #       we can only set custom lnors *after* calling it.
+    mesh.create_normals_split()
     if geom_mat_no is None:
         ok_normals = blen_read_geom_layer_normal(fbx_obj, mesh)
     else:
@@ -1080,14 +1138,26 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
             return geom_mat_no * Vector(v)
         ok_normals = blen_read_geom_layer_normal(fbx_obj, mesh, nortrans)
 
-    mesh.validate()
+    mesh.validate(cleanup_cddata=False)  # *Very* important to not remove lnors here!
 
-    if not ok_normals:
+    if ok_normals:
+        clnors = array.array('f', [0.0] * (len(mesh.loops) * 3))
+        mesh.loops.foreach_get("normal", clnors)
+
+        if not ok_smooth:
+            mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
+            ok_smooth = True
+
+        mesh.normals_split_custom_set(tuple(zip(*(iter(clnors),) * 3)))
+        mesh.use_auto_smooth = True
+        mesh.show_edge_sharp = True
+    else:
         mesh.calc_normals()
 
+    mesh.free_normals_split()
+
     if not ok_smooth:
-        for p in mesh.polygons:
-            p.use_smooth = True
+        mesh.polygons.foreach_set("use_smooth", [True] * len(mesh.polygons))
 
     if settings.use_custom_props:
         blen_read_custom_properties(fbx_obj, mesh, settings)
@@ -1195,21 +1265,32 @@ def blen_read_material(fbx_tmpl, fbx_obj, settings):
 
 
 # -------
-# Texture
+# Image & Texture
 
-def blen_read_texture(fbx_tmpl, fbx_obj, basedir, settings):
+def blen_read_texture_image(fbx_tmpl, fbx_obj, basedir, settings):
     import os
     from bpy_extras import image_utils
 
-    elem_name_utf8 = elem_name_ensure_class(fbx_obj, b'Texture')
+    elem_name_utf8 = elem_name_ensure_classes(fbx_obj, {b'Texture', b'Video'})
 
     image_cache = settings.image_cache
 
-    filepath = elem_find_first_string(fbx_obj, b'FileName')
-    if os.sep == '/':
-        filepath = filepath.replace('\\', '/')
+    # Yet another beautiful logic demonstration by Master FBX:
+    # * RelativeFilename in both Video and Texture nodes.
+    # * FileName in texture nodes.
+    # * Filename in video nodes.
+    # Aaaaaaaarrrrrrrrgggggggggggg!!!!!!!!!!!!!!
+    filepath = elem_find_first_string(fbx_obj, b'RelativeFilename')
+    if filepath:
+        filepath = os.path.join(basedir, filepath)
     else:
-        filepath = filepath.replace('/', '\\')
+        filepath = elem_find_first_string(fbx_obj, b'FileName')
+    if not filepath:
+        filepath = elem_find_first_string(fbx_obj, b'Filename')
+    if not filepath:
+        print("Error, could not find any file path in ", fbx_obj)
+    else :
+        filepath = filepath.replace('\\', '/') if (os.sep == '/') else filepath.replace('/', '\\')
 
     image = image_cache.get(filepath)
     if image is not None:
@@ -1221,6 +1302,13 @@ def blen_read_texture(fbx_tmpl, fbx_obj, basedir, settings):
         place_holder=True,
         recursive=settings.use_image_search,
         )
+
+    # Try to use embedded data, if available!
+    data = elem_find_first_bytes(fbx_obj, b'Content')
+    if (data):
+        data_len = len(data)
+        if (data_len):
+            image.pack(data=data, data_len=data_len)
 
     image_cache[filepath] = image
     # name can be ../a/b/c
@@ -2145,15 +2233,24 @@ def load(operator, context, filepath="",
     _(); del _
 
     # ----
-    # Load image data
+    # Load image & textures data
     def _():
-        fbx_tmpl = fbx_template_get((b'Texture', b'KFbxFileTexture'))
+        fbx_tmpl_tex = fbx_template_get((b'Texture', b'KFbxFileTexture'))
+        fbx_tmpl_img = fbx_template_get((b'Video', b'KFbxVideo'))
 
+        # Important to run all 'Video' ones first, embedded images are stored in those nodes.
+        # XXX Note we simplify things here, assuming both matching Video and Texture will use same file path,
+        #     this may be a bit weak, if issue arise we'll fallback to plain connection stuff...
+        for fbx_uuid, fbx_item in fbx_table_nodes.items():
+            fbx_obj, blen_data = fbx_item
+            if fbx_obj.id != b'Video':
+                continue
+            fbx_item[1] = blen_read_texture_image(fbx_tmpl_img, fbx_obj, basedir, settings)
         for fbx_uuid, fbx_item in fbx_table_nodes.items():
             fbx_obj, blen_data = fbx_item
             if fbx_obj.id != b'Texture':
                 continue
-            fbx_item[1] = blen_read_texture(fbx_tmpl, fbx_obj, basedir, settings)
+            fbx_item[1] = blen_read_texture_image(fbx_tmpl_tex, fbx_obj, basedir, settings)
     _(); del _
 
     # ----
@@ -2244,7 +2341,7 @@ def load(operator, context, filepath="",
                     fbx_sdata, bl_data = p_item = fbx_table_nodes.get(c_src, (None, None))
                     if fbx_sdata is None:
                         continue
-                    if fbx_sdata.id != b'Geometry':
+                    if fbx_sdata.id not in {b'Geometry', b'NodeAttribute'}:
                         continue
                     parent.bl_data = bl_data
                 else:
@@ -2546,7 +2643,8 @@ def load(operator, context, filepath="",
             assert(fbx_obj.id == b'Material')
             fbx_props = (elem_find_first(fbx_obj, b'Properties70'),
                          elem_find_first(fbx_tmpl, b'Properties70', fbx_elem_nil))
-            assert(fbx_props[0] is not None)
+            # Do not assert, it can be None actually, sigh...
+            #~ assert(fbx_props[0] is not None)
             # (x / 7.142) is only a guess, cycles usable range is (0.0 -> 0.5)
             return elem_props_get_number(fbx_props, b'BumpFactor', 2.5) / 7.142
 
@@ -2555,7 +2653,8 @@ def load(operator, context, filepath="",
 
             fbx_props = (elem_find_first(fbx_obj, b'Properties70'),
                          elem_find_first(fbx_tmpl, b'Properties70', fbx_elem_nil))
-            assert(fbx_props[0] is not None)
+            # Do not assert, it can be None actually, sigh...
+            #~ assert(fbx_props[0] is not None)
             return (elem_props_get_vector_3d(fbx_props, b'Translation', (0.0, 0.0, 0.0)),
                     elem_props_get_vector_3d(fbx_props, b'Rotation', (0.0, 0.0, 0.0)),
                     elem_props_get_vector_3d(fbx_props, b'Scaling', (1.0, 1.0, 1.0)),

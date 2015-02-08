@@ -1341,7 +1341,7 @@ def fbx_data_video_elements(root, vid, scene_data):
     elem_props_template_finalize(tmpl, props)
 
     elem_data_single_int32(fbx_vid, b"UseMipMap", 0)
-    elem_data_single_string_unicode(fbx_vid, b"FileName", fname_abs)
+    elem_data_single_string_unicode(fbx_vid, b"Filename", fname_abs)
     elem_data_single_string_unicode(fbx_vid, b"RelativeFilename", fname_rel)
 
     if scene_data.settings.media_settings.embed_textures:
@@ -2612,7 +2612,7 @@ def fbx_definitions_elements(root, scene_data):
 
 def fbx_objects_elements(root, scene_data):
     """
-    Data (objects, geometry, material, textures, armatures, etc.
+    Data (objects, geometry, material, textures, armatures, etc.).
     """
     objects = elem_empty(root, b"Objects")
 
