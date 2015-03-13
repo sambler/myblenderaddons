@@ -702,18 +702,55 @@ def blen_read_geom_layerinfo(fbx_layer):
 
 def blen_read_geom_array_setattr(generator, blen_data, blen_attr, fbx_data, stride, item_size, descr, xform):
     """Generic fbx_layer to blen_data setter, generator is expected to yield tuples (ble_idx, fbx_idx)."""
+    max_idx = len(blen_data) - 1
+    print_error = True
+
+    def check_skip(blen_idx, fbx_idx):
+        nonlocal print_error
+        if fbx_idx == -1:
+            return True
+        if blen_idx > max_idx:
+            if print_error:
+                print("ERROR: too much data in this layer, compared to elements in mesh, skipping!")
+                print_error = False
+            return True
+        return False
+
     if xform is not None:
-        for blen_idx, fbx_idx in generator:
-            if fbx_idx == -1:
-                continue
-            setattr(blen_data[blen_idx], blen_attr,
-                    xform(fbx_data[fbx_idx] if (item_size == 1) else fbx_data[fbx_idx:fbx_idx + item_size]))
+        if isinstance(blen_data, list):
+            if item_size == 1:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    blen_data[blen_idx] = xform(fbx_data[fbx_idx])
+            else:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    blen_data[blen_idx] = xform(fbx_data[fbx_idx:fbx_idx + item_size])
+        else:
+            if item_size == 1:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    setattr(blen_data[blen_idx], blen_attr, xform(fbx_data[fbx_idx]))
+            else:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    setattr(blen_data[blen_idx], blen_attr, xform(fbx_data[fbx_idx:fbx_idx + item_size]))
     else:
-        for blen_idx, fbx_idx in generator:
-            if fbx_idx == -1:
-                continue
-            setattr(blen_data[blen_idx], blen_attr,
-                    fbx_data[fbx_idx] if (item_size == 1) else fbx_data[fbx_idx:fbx_idx + item_size])
+        if isinstance(blen_data, list):
+            if item_size == 1:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    blen_data[blen_idx] = fbx_data[fbx_idx]
+            else:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    blen_data[blen_idx] = fbx_data[fbx_idx:fbx_idx + item_size]
+        else:
+            if item_size == 1:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    setattr(blen_data[blen_idx], blen_attr, fbx_data[fbx_idx])
+            else:
+                def _process(blend_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx):
+                    setattr(blen_data[blen_idx], blen_attr, fbx_data[fbx_idx:fbx_idx + item_size])
+
+    for blen_idx, fbx_idx in generator:
+        if check_skip(blen_idx, fbx_idx):
+            continue
+        _process(blen_data, blen_attr, fbx_data, xform, item_size, blen_idx, fbx_idx)
 
 
 # generic generators.
@@ -920,7 +957,7 @@ def blen_read_geom_layer_uv(fbx_obj, mesh):
 
             uv_tex = mesh.uv_textures.new(name=fbx_layer_name)
             uv_lay = mesh.uv_layers[-1]
-            blen_data = uv_lay.data[:]
+            blen_data = uv_lay.data
 
             # some valid files omit this data
             if fbx_layer_data is None:
@@ -949,7 +986,7 @@ def blen_read_geom_layer_color(fbx_obj, mesh):
             fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'ColorIndex'))
 
             color_lay = mesh.vertex_colors.new(name=fbx_layer_name)
-            blen_data = color_lay.data[:]
+            blen_data = color_lay.data
 
             # some valid files omit this data
             if fbx_layer_data is None:
@@ -1032,12 +1069,23 @@ def blen_read_geom_layer_normal(fbx_obj, mesh, xform=None):
     fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'NormalsIndex'))
 
     # try loops, then vertices.
-    tries = ((mesh.loops, blen_read_geom_array_mapped_polyloop),
-             (mesh.vertices, blen_read_geom_array_mapped_vert))
-    for blen_data, func in tries:
-        if func(mesh, blen_data, "normal",
+    tries = ((mesh.loops, False, blen_read_geom_array_mapped_polyloop),
+             (mesh.polygons, True, blen_read_geom_array_mapped_polygon),
+             (mesh.vertices, True, blen_read_geom_array_mapped_vert))
+    for blen_data, is_fake, func in tries:
+        bdata = [None] * len(blen_data) if is_fake else blen_data
+        if func(mesh, bdata, "normal",
                 fbx_layer_data, fbx_layer_index, fbx_layer_mapping, fbx_layer_ref, 3, 3, layer_id, xform):
+            if blen_data is mesh.polygons:
+                for pidx, p in enumerate(mesh.polygons):
+                    for lidx in range(p.loop_start, p.loop_start + p.loop_total):
+                        mesh.loops[lidx].normal[:] = bdata[pidx]
+            elif blen_data is mesh.vertices:
+                # We have to copy vnors to lnors! Far from elegant, but simple.
+                for l in mesh.loops:
+                    l.normal[:] = bdata[l.vertex_index]
             return True
+    return False
 
 
 def blen_read_geom(fbx_tmpl, fbx_obj, settings):
@@ -1142,7 +1190,7 @@ def blen_read_geom(fbx_tmpl, fbx_obj, settings):
             return geom_mat_no * Vector(v)
         ok_normals = blen_read_geom_layer_normal(fbx_obj, mesh, nortrans)
 
-    mesh.validate(cleanup_cddata=False)  # *Very* important to not remove lnors here!
+    mesh.validate(clean_customdata=False)  # *Very* important to not remove lnors here!
 
     if ok_normals:
         clnors = array.array('f', [0.0] * (len(mesh.loops) * 3))
@@ -1293,6 +1341,8 @@ def blen_read_texture_image(fbx_tmpl, fbx_obj, basedir, settings):
         filepath = elem_find_first_string(fbx_obj, b'Filename')
     if not filepath:
         print("Error, could not find any file path in ", fbx_obj)
+        print("       Falling back to: ", elem_name_utf8)
+        filepath = elem_name_utf8
     else :
         filepath = filepath.replace('\\', '/') if (os.sep == '/') else filepath.replace('/', '\\')
 
@@ -2036,7 +2086,8 @@ def load(operator, context, filepath="",
     from . import parse_fbx
     from .fbx_utils import RIGHT_HAND_AXES, FBX_FRAMERATES
 
-    start_time = time.process_time()
+    start_time_proc = time.process_time()
+    start_time_sys = time.time()
 
     # detect ascii files
     if is_ascii(filepath, 24):
@@ -2724,7 +2775,7 @@ def load(operator, context, filepath="",
                                 "clamp": tex_map[3],
                                 }
 
-                        if lnk_type == b'DiffuseColor':
+                        if lnk_type in {b'DiffuseColor', b'3dsMax|maps|texmap_diffuse'}:
                             ma_wrap.diffuse_image_set(image)
                             if use_mapping:
                                 ma_wrap.diffuse_mapping_set(**tex_map_kw)
@@ -2732,7 +2783,7 @@ def load(operator, context, filepath="",
                             ma_wrap.specular_image_set(image)
                             if use_mapping:
                                 ma_wrap.specular_mapping_set(**tex_map_kw)
-                        elif lnk_type == b'ReflectionColor':
+                        elif lnk_type in {b'ReflectionColor', b'3dsMax|maps|texmap_reflection'}:
                             ma_wrap.reflect_image_set(image)
                             if use_mapping:
                                 ma_wrap.reflect_mapping_set(**tex_map_kw)
@@ -2748,7 +2799,8 @@ def load(operator, context, filepath="",
                             ma_wrap.hardness_image_set(image)
                             if use_mapping:
                                 ma_wrap.hardness_mapping_set(**tex_map_kw)
-                        elif lnk_type == b'NormalMap' or lnk_type == b'Bump':  # XXX, applications abuse bump!
+                        # XXX, applications abuse bump!
+                        elif lnk_type in {b'NormalMap', b'Bump', b'3dsMax|maps|texmap_bump'}:
                             ma_wrap.normal_image_set(image)
                             ma_wrap.normal_factor_set(texture_bumpfac_get(fbx_obj))
                             if use_mapping:
@@ -2773,13 +2825,13 @@ def load(operator, context, filepath="",
 
                         mtex = material_mtex_new(material, image, tex_map)
 
-                        if lnk_type == b'DiffuseColor':
+                        if lnk_type in {b'DiffuseColor', b'3dsMax|maps|texmap_diffuse'}:
                             mtex.use_map_color_diffuse = True
                             mtex.blend_type = 'MULTIPLY'
                         elif lnk_type == b'SpecularColor':
                             mtex.use_map_color_spec = True
                             mtex.blend_type = 'MULTIPLY'
-                        elif lnk_type == b'ReflectionColor':
+                        elif lnk_type in {b'ReflectionColor', b'3dsMax|maps|texmap_reflection'}:
                             mtex.use_map_raymir = True
                         elif lnk_type == b'TransparentColor':  # alpha
                             material.use_transparency = True
@@ -2793,7 +2845,8 @@ def load(operator, context, filepath="",
                             mtex.use_map_diffuse = True
                         elif lnk_type == b'ShininessExponent':
                             mtex.use_map_hardness = True
-                        elif lnk_type == b'NormalMap' or lnk_type == b'Bump':  # XXX, applications abuse bump!
+                        # XXX, applications abuse bump!
+                        elif lnk_type in {b'NormalMap', b'Bump', b'3dsMax|maps|texmap_bump'}:
                             mtex.texture.use_normal_map = True  # not ideal!
                             mtex.use_map_normal = True
                             mtex.normal_factor = texture_bumpfac_get(fbx_obj)
@@ -2870,5 +2923,6 @@ def load(operator, context, filepath="",
                                 material.use_raytrace = False
     _(); del _
 
-    print('Import finished in %.4f sec.' % (time.process_time() - start_time))
+    print('Import finished in %.4f sec (process time: %.4f sec).' %
+          (time.time() - start_time_sys, time.process_time() - start_time_proc))
     return {'FINISHED'}
