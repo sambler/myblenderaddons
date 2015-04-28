@@ -19,8 +19,8 @@
 bl_info = {
     "name": "Node Wrangler",
     "author": "Bartek Skorupa, Greg Zaal, Sebastian Koenig",
-    "version": (3, 24),
-    "blender": (2, 72, 0),
+    "version": (3, 25),
+    "blender": (2, 74, 0),
     "location": "Node Editor Toolbar or Ctrl-Space",
     "description": "Various tools to enhance and speed up node-based workflow",
     "warning": "",
@@ -758,8 +758,9 @@ def store_mouse_cursor(context, event):
 
 def draw_line(x1, y1, x2, y2, size, colour=[1.0, 1.0, 1.0, 0.7]):
     bgl.glEnable(bgl.GL_BLEND)
-    bgl.glLineWidth(size)
+    bgl.glLineWidth(size * dpifac())
     bgl.glShadeModel(bgl.GL_SMOOTH)
+    bgl.glEnable(bgl.GL_LINE_SMOOTH)
 
     bgl.glBegin(bgl.GL_LINE_STRIP)
     try:
@@ -771,25 +772,26 @@ def draw_line(x1, y1, x2, y2, size, colour=[1.0, 1.0, 1.0, 0.7]):
         pass
     bgl.glEnd()
     bgl.glShadeModel(bgl.GL_FLAT)
+    bgl.glDisable(bgl.GL_LINE_SMOOTH)
 
 
 def draw_circle(mx, my, radius, colour=[1.0, 1.0, 1.0, 0.7]):
+    bgl.glEnable(bgl.GL_LINE_SMOOTH)
     bgl.glBegin(bgl.GL_TRIANGLE_FAN)
     bgl.glColor4f(colour[0], colour[1], colour[2], colour[3])
-    radius = radius
-    sides = 32
+    radius = radius * dpifac()
+    sides = 12
     for i in range(sides + 1):
         cosine = radius * cos(i * 2 * pi / sides) + mx
         sine = radius * sin(i * 2 * pi / sides) + my
         bgl.glVertex2f(cosine, sine)
     bgl.glEnd()
+    bgl.glDisable(bgl.GL_LINE_SMOOTH)
 
 
 def draw_rounded_node_border(node, radius=8, colour=[1.0, 1.0, 1.0, 0.7]):
     bgl.glEnable(bgl.GL_BLEND)
-    settings = bpy.context.user_preferences.addons[__name__].preferences
-    if settings.bgl_antialiasing:
-        bgl.glEnable(bgl.GL_LINE_SMOOTH)
+    bgl.glEnable(bgl.GL_LINE_SMOOTH)
 
     area_width = bpy.context.area.width - (16*dpifac()) - 1
     bottom_bar = (16*dpifac()) + 1
@@ -926,22 +928,19 @@ def draw_rounded_node_border(node, radius=8, colour=[1.0, 1.0, 1.0, 0.7]):
 
     # Restore defaults
     bgl.glDisable(bgl.GL_BLEND)
-    if settings.bgl_antialiasing:
-        bgl.glDisable(bgl.GL_LINE_SMOOTH)
+    bgl.glDisable(bgl.GL_LINE_SMOOTH)
 
 
-def draw_callback_mixnodes(self, context, mode):
+def draw_callback_nodeoutline(self, context, mode):
     if self.mouse_path:
         nodes = context.space_data.node_tree.nodes
-        settings = context.user_preferences.addons[__name__].preferences
-        if settings.bgl_antialiasing:
-            bgl.glEnable(bgl.GL_LINE_SMOOTH)
+        bgl.glEnable(bgl.GL_LINE_SMOOTH)
 
         if mode == "LINK":
             col_outer = [1.0, 0.2, 0.2, 0.4]
             col_inner = [0.0, 0.0, 0.0, 0.5]
             col_circle_inner = [0.3, 0.05, 0.05, 1.0]
-        if mode == "LINKMENU":
+        elif mode == "LINKMENU":
             col_outer = [0.4, 0.6, 1.0, 0.4]
             col_inner = [0.0, 0.0, 0.0, 0.5]
             col_circle_inner = [0.08, 0.15, .3, 1.0]
@@ -958,18 +957,22 @@ def draw_callback_mixnodes(self, context, mode):
         n1 = nodes[context.scene.NWLazySource]
         n2 = nodes[context.scene.NWLazyTarget]
 
-        if n1 != n2:
-            draw_rounded_node_border(n1, radius=6, colour=col_outer)  # outline
-            draw_rounded_node_border(n1, radius=5, colour=col_inner)  # inner
-            draw_rounded_node_border(n2, radius=6, colour=col_outer)  # outline
-            draw_rounded_node_border(n2, radius=5, colour=col_inner)  # inner
+        if n1 == n2:
+            col_outer = [0.4, 0.4, 0.4, 0.4]
+            col_inner = [0.0, 0.0, 0.0, 0.5]
+            col_circle_inner = [0.2, 0.2, 0.2, 1.0]
 
-        draw_line(m1x, m1y, m2x, m2y, 4, col_outer)  # line outline
+        draw_rounded_node_border(n1, radius=6, colour=col_outer)  # outline
+        draw_rounded_node_border(n1, radius=5, colour=col_inner)  # inner
+        draw_rounded_node_border(n2, radius=6, colour=col_outer)  # outline
+        draw_rounded_node_border(n2, radius=5, colour=col_inner)  # inner
+
+        draw_line(m1x, m1y, m2x, m2y, 5, col_outer)  # line outline
         draw_line(m1x, m1y, m2x, m2y, 2, col_inner)  # line inner
 
         # circle outline
-        draw_circle(m1x, m1y, 6, col_outer)
-        draw_circle(m2x, m2y, 6, col_outer)
+        draw_circle(m1x, m1y, 7, col_outer)
+        draw_circle(m2x, m2y, 7, col_outer)
 
         # circle inner
         draw_circle(m1x, m1y, 5, col_circle_inner)
@@ -980,8 +983,7 @@ def draw_callback_mixnodes(self, context, mode):
         bgl.glDisable(bgl.GL_BLEND)
         bgl.glColor4f(0.0, 0.0, 0.0, 1.0)
 
-        if settings.bgl_antialiasing:
-            bgl.glDisable(bgl.GL_LINE_SMOOTH)
+        bgl.glDisable(bgl.GL_LINE_SMOOTH)
 
 
 def get_nodes_links(context):
@@ -1028,11 +1030,6 @@ class NWNodeWrangler(bpy.types.AddonPreferences):
         ),
         default='CENTER',
         description="When merging nodes with the Ctrl+Numpad0 hotkey (and similar) specifiy the position of the new nodes")
-    bgl_antialiasing = BoolProperty(
-        name="Line Antialiasing",
-        default=False,
-        description="Remove aliasing artifacts on lines drawn in interactive modes such as Lazy Connect (Alt+LMB) and Lazy Merge (Alt+RMB) - this may cause issues on some systems"
-    )
 
     show_hotkey_list = BoolProperty(
         name="Show Hotkey List",
@@ -1050,7 +1047,6 @@ class NWNodeWrangler(bpy.types.AddonPreferences):
         col = layout.column()
         col.prop(self, "merge_position")
         col.prop(self, "merge_hide")
-        col.prop(self, "bgl_antialiasing")
 
         box = col.box()
         col = box.column(align=True)
@@ -1158,7 +1154,7 @@ class NWLazyMix(Operator, NWBase):
             args = (self, context, 'MIX')
             # Add the region OpenGL drawing callback
             # draw in view space with 'POST_VIEW' and 'PRE_VIEW'
-            self._handle = bpy.types.SpaceNodeEditor.draw_handler_add(draw_callback_mixnodes, args, 'WINDOW', 'POST_PIXEL')
+            self._handle = bpy.types.SpaceNodeEditor.draw_handler_add(draw_callback_nodeoutline, args, 'WINDOW', 'POST_PIXEL')
 
             self.mouse_path = []
 
@@ -1263,7 +1259,7 @@ class NWLazyConnect(Operator, NWBase):
             args = (self, context, mode)
             # Add the region OpenGL drawing callback
             # draw in view space with 'POST_VIEW' and 'PRE_VIEW'
-            self._handle = bpy.types.SpaceNodeEditor.draw_handler_add(draw_callback_mixnodes, args, 'WINDOW', 'POST_PIXEL')
+            self._handle = bpy.types.SpaceNodeEditor.draw_handler_add(draw_callback_nodeoutline, args, 'WINDOW', 'POST_PIXEL')
 
             self.mouse_path = []
 
@@ -2671,98 +2667,63 @@ class NWLinkActiveToSelected(Operator, NWBase):
 
 
 class NWAlignNodes(Operator, NWBase):
+    '''Align the selected nodes neatly in a row/column'''
     bl_idname = "node.nw_align_nodes"
-    bl_label = "Align nodes"
+    bl_label = "Align Nodes"
     bl_options = {'REGISTER', 'UNDO'}
 
-    # option: 'Vertically', 'Horizontally'
-    option = EnumProperty(
-        name="option",
-        description="Direction",
-        items=(
-            ('AXIS_X', "Align Vertically", 'Align Vertically'),
-            ('AXIS_Y', "Aligh Horizontally", 'Aligh Horizontally'),
-        )
-    )
-
     def execute(self, context):
+        # TODO prop: lock active (arrange everything without moving active node)
         nodes, links = get_nodes_links(context)
-        selected = []  # entry = [index, loc.x, loc.y, width, height]
-        frames_reselect = []  # entry = frame node. will be used to reselect all selected frames
-        active = nodes.active
-        for i, node in enumerate(nodes):
-            total_w = 0.0  # total width of all nodes. Will be calculated later.
-            total_h = 0.0  # total height of all nodes. Will be calculated later
-            if node.select:
-                if node.type == 'FRAME':
-                    node.select = False
-                    frames_reselect.append(i)
-                else:
-                    locx = node.location.x
-                    locy = node.location.y
-                    width = node.dimensions[0]
-                    height = node.dimensions[1]
-                    total_w += width  # add nodes[i] width to total width of all nodes
-                    total_h += height  # add nodes[i] height to total height of all nodes
-                    # calculate relative locations
-                    parent = node.parent
-                    while parent is not None:
-                        locx += parent.location.x
-                        locy += parent.location.y
-                        parent = parent.parent
-                    selected.append([i, locx, locy, width, height])
-        count = len(selected)
-        if count > 1:  # aligning makes sense only if at least 2 nodes are selected
-            selected_sorted_x = sorted(selected, key=lambda k: (k[1], -k[2]))
-            selected_sorted_y = sorted(selected, key=lambda k: (-k[2], k[1]))
-            min_x = selected_sorted_x[0][1]  # min loc.x
-            min_x_loc_y = selected_sorted_x[0][2]  # loc y of node with min loc x
-            min_x_w = selected_sorted_x[0][3]  # width of node with max loc x
-            max_x = selected_sorted_x[count - 1][1]  # max loc.x
-            max_x_loc_y = selected_sorted_x[count - 1][2]  # loc y of node with max loc.x
-            max_x_w = selected_sorted_x[count - 1][3]  # width of node with max loc.x
-            min_y = selected_sorted_y[0][2]  # min loc.y
-            min_y_loc_x = selected_sorted_y[0][1]  # loc.x of node with min loc.y
-            min_y_h = selected_sorted_y[0][4]  # height of node with min loc.y
-            min_y_w = selected_sorted_y[0][3]  # width of node with min loc.y
-            max_y = selected_sorted_y[count - 1][2]  # max loc.y
-            max_y_loc_x = selected_sorted_y[count - 1][1]  # loc x of node with max loc.y
-            max_y_w = selected_sorted_y[count - 1][3]  # width of node with max loc.y
-            max_y_h = selected_sorted_y[count - 1][4]  # height of node with max loc.y
+        margin = 80
+        
+        selection = []
+        for node in nodes:
+            if node.select and node.type != 'FRAME':
+                selection.append(node)
 
-            if self.option == 'AXIS_Y':  # Horizontally. Equivelent of s -> x -> 0 with even spacing.
-                loc_x = min_x
-                #loc_y = (max_x_loc_y + min_x_loc_y) / 2.0
-                loc_y = (max_y - max_y_h / 2.0 + min_y - min_y_h / 2.0) / 2.0
-                offset_x = (max_x - min_x - total_w + max_x_w) / (count - 1)
-                for i, x, y, w, h in selected_sorted_x:
-                    nodes[i].location.x = loc_x
-                    nodes[i].location.y = loc_y + h / 2.0
-                    parent = nodes[i].parent
-                    while parent is not None:
-                        nodes[i].location.x -= parent.location.x
-                        nodes[i].location.y -= parent.location.y
-                        parent = parent.parent
-                    loc_x += offset_x + w
-            else:  # if self.option == 'AXIS_Y'
-                loc_x = (max_x + max_x_w / 2.0 + min_x + min_x_w / 2.0) / 2.0
-                loc_y = min_y
-                offset_y = (max_y - min_y + total_h - min_y_h) / (count - 1)
-                for i, x, y, w, h in selected_sorted_y:
-                    nodes[i].location.x = loc_x - w / 2.0
-                    nodes[i].location.y = loc_y
-                    parent = nodes[i].parent
-                    while parent is not None:
-                        nodes[i].location.x -= parent.location.x
-                        nodes[i].location.y -= parent.location.y
-                        parent = parent.parent
-                    loc_y += offset_y - h
+        # If no nodes are selected, align all nodes
+        if not selection:
+            selection = nodes
 
-            # reselect selected frames
-            for i in frames_reselect:
-                nodes[i].select = True
-            # restore active node
-            nodes.active = active
+        # Check if nodes should be layed out horizontally or vertically
+        x_locs = [n.location.x + (n.dimensions.x / 2) for n in selection]  # use dimension to get center of node, not corner
+        y_locs = [n.location.y - (n.dimensions.y / 2) for n in selection]
+        x_range = max(x_locs) - min(x_locs)
+        y_range = max(y_locs) - min(y_locs)
+        mid_x = (max(x_locs) + min(x_locs)) / 2
+        mid_y = (max(y_locs) + min(y_locs)) / 2
+        horizontal = x_range > y_range
+
+        # Sort selection by location of node mid-point
+        if horizontal:
+            selection = sorted(selection, key=lambda n: n.location.x + (n.dimensions.x / 2))
+        else:
+            selection = sorted(selection, key=lambda n: n.location.y - (n.dimensions.y / 2), reverse=True)
+
+        # Alignment
+        current_pos = 0
+        for node in selection:
+            current_margin = margin
+            current_margin = current_margin / 2 if node.hide else current_margin  # use a smaller margin for hidden nodes
+
+            if horizontal:
+                node.location.x = current_pos
+                current_pos += current_margin + node.dimensions.x
+                node.location.y = mid_y + (node.dimensions.y / 2)
+            else:
+                node.location.y = current_pos
+                current_pos -= (current_margin / 2) + node.dimensions.y  # use half-margin for vertical alignment
+                node.location.x = mid_x - (node.dimensions.x / 2)
+
+        # Position nodes centered around where they used to be
+        locs = ([n.location.x + (n.dimensions.x / 2) for n in selection]) if horizontal else ([n.location.y - (n.dimensions.y / 2) for n in selection])
+        new_mid = (max(locs) + min(locs)) / 2
+        for node in selection:
+            if horizontal:
+                node.location.x += (mid_x - new_mid)
+            else:
+                node.location.y += (mid_y - new_mid)
 
         return {'FINISHED'}
 
@@ -3177,6 +3138,10 @@ def drawlayout(context, layout, mode='non-panel'):
     col.separator()
 
     col = layout.column(align=True)
+    col.operator(NWAlignNodes.bl_idname, icon='ALIGN')
+    col.separator()
+
+    col = layout.column(align=True)
     col.operator(NWDeleteUnused.bl_idname, icon='CANCEL')
     col.separator()
 
@@ -3430,16 +3395,6 @@ class NWLinkUseOutputsNamesMenu(Menu, NWBase):
         props.replace = True
         props.use_node_name = False
         props.use_outputs_names = True
-
-
-class NWNodeAlignMenu(Menu, NWBase):
-    bl_idname = "NODE_MT_nw_node_align_menu"
-    bl_label = "Align Nodes"
-
-    def draw(self, context):
-        layout = self.layout
-        layout.operator(NWAlignNodes.bl_idname, text="Horizontally").option = 'AXIS_X'
-        layout.operator(NWAlignNodes.bl_idname, text="Vertically").option = 'AXIS_Y'
 
 
 class NWVertColMenu(bpy.types.Menu):
@@ -4071,11 +4026,12 @@ kmi_defs = (
     (NWLazyConnect.bl_idname, 'RIGHTMOUSE', 'PRESS', True, True, False, (('with_menu', True),), "Lazy Connect with Socket Menu"),
     # Viewer Tile Center
     (NWViewerFocus.bl_idname, 'LEFTMOUSE', 'DOUBLE_CLICK', False, False, False, None, "Set Viewers Tile Center"),
+    # Align Nodes
+    (NWAlignNodes.bl_idname, 'EQUAL', 'PRESS', False, True, False, None, "Align selected nodes neatly in a row/column"),
     # MENUS
     ('wm.call_menu', 'SPACE', 'PRESS', True, False, False, (('name', NodeWranglerMenu.bl_idname),), "Node Wranger menu"),
     ('wm.call_menu', 'SLASH', 'PRESS', False, False, False, (('name', NWAddReroutesMenu.bl_idname),), "Add Reroutes menu"),
     ('wm.call_menu', 'NUMPAD_SLASH', 'PRESS', False, False, False, (('name', NWAddReroutesMenu.bl_idname),), "Add Reroutes menu"),
-    ('wm.call_menu', 'EQUAL', 'PRESS', False, True, False, (('name', NWNodeAlignMenu.bl_idname),), "Node alignment menu"),
     ('wm.call_menu', 'BACK_SLASH', 'PRESS', False, False, False, (('name', NWLinkActiveToSelectedMenu.bl_idname),), "Link active to selected (menu)"),
     ('wm.call_menu', 'C', 'PRESS', False, True, False, (('name', NWCopyToSelectedMenu.bl_idname),), "Copy to selected (menu)"),
     ('wm.call_menu', 'S', 'PRESS', False, True, False, (('name', NWSwitchNodeTypeMenu.bl_idname),), "Switch node type menu"),
@@ -4133,8 +4089,6 @@ def unregister():
     del bpy.types.Scene.NWLazyTarget
     del bpy.types.Scene.NWSourceSocket
 
-    bpy.utils.unregister_module(__name__)
-
     # keymaps
     for km, kmi in addon_keymaps:
         km.keymap_items.remove(kmi)
@@ -4149,6 +4103,8 @@ def unregister():
     bpy.types.NODE_PT_category_SH_NEW_TEXTURE.remove(multipleimages_menu_func)
     bpy.types.NODE_MT_category_CMP_INPUT.remove(multipleimages_menu_func)
     bpy.types.NODE_PT_category_CMP_INPUT.remove(multipleimages_menu_func)
+
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

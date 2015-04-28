@@ -21,7 +21,7 @@
 bl_info = {
     "name": "Wavefront OBJ format",
     "author": "Campbell Barton, Bastien Montagne",
-    "version": (2, 1, 0),
+    "version": (2, 1, 1),
     "blender": (2, 74, 0),
     "location": "File > Import-Export",
     "description": "Import-Export OBJ, Import OBJ mesh, UV's, "
@@ -41,17 +41,19 @@ if "bpy" in locals():
 
 
 import bpy
-from bpy.props import (BoolProperty,
-                       FloatProperty,
-                       StringProperty,
-                       EnumProperty,
-                       )
-from bpy_extras.io_utils import (ImportHelper,
-                                 ExportHelper,
-                                 orientation_helper_factory,
-                                 path_reference_mode,
-                                 axis_conversion,
-                                 )
+from bpy.props import (
+        BoolProperty,
+        FloatProperty,
+        StringProperty,
+        EnumProperty,
+        )
+from bpy_extras.io_utils import (
+        ImportHelper,
+        ExportHelper,
+        orientation_helper_factory,
+        path_reference_mode,
+        axis_conversion,
+        )
 
 
 IOOBJOrientationHelper = orientation_helper_factory("IOOBJOrientationHelper", axis_forward='-Z', axis_up='Y')

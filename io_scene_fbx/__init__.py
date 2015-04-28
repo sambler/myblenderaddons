@@ -21,7 +21,7 @@
 bl_info = {
     "name": "FBX format",
     "author": "Campbell Barton, Bastien Montagne, Jens Restemeier",
-    "version": (3, 2, 2),
+    "version": (3, 2, 4),
     "blender": (2, 74, 0),
     "location": "File > Import-Export",
     "description": "FBX IO meshes, UV's, vertex colors, materials, "
@@ -45,18 +45,19 @@ if "bpy" in locals():
 
 
 import bpy
-from bpy.props import (StringProperty,
-                       BoolProperty,
-                       FloatProperty,
-                       EnumProperty,
-                       )
-
-from bpy_extras.io_utils import (ImportHelper,
-                                 ExportHelper,
-                                 orientation_helper_factory,
-                                 path_reference_mode,
-                                 axis_conversion,
-                                 )
+from bpy.props import (
+        StringProperty,
+        BoolProperty,
+        FloatProperty,
+        EnumProperty,
+        )
+from bpy_extras.io_utils import (
+        ImportHelper,
+        ExportHelper,
+        orientation_helper_factory,
+        path_reference_mode,
+        axis_conversion,
+        )
 
 
 IOFBXOrientationHelper = orientation_helper_factory("IOFBXOrientationHelper", axis_forward='-Z', axis_up='Y')
@@ -84,10 +85,10 @@ class ImportFBX(bpy.types.Operator, ImportHelper, IOFBXOrientationHelper):
             default=1.0,
             )
     bake_space_transform = BoolProperty(
-            name="Apply Transform",
+            name="!EXPERIMENTAL! Apply Transform",
             description="Bake space transform into object data, avoids getting unwanted rotations to objects when "
                         "target space is not aligned with Blender's space "
-                        "(WARNING! experimental option, might give odd/wrong results)",
+                        "(WARNING! experimental option, use at own risks, known broken with armatures/animations)",
             default=False,
             )
 
@@ -237,10 +238,10 @@ class ExportFBX(bpy.types.Operator, ExportHelper, IOFBXOrientationHelper):
             )
     # 7.4 only
     bake_space_transform = BoolProperty(
-            name="Apply Transform",
+            name="!EXPERIMENTAL! Apply Transform",
             description="Bake space transform into object data, avoids getting unwanted rotations to objects when "
                         "target space is not aligned with Blender's space "
-                        "(WARNING! experimental option, might give odd/wrong results)",
+                        "(WARNING! experimental option, use at own risks, known broken with armatures/animations)",
             default=False,
             )
 
@@ -345,7 +346,9 @@ class ExportFBX(bpy.types.Operator, ExportHelper, IOFBXOrientationHelper):
             )
     bake_anim_use_all_actions = BoolProperty(
             name="All Actions",
-            description="Export each action as a separated FBX's AnimStack, instead of global scene animation",
+            description="Export each action as a separated FBX's AnimStack, instead of global scene animation "
+                        "(note that animated objects will get all actions compatible with them, "
+                        "others will get no animation at all)",
             default=True,
             )
     bake_anim_step = FloatProperty(

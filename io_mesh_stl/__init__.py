@@ -21,7 +21,7 @@
 bl_info = {
     "name": "STL format",
     "author": "Guillaume Bouchard (Guillaum)",
-    "version": (1, 1, 1),
+    "version": (1, 1, 2),
     "blender": (2, 74, 0),
     "location": "File > Import-Export > Stl",
     "description": "Import-Export STL files",
@@ -165,7 +165,7 @@ class ExportSTL(Operator, ExportHelper, IOSTLOrientationHelper):
     use_scene_unit = BoolProperty(
             name="Scene Unit",
             description="Apply current scene's unit (as defined by unit scale) to exported data",
-            default=True,
+            default=False,
             )
     ascii = BoolProperty(
             name="Ascii",
@@ -175,7 +175,7 @@ class ExportSTL(Operator, ExportHelper, IOSTLOrientationHelper):
     use_mesh_modifiers = BoolProperty(
             name="Apply Modifiers",
             description="Apply the modifiers before saving",
-            default=False,
+            default=True,
             )
 
 
