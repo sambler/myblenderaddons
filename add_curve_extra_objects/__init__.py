@@ -22,8 +22,8 @@ bl_info = {
     "name": "Extra Objects",
     "author": "Multiple Authors",
     "version": (0, 1),
-    "blender": (2, 72, 0),
-    "location": "View3D > Add > Curve",
+    "blender": (2, 63, 0),
+    "location": "View3D > Add > Curve > Extra Objects",
     "description": "Add extra curve object types",
     "warning": "",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"
@@ -31,10 +31,10 @@ bl_info = {
     "category": "Add Curve"}
 
 if "bpy" in locals():
-    import importlib
-    importlib.reload(add_curve_aceous_galore)
-    importlib.reload(add_curve_spirals)
-    importlib.reload(add_curve_torus_knots)
+    import imp
+    imp.reload(add_curve_aceous_galore)
+    imp.reload(add_curve_spirals)
+    imp.reload(add_curve_torus_knots)
 
 else:
     from . import add_curve_aceous_galore
