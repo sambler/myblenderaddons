@@ -42,6 +42,7 @@ from . import parse_fbx, fbx_utils
 from .parse_fbx import data_types, FBXElem
 from .fbx_utils import (
     PerfMon,
+    units_blender_to_fbx_factor,
     units_convertor_iter,
     array_to_matrix4,
     similar_values,
@@ -477,12 +478,12 @@ def blen_read_object_transform_preprocess(fbx_props, fbx_obj, rot_alt_mat, use_p
             pst_rot = const_vector_zero_3d
         rot_ord = {
             0: 'XYZ',
-            1: 'XYZ',
-            2: 'XZY',
-            3: 'YZX',
-            4: 'YXZ',
-            5: 'ZXY',
-            6: 'ZYX',
+            1: 'XZY',
+            2: 'YZX',
+            3: 'YXZ',
+            4: 'ZXY',
+            5: 'ZYX',
+            6: 'XYZ',  # XXX eSphericXYZ, not really supported...
             }.get(elem_props_get_enum(fbx_props, b'RotationOrder', 0))
     else:
         pre_rot = const_vector_zero_3d
@@ -1761,7 +1762,7 @@ class FbxImportHelperNode:
             for child in self.children:
                 child.collect_armature_meshes()
 
-    def build_skeleton(self, arm, parent_matrix, parent_bone_size=1):
+    def build_skeleton(self, arm, parent_matrix, parent_bone_size=1, force_connect_children=False):
         # ----
         # Now, create the (edit)bone.
         bone = arm.bl_data.edit_bones.new(name=self.fbx_name)
@@ -1801,10 +1802,14 @@ class FbxImportHelperNode:
             if child.ignore:
                 continue
             if child.is_bone:
-                child_bone = child.build_skeleton(arm, bone_matrix, bone_size)
+                child_bone = child.build_skeleton(arm, bone_matrix, bone_size,
+                                                  force_connect_children=force_connect_children)
                 # Connection to parent.
                 child_bone.parent = bone
                 if similar_values_iter(bone.tail, child_bone.head):
+                    child_bone.use_connect = True
+                elif force_connect_children:
+                    bone.tail = child_bone.head
                     child_bone.use_connect = True
 
         return bone
@@ -1976,7 +1981,7 @@ class FbxImportHelperNode:
                 if child.ignore:
                     continue
                 if child.is_bone:
-                    child_obj = child.build_skeleton(self, Matrix())
+                    child.build_skeleton(self, Matrix(), force_connect_children=settings.force_connect_children)
 
             bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -2074,6 +2079,7 @@ def load(operator, context, filepath="",
          use_custom_props=True,
          use_custom_props_enum_as_string=True,
          ignore_leaf_bones=False,
+         force_connect_children=False,
          automatic_bone_orientation=False,
          primary_bone_axis='Y',
          secondary_bone_axis='X',
@@ -2152,7 +2158,7 @@ def load(operator, context, filepath="",
     # FBX default base unit seems to be the centimeter, while raw Blender Unit is equivalent to the meter...
     unit_scale = elem_props_get_number(fbx_settings_props, b'UnitScaleFactor', 1.0)
     unit_scale_org = elem_props_get_number(fbx_settings_props, b'OriginalUnitScaleFactor', 1.0)
-    global_scale *=  unit_scale / unit_scale_org / 100.0
+    global_scale *= (unit_scale / units_blender_to_fbx_factor(context.scene))
     # Compute global matrix and scale.
     if not use_manual_orientation:
         axis_forward = (elem_props_get_integer(fbx_settings_props, b'FrontAxis', 1),
@@ -2198,7 +2204,7 @@ def load(operator, context, filepath="",
         use_alpha_decals, decal_offset,
         use_custom_props, use_custom_props_enum_as_string,
         cycles_material_wrap_map, image_cache,
-        ignore_leaf_bones, automatic_bone_orientation, bone_correction_matrix,
+        ignore_leaf_bones, force_connect_children, automatic_bone_orientation, bone_correction_matrix,
         use_prepost_rot,
     )
 
