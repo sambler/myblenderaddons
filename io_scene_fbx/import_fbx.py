@@ -539,7 +539,7 @@ def blen_read_animations_curves_iter(fbx_curves, blen_start_offset, fbx_start_of
         yield (curr_blenkframe, curr_values)
 
 
-def blen_read_animations_action_item(action, item, cnodes, fps):
+def blen_read_animations_action_item(action, item, cnodes, fps, anim_offset):
     """
     'Bake' loc/rot/scale into the action,
     taking any pre_ and post_ matrix into account to transform from fbx into blender space.
@@ -587,8 +587,7 @@ def blen_read_animations_action_item(action, item, cnodes, fps):
                    for prop, nbr_channels, grpname in props for channel in range(nbr_channels)]
 
     if isinstance(item, ShapeKey):
-        # We assume for now blen init point is frame 1.0, while FBX ktime init point is 0.
-        for frame, values in blen_read_animations_curves_iter(fbx_curves, 1.0, 0, fps):
+        for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
             value = 0.0
             for v, (fbxprop, channel, _fbx_acdata) in values:
                 assert(fbxprop == b'DeformPercent')
@@ -610,8 +609,7 @@ def blen_read_animations_action_item(action, item, cnodes, fps):
         # Pre-compute inverted local rest matrix of the bone, if relevant.
         restmat_inv = item.get_bind_matrix().inverted_safe() if item.is_bone else None
 
-        # We assume for now blen init point is frame 1.0, while FBX ktime init point is 0.
-        for frame, values in blen_read_animations_curves_iter(fbx_curves, 1.0, 0, fps):
+        for frame, values in blen_read_animations_curves_iter(fbx_curves, anim_offset, 0, fps):
             for v, (fbxprop, channel, _fbx_acdata) in values:
                 if fbxprop == b'Lcl Translation':
                     transform_data.loc[channel] = v
@@ -655,7 +653,7 @@ def blen_read_animations_action_item(action, item, cnodes, fps):
         fc.update()
 
 
-def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene):
+def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, anim_offset):
     """
     Recreate an action per stack/layer/object combinations.
     Only the first found action is linked to objects, more complex setups are not handled,
@@ -688,7 +686,7 @@ def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene):
                 if not id_data.animation_data.action:
                     id_data.animation_data.action = action
                 # And actually populate the action!
-                blen_read_animations_action_item(action, item, cnodes, scene.render.fps)
+                blen_read_animations_action_item(action, item, cnodes, scene.render.fps, anim_offset)
 
 
 # ----
@@ -1455,7 +1453,7 @@ class FbxImportHelperNode:
     It tries to keep the correction data in one place so it can be applied consistently to the imported data.
     """
 
-    __slots__ = ('_parent', 'anim_compensation_matrix', 'armature_setup', 'bind_matrix',
+    __slots__ = ('_parent', 'anim_compensation_matrix', 'armature_setup', 'armature', 'bind_matrix',
                  'bl_bone', 'bl_data', 'bl_obj', 'bone_child_matrix', 'children', 'clusters',
                  'fbx_elem', 'fbx_name', 'fbx_transform_data', 'fbx_type', 'has_bone_children', 'ignore', 'is_armature',
                  'is_bone', 'is_root', 'matrix', 'matrix_as_parent', 'matrix_geom', 'meshes', 'post_matrix', 'pre_matrix')
@@ -1471,6 +1469,7 @@ class FbxImportHelperNode:
         self.is_root = False
         self.is_bone = is_bone
         self.is_armature = False
+        self.armature = None                    # For bones only, relevant armature node.
         self.has_bone_children = False          # True if the hierarchy below this node contains bones, important to support mixed hierarchies.
         self.ignore = False                     # True for leaf-bones added to the end of some bone chains to set the lengths.
         self.pre_matrix = None                  # correction matrix that needs to be applied before the FBX transform
@@ -1485,7 +1484,7 @@ class FbxImportHelperNode:
 
         self.meshes = None                      # List of meshes influenced by this bone.
         self.clusters = []                      # Deformer Cluster nodes
-        self.armature_setup = None              # mesh and armature matrix when the mesh was bound
+        self.armature_setup = {}                # mesh and armature matrix when the mesh was bound
 
         self._parent = None
         self.children = []
@@ -1638,6 +1637,12 @@ class FbxImportHelperNode:
         for child in self.children:
             child.find_correction_matrix(settings, correction_matrix_inv)
 
+    def find_armature_bones(self, armature):
+        for child in self.children:
+            if child.is_bone:
+                child.armature = armature
+                child.find_armature_bones(armature)
+
     def find_armatures(self):
         needs_armature = False
         for child in self.children:
@@ -1648,17 +1653,20 @@ class FbxImportHelperNode:
             if self.fbx_type in {b'Null', b'Root'}:
                 # if empty then convert into armature
                 self.is_armature = True
+                armature = self
             else:
                 # otherwise insert a new node
                 armature = FbxImportHelperNode(None, None, None, False)
                 armature.fbx_name = "Armature"
                 armature.is_armature = True
 
-                for child in self.children[:]:
+                for child in self.children:
                     if child.is_bone:
                         child.parent = armature
 
                 armature.parent = self
+
+            armature.find_armature_bones(armature)
 
         for child in self.children:
             if child.is_armature or child.is_bone:
@@ -1798,6 +1806,7 @@ class FbxImportHelperNode:
         # while Blender attaches to the tail.
         self.bone_child_matrix = Matrix.Translation(-bone_tail)
 
+        connected = ...
         for child in self.children:
             if child.ignore:
                 continue
@@ -1808,13 +1817,41 @@ class FbxImportHelperNode:
                 child_bone.parent = bone
                 if similar_values_iter(bone.tail, child_bone.head):
                     child_bone.use_connect = True
-                elif force_connect_children:
-                    bone.tail = child_bone.head
-                    child_bone.use_connect = True
+                    # Disallow any force-connection at this level from now on, since that child was 'really'
+                    # connected, we do not want to move current bone's tail anymore!
+                    if connected is ...:
+                        connected = None
+                    elif connected is not None:
+                        # We already force-connected some children, so we have to store that child_bone in
+                        # force-connected list as well (since current bone's tail is no more in its original position).
+                        connected[1].append(child_bone)
+                elif force_connect_children and connected is not None:
+                    if connected is ...:  # First child bone to force-connect, it's OK so far.
+                        connected = (bone.tail.copy(), [child_bone])
+                        bone.tail = child_bone.head
+                        child_bone.use_connect = True
+                    else:
+                        # We already have at least one child bone force-connected.
+                        # Since we already moved current bone's tail to match that child,
+                        # if current child bone had been 'compatible' (same head position) it would have been
+                        # already handled by code above.
+                        # This means that at this point we know we have several child bones with different head
+                        # positions, hence we cannot force-connect them to current bone. We need to restore
+                        # situation prior to first force-connect!
+                        for cb in connected[1]:
+                            cb.use_connect = False
+                        bone.tail = connected[0]
+                        connected = None
 
         return bone
 
-    def build_node(self, fbx_tmpl, settings):
+    def build_node_obj(self, fbx_tmpl, settings):
+        if self.bl_obj:
+            return self.bl_obj
+
+        if self.is_bone or not self.fbx_elem:
+            return None
+
         # create when linking since we need object data
         elem_name_utf8 = self.fbx_name
 
@@ -1843,8 +1880,30 @@ class FbxImportHelperNode:
             for child in self.children:
                 if child.ignore:
                     continue
-                child_obj = child.build_skeleton_children(fbx_tmpl, settings, scene)
-                if child_obj:
+                child.build_skeleton_children(fbx_tmpl, settings, scene)
+            return None
+        else:
+            # child is not a bone
+            obj = self.build_node_obj(fbx_tmpl, settings)
+
+            for child in self.children:
+                if child.ignore:
+                    continue
+                child.build_skeleton_children(fbx_tmpl, settings, scene)
+
+            # instance in scene
+            obj_base = scene.objects.link(obj)
+            obj_base.select = True
+
+            return obj
+
+    def link_skeleton_children(self, fbx_tmpl, settings, scene):
+        if self.is_bone:
+            for child in self.children:
+                if child.ignore:
+                    continue
+                child_obj = child.bl_obj
+                if child_obj and child_obj != self.bl_obj:
                     child_obj.parent = self.bl_obj  # get the armature the bone belongs to
                     child_obj.parent_bone = self.bl_bone
                     child_obj.parent_type = 'BONE'
@@ -1860,19 +1919,14 @@ class FbxImportHelperNode:
                     child_obj.matrix_basis = child.get_matrix()
             return None
         else:
-            # child is not a bone
-            obj = self.build_node(fbx_tmpl, settings)
+            obj = self.bl_obj
 
             for child in self.children:
                 if child.ignore:
                     continue
-                child_obj = child.build_skeleton_children(fbx_tmpl, settings, scene)
+                child_obj = child.link_skeleton_children(fbx_tmpl, settings, scene)
                 if child_obj:
                     child_obj.parent = obj
-
-            # instance in scene
-            obj_base = scene.objects.link(obj)
-            obj_base.select = True
 
             return obj
 
@@ -1999,13 +2053,42 @@ class FbxImportHelperNode:
                 if child.ignore:
                     continue
                 child_obj = child.build_skeleton_children(fbx_tmpl, settings, scene)
+
+            return arm
+        elif self.fbx_elem:
+            obj = self.build_node_obj(fbx_tmpl, settings)
+
+            # walk through children
+            for child in self.children:
+                child.build_hierarchy(fbx_tmpl, settings, scene)
+
+            # instance in scene
+            obj_base = scene.objects.link(obj)
+            obj_base.select = True
+
+            return obj
+        else:
+            for child in self.children:
+                child.build_hierarchy(fbx_tmpl, settings, scene)
+
+            return None
+
+    def link_hierarchy(self, fbx_tmpl, settings, scene):
+        if self.is_armature:
+            arm = self.bl_obj
+
+            # Link bone children:
+            for child in self.children:
+                if child.ignore:
+                    continue
+                child_obj = child.link_skeleton_children(fbx_tmpl, settings, scene)
                 if child_obj:
                     child_obj.parent = arm
 
             # Add armature modifiers to the meshes
             if self.meshes:
                 for mesh in self.meshes:
-                    (mmat, amat) = mesh.armature_setup
+                    (mmat, amat) = mesh.armature_setup[self]
                     me_obj = mesh.bl_obj
 
                     # bring global armature & mesh matrices into *Blender* global space.
@@ -2026,7 +2109,7 @@ class FbxImportHelperNode:
                     # we can compute inverse parenting matrix of the mesh.
                     me_obj.matrix_parent_inverse = amat.inverted_safe() * mmat * me_obj.matrix_basis.inverted_safe()
 
-                    mod = mesh.bl_obj.modifiers.new(elem_name_utf8, 'ARMATURE')
+                    mod = mesh.bl_obj.modifiers.new(arm.name, 'ARMATURE')
                     mod.object = arm
 
             # Add bone weights to the deformers
@@ -2037,22 +2120,20 @@ class FbxImportHelperNode:
                     child.set_bone_weights()
 
             return arm
-        elif self.fbx_elem:
-            obj = self.build_node(fbx_tmpl, settings)
+        elif self.bl_obj:
+            obj = self.bl_obj
 
             # walk through children
             for child in self.children:
-                child_obj = child.build_hierarchy(fbx_tmpl, settings, scene)
+                child_obj = child.link_hierarchy(fbx_tmpl, settings, scene)
                 child_obj.parent = obj
-
-            # instance in scene
-            obj_base = scene.objects.link(obj)
-            obj_base.select = True
 
             return obj
         else:
             for child in self.children:
-                child.build_hierarchy(fbx_tmpl, settings, scene)
+                child.link_hierarchy(fbx_tmpl, settings, scene)
+
+            return None
 
 
 def is_ascii(filepath, size):
@@ -2076,6 +2157,7 @@ def load(operator, context, filepath="",
          use_image_search=False,
          use_alpha_decals=False,
          decal_offset=0.0,
+         anim_offset=1.0,
          use_custom_props=True,
          use_custom_props_enum_as_string=True,
          ignore_leaf_bones=False,
@@ -2202,6 +2284,7 @@ def load(operator, context, filepath="",
         bake_space_transform, global_matrix_inv, global_matrix_inv_transposed,
         use_cycles, use_image_search,
         use_alpha_decals, decal_offset,
+        anim_offset,
         use_custom_props, use_custom_props_enum_as_string,
         cycles_material_wrap_map, image_cache,
         ignore_leaf_bones, force_connect_children, automatic_bone_orientation, bone_correction_matrix,
@@ -2527,7 +2610,7 @@ def load(operator, context, filepath="",
                                 # when actually binding them via the modifier.
                                 # Note we assume all bones were bound with the same mesh/armature (global) matrix,
                                 # we do not support otherwise in Blender anyway!
-                                mesh_node.armature_setup = (mesh_matrix, armature_matrix)
+                                mesh_node.armature_setup[helper_node.armature] = (mesh_matrix, armature_matrix)
                                 meshes.add(mesh_node)
 
                 helper_node.clusters.append((fbx_cluster, meshes))
@@ -2543,6 +2626,9 @@ def load(operator, context, filepath="",
 
         # build the Object/Armature/Bone hierarchy
         root_helper.build_hierarchy(fbx_tmpl, settings, scene)
+
+        # Link the Object/Armature/Bone hierarchy
+        root_helper.link_hierarchy(fbx_tmpl, settings, scene)
 
         # root_helper.print_info(0)
     _(); del _
@@ -2688,7 +2774,7 @@ def load(operator, context, filepath="",
                 curvenodes[acn_uuid][ac_uuid] = (fbx_acitem, channel)
 
         # And now that we have sorted all this, apply animations!
-        blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene)
+        blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, settings.anim_offset)
 
     _(); del _
 
