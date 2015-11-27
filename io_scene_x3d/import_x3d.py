@@ -3143,7 +3143,7 @@ def importLamp_PointLight(node, ancestry):
     # is_on = node.getFieldAsBool('on', True, ancestry) # TODO
     radius = node.getFieldAsFloat('radius', 100.0, ancestry)
 
-    bpylamp = bpy.data.lamps.new("ToDo", 'POINT')
+    bpylamp = bpy.data.lamps.new(vrmlname, 'POINT')
     bpylamp.energy = intensity
     bpylamp.distance = radius
     bpylamp.color = color
@@ -3224,7 +3224,7 @@ def importLamp(bpyscene, node, spec, ancestry, global_matrix):
         print("Error, not a lamp")
         raise ValueError
 
-    bpyob = node.blendData = node.blendObject = bpy.data.objects.new("TODO", bpylamp)
+    bpyob = node.blendData = node.blendObject = bpy.data.objects.new(bpylamp.name, bpylamp)
     bpyscene.objects.link(bpyob).select = True
 
     bpyob.matrix_world = getFinalMatrix(node, mtx, ancestry, global_matrix)
