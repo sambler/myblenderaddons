@@ -177,13 +177,13 @@ url_manual_mapping = (
     #("bpy.types.Brush.*", ""),   # TODO - manual has no place for this! XXX
     ("bpy.types.Curve.*",         "modeling/curves"),
     ("bpy.types.GreasePencil.*",  "interface/grease_pencil/index.html"),
-    ("bpy.types.Group.*",         "editors/3dview/groups.html"),
+    ("bpy.types.Group.*",         "editors/3dview/relationships/groups.html"),
     ("bpy.types.Image.*",         "render/blender_render/textures/types/image.html"),
     ("bpy.types.ShapeKey.*",      "animation/shape_keys.html"), # not an id but include because of key
     ("bpy.types.Key.*",           "animation/shape_keys.html"),
     #("bpy.types.Lattice.*", ""),  # TODO - manual has no place for this! XXX
     ("bpy.types.Library.*",       "data_system/linked_libraries.html"),
-    #("bpy.types.Mask.*", ""),     # TODO - manual has no place for this! XXX
+    ("bpy.types.Mask.*",          "editors/movie_clip_editor/masking.html"),
 
     # *** Materials (blender internal) ***
     ("bpy.types.Material.diffuse*",  "render/blender_render/materials/properties/diffuse_shaders.html"),
@@ -249,7 +249,7 @@ url_manual_mapping = (
     ("bpy.types.ShaderNodeBsdfDiffuse.*",          "render/cycles/nodes/shaders.html#diffuse"),
     ("bpy.types.ShaderNodeBsdfGlass.*",            "render/cycles/nodes/shaders.html#glass"),
     ("bpy.types.ShaderNodeBsdfGlossy.*",           "render/cycles/nodes/shaders.html#glossy"),
-    ("bpy.types.ShaderNodeBsdfHair.*",             "render/cycles/nodes/shaders.html"),  # todo doc
+    ("bpy.types.ShaderNodeBsdfHair.*",             "render/cycles/nodes/shaders.html#hair"),
     ("bpy.types.ShaderNodeBsdfRefraction.*",       "render/cycles/nodes/shaders.html#refraction"),
     ("bpy.types.ShaderNodeBsdfToon.*",             "render/cycles/nodes/shaders.html#toon"),
     ("bpy.types.ShaderNodeBsdfTranslucent.*",      "render/cycles/nodes/shaders.html#translucent"),
@@ -259,52 +259,52 @@ url_manual_mapping = (
     ("bpy.types.ShaderNodeHoldout.*",              "render/cycles/nodes/shaders.html#holdout"),
     ("bpy.types.ShaderNodeMixShader.*",            "render/cycles/nodes/shaders.html#mix-and-add"),
     ("bpy.types.ShaderNodeSubsurfaceScattering.*", "render/cycles/nodes/shaders.html#subsurface-scattering"),
-    ("bpy.types.ShaderNodeVolumeAbsorption.*",     "render/cycles/nodes/shaders.html"),  # todo doc
-    ("bpy.types.ShaderNodeVolumeScatter.*",        "render/cycles/nodes/shaders.html"),  # todo doc
+    ("bpy.types.ShaderNodeVolumeAbsorption.*",     "render/cycles/nodes/shaders.html#volume-absorption"),
+    ("bpy.types.ShaderNodeVolumeScatter.*",        "render/cycles/nodes/shaders.html#volume-scatter"),
     # Textures
-    ("bpy.types.ShaderNodeTexBrick.*",       "render/cycles/nodes/textures.html#brick-texture"),
-    ("bpy.types.ShaderNodeTexChecker.*",     "render/cycles/nodes/textures.html#checker-texture"),
-    ("bpy.types.ShaderNodeTexEnvironment.*", "render/cycles/nodes/textures.html#environment-texture"),
-    ("bpy.types.ShaderNodeTexGradient.*",    "render/cycles/nodes/textures.html#gradient-texture"),
-    ("bpy.types.ShaderNodeTexImage.*",       "render/cycles/nodes/textures.html#image-texture"),
-    ("bpy.types.ShaderNodeTexMagic.*",       "render/cycles/nodes/textures.html#magic-texture"),
-    ("bpy.types.ShaderNodeTexMusgrave.*",    "render/cycles/nodes/textures.html#musgrave-texture"),
-    ("bpy.types.ShaderNodeTexNoise.*",       "render/cycles/nodes/textures.html#noise-texture"),
-    ("bpy.types.ShaderNodeTexSky.*",         "render/cycles/nodes/textures.html#sky-texture"),
-    ("bpy.types.ShaderNodeTexVoronoi.*",     "render/cycles/nodes/textures.html#voronoi-texture"),
-    ("bpy.types.ShaderNodeTexWave.*",        "render/cycles/nodes/textures.html#wave-texture"),
+    ("bpy.types.ShaderNodeTexBrick.*",        "render/cycles/nodes/textures.html#brick-texture"),
+    ("bpy.types.ShaderNodeTexChecker.*",      "render/cycles/nodes/textures.html#checker-texture"),
+    ("bpy.types.ShaderNodeTexEnvironment.*",  "render/cycles/nodes/textures.html#environment-texture"),
+    ("bpy.types.ShaderNodeTexGradient.*",     "render/cycles/nodes/textures.html#gradient-texture"),
+    ("bpy.types.ShaderNodeTexImage.*",        "render/cycles/nodes/textures.html#image-texture"),
+    ("bpy.types.ShaderNodeTexMagic.*",        "render/cycles/nodes/textures.html#magic-texture"),
+    ("bpy.types.ShaderNodeTexMusgrave.*",     "render/cycles/nodes/textures.html#musgrave-texture"),
+    ("bpy.types.ShaderNodeTexNoise.*",        "render/cycles/nodes/textures.html#noise-texture"),
+    ("bpy.types.ShaderNodeTexSky.*",          "render/cycles/nodes/textures.html#sky-texture"),
+    ("bpy.types.ShaderNodeTexVoronoi.*",      "render/cycles/nodes/textures.html#voronoi-texture"),
+    ("bpy.types.ShaderNodeTexWave.*",         "render/cycles/nodes/textures.html#wave-texture"),
     # Other
-    ("bpy.types.ShaderNodeAttribute.*",      "render/cycles/nodes/more.html#attribute"),
-    ("bpy.types.ShaderNodeBlackbody.*",      "render/cycles/nodes/more.html#blackbody"),
+    ("bpy.types.ShaderNodeAttribute.*",       "render/cycles/nodes/more.html#attribute"),
+    ("bpy.types.ShaderNodeBlackbody.*",       "render/cycles/nodes/more.html#blackbody"),
     # ("bpy.types.ShaderNodeBrightContrast.*", ""),
-    ("bpy.types.ShaderNodeBump.*",           "render/cycles/nodes/more.html#bump"),
-    ("bpy.types.ShaderNodeCameraData.*",     "render/cycles/nodes/more.html"),  # TODO doc
-    # ("bpy.types.ShaderNodeCombineHSV.*", ""),
-    # ("bpy.types.ShaderNodeCombineRGB.*", ""),
+    ("bpy.types.ShaderNodeBump.*",            "render/cycles/nodes/more.html#bump"),
+    ("bpy.types.ShaderNodeCameraData.*",      "render/cycles/nodes/input.html#camera-data"),
+    # ("bpy.types.ShaderNodeCombineHSV.*",    ""),
+    # ("bpy.types.ShaderNodeCombineRGB.*",    ""),
     ("bpy.types.ShaderNodeFresnel.*",         "render/cycles/nodes/more.html#fresnel"),
     # ("bpy.types.ShaderNodeGamma.*", ""),
     ("bpy.types.ShaderNodeGeometry.*",        "render/cycles/nodes/more.html#geometry"),
-    ("bpy.types.ShaderNodeHairInfo.*",        "render/cycles/nodes/more.html#hair-info"),
+    ("bpy.types.ShaderNodeHairInfo.*",        "render/cycles/nodes/input.html#hair-info"),
     # ("bpy.types.ShaderNodeHueSaturation.*", ""),
-    # ("bpy.types.ShaderNodeInvert.*", ""),
+    # ("bpy.types.ShaderNodeInvert.*",        ""),
     ("bpy.types.ShaderNodeLayerWeight.*",     "render/cycles/nodes/more.html#layer-weight"),
     ("bpy.types.ShaderNodeLightFalloff.*",    "render/cycles/nodes/more.html#light-falloff"),
     ("bpy.types.ShaderNodeLightPath.*",       "render/cycles/nodes/more.html#light-path"),
     ("bpy.types.ShaderNodeMapping.*",         "render/cycles/nodes/more.html#mapping"),
-    # # ("bpy.types.ShaderNodeMath.*", ""),
-    # ("bpy.types.ShaderNodeMixRGB.*", ""),
+    # # ("bpy.types.ShaderNodeMath.*",        ""),
+    # ("bpy.types.ShaderNodeMixRGB.*",        ""),
     ("bpy.types.ShaderNodeNormalMap.*",       "render/cycles/nodes/more.html#normal-map"),
     ("bpy.types.ShaderNodeObjectInfo.*",      "render/cycles/nodes/more.html#object-info"),
     ("bpy.types.ShaderNodeParticleInfo.*",    "render/cycles/nodes/more.html#particle-info"),
     ("bpy.types.ShaderNodeRGB.*",             "render/cycles/nodes/more.html#rgb"),
-    # ("bpy.types.ShaderNodeRGBCurve.*", ""),
-    # ("bpy.types.ShaderNodeRGBToBW.*", ""),
-    # ("bpy.types.ShaderNodeSeparateHSV.*", ""),
-    # ("bpy.types.ShaderNodeSeparateRGB.*", ""),
-    ("bpy.types.ShaderNodeTangent.*",        "render/cycles/nodes/more.html#tangent"),
-    ("bpy.types.ShaderNodeTexCoord.*",       "render/cycles/nodes/more.html#texture-coordinates"),
-    ("bpy.types.ShaderNodeValue.*",          "render/cycles/nodes/more.html#value"),
-    # ("bpy.types.ShaderNodeVectorCurve.*", ""),
+    # ("bpy.types.ShaderNodeRGBCurve.*",      ""),
+    # ("bpy.types.ShaderNodeRGBToBW.*",       ""),
+    # ("bpy.types.ShaderNodeSeparateHSV.*",   ""),
+    # ("bpy.types.ShaderNodeSeparateRGB.*",   ""),
+    ("bpy.types.ShaderNodeTangent.*",         "render/cycles/nodes/more.html#tangent"),
+    ("bpy.types.ShaderNodeTexCoord.*",        "render/cycles/nodes/more.html#texture-coordinates"),
+    ("bpy.types.ShaderNodeValue.*",           "render/cycles/nodes/more.html#value"),
+    # ("bpy.types.ShaderNodeVectorCurve.*",   ""),
     ("bpy.types.ShaderNodeVectorMath.*",      "render/cycles/nodes/more.html"),  # TODO doc
     ("bpy.types.ShaderNodeVectorTransform.*", "render/cycles/nodes/more.html#vector-transform"),
 
@@ -422,18 +422,18 @@ url_manual_mapping = (
     ("bpy.types.Lamp.*",       "render/blender_render/lighting"),             # catchall, todo - refine
 
     # --- Animation ---
-    ("bpy.types.Keyframe.*",  "animation/actions.html"),
-    ("bpy.types.FCurve.*",    "editors/graph_editor/fcurves.html"),
+    ("bpy.types.Keyframe.*",   "animation/actions.html"),
+    ("bpy.types.FCurve.*",     "editors/graph_editor/fcurves.html"),
 
     # --- Rigging ---
-    ("bpy.types.Bone.*",      "rigging/armatures/bones.html"),
-    ("bpy.types.EditBone.*",  "rigging/armatures/bones.html"),
-    ("bpy.types.PoseBone.*",  "rigging/posing"),
+    ("bpy.types.Bone.*",       "rigging/armatures/bones.html"),
+    ("bpy.types.EditBone.*",   "rigging/armatures/bones.html"),
+    ("bpy.types.PoseBone.*",   "rigging/posing"),
 
     # --- World ---
-    ("bpy.types.World.*",     "render/blender_render/world"),
+    ("bpy.types.World.*",      "render/blender_render/world"),
 
-    ("bpy.types.Texture.*",   "render/blender_render/textures"),
+    ("bpy.types.Texture.*",    "render/blender_render/textures"),
 
     # *** Spaces ***
     ("bpy.types.SpaceView3D.*",  "editors/3dview"),
@@ -446,7 +446,7 @@ url_manual_mapping = (
     ("bpy.ops.anim.*",        "animation"),
     ("bpy.ops.armature.*",    "rigging/armatures/"),
     ("bpy.ops.boid.*",        "physics/particles/physics/boids.html"),
-    # ("bpy.ops.brush.*",  ""),  # TODO
+    # ("bpy.ops.brush.*",     ""),  # TODO
     ("bpy.ops.buttons.*",     "interface/buttons_and_controls.html"),
     ("bpy.ops.camera.*",      "render/camera"),
     ("bpy.ops.clip.*",        "editors/movie_clip_editor/index.html#movie-clip-editor"),
@@ -475,7 +475,7 @@ url_manual_mapping = (
     # ("bpy.ops.lattice.*",  ""),  # TODO
     ("bpy.ops.logic.*",            "game_engine/logic"),
     ("bpy.ops.marker.*",           "animation/markers.html"),
-    # ("bpy.ops.mask.*",  ""),     # TODO
+    ("bpy.ops.mask.*",  "editors/movie_clip_editor/masking.html"),
     ("bpy.ops.material.new",    "render/blender_render/materials/assigning_a_material.html#creating-a-new-material"),
     ("bpy.ops.material.*",      "render/blender_render"),
     ("bpy.ops.mesh.vertices_smooth",      "modeling/meshes/editing/deforming/smooth.html"),
