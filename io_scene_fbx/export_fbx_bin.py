@@ -1794,10 +1794,10 @@ def fbx_skeleton_from_armature(scene, settings, arm_obj, objects, data_meshes,
         # Always handled by an Armature modifier...
         found = False
         for mod in ob_obj.bdata.modifiers:
-            if mod.type not in {'ARMATURE'}:
+            if mod.type not in {'ARMATURE'} or not mod.object:
                 continue
             # We only support vertex groups binding method, not bone envelopes one!
-            if mod.object == arm_obj.bdata and mod.use_vertex_groups:
+            if mod.object in {arm_obj.bdata, arm_obj.bdata.proxy} and mod.use_vertex_groups:
                 found = True
                 break
 
@@ -2059,6 +2059,9 @@ def fbx_animations(scene_data):
 
             if not ob.animation_data:
                 continue  # Do not export animations for objects that are absolutely not animated, see T44386.
+
+            if ob.animation_data.is_property_readonly('action'):
+                continue  # Cannot re-assign 'active action' to this object (usually related to NLA usage, see T48089).
 
             # We can't play with animdata and actions and get back to org state easily.
             # So we have to add a temp copy of the object to the scene, animate it, and remove it... :/

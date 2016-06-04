@@ -21,13 +21,13 @@
 bl_info = {
     "name": "Pie Menus Official",
     "author": "Antony Riakiotakis, Sebastian Koenig",
-    "version": (1, 0, 2),
-    "blender": (2, 71, 4),
+    "version": (1, 0, 3),
+    "blender": (2, 77, 0),
     "description": "Enable official Pie Menus in Blender",
+    "wiki_url": "http://wiki.blender.org/index.php/Dev:Ref/Release_Notes/2.72/UI/Pie_Menus",
+    "tracker_url": "https://developer.blender.org/maniphest/task/create/?project=3&type=Bug",
     "category": "User Interface",
-    "wiki_url": "http://wiki.blender.org/index.php/Dev:Ref/Release_Notes/2.72/UI/Pie_Menus"
 }
-
 
 import bpy
 from bpy.types import Menu, Operator
@@ -352,6 +352,30 @@ class CLIP_PIE_timecontrol_pie(Menu):
         pie.operator("screen.frame_offset", text="Next Frame", icon='TRIA_RIGHT').delta = 1
 
 
+class PieMenuPrefs(bpy.types.AddonPreferences):
+    bl_idname = __name__
+
+    bpy.types.Scene.Enable_Tab_01 = bpy.props.BoolProperty(default=False)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.prop(context.scene, "Enable_Tab_01", text="Hotkey List", icon="INFO")
+        if context.scene.Enable_Tab_01:
+            row = layout.row()
+            layout.label(text="Object Mode: 'TAB', 'PRESS'")
+            layout.label(text="Shade: 'Z', 'PRESS'")
+            layout.label(text="View: 'Q', 'PRESS'")
+            layout.label(text="Manipulator: 'SPACE', 'PRESS', ctrl=True")
+            layout.label(text="Pivot: 'PERIOD', 'PRESS'")
+            layout.label(text="Snap: 'TAB', 'PRESS', ctrl=True, shift=True")
+            layout.label(text="Grease Pencil Stroke Edit Mode: 'TAB', 'PRESS'")
+            layout.label(text="Marker: 'Q', 'PRESS'")
+            layout.label(text="Clipsetup: 'W', 'PRESS'")
+            layout.label(text="Tracking: 'E', 'PRESS'")
+            layout.label(text="Solver: 'S', 'PRESS', shift=True")
+            layout.label(text="Reconstruction: 'W', 'PRESS', shift=True")
+            layout.label(text="Timecontrol: 'A', 'PRESS', oskey=True")
+
 addon_keymaps = []
 
 classes = (
@@ -364,7 +388,7 @@ classes = (
     VIEW3D_PIE_manipulator,
     VIEW3D_PIE_pivot,
     VIEW3D_PIE_snap,
-
+    PieMenuPrefs,
     CLIP_PIE_geometry_reconstruction,
     CLIP_PIE_tracking_pie,
     CLIP_PIE_display_pie,
