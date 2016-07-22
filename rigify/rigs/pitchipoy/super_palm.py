@@ -1,4 +1,4 @@
-#====================== BEGIN GPL LICENSE BLOCK ======================
+# ##### BEGIN GPL LICENSE BLOCK #####
 #
 #  This program is free software; you can redistribute it and/or
 #  modify it under the terms of the GNU General Public License
@@ -14,7 +14,7 @@
 #  along with this program; if not, write to the Free Software Foundation,
 #  Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-#======================= END GPL LICENSE BLOCK ========================
+# ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
 
@@ -23,10 +23,10 @@ from math import cos, pi
 
 import bpy
 
-from ..utils import MetarigError
-from ..utils import copy_bone
-from ..utils import strip_org, deformer
-from ..utils import create_widget
+from ...utils import MetarigError
+from ...utils import copy_bone
+from ...utils import strip_org, deformer
+from ...utils import create_widget
 
 
 def bone_siblings(obj, bone):
@@ -70,7 +70,9 @@ class Rig:
         siblings = bone_siblings(obj, bone)
 
         if len(siblings) == 0:
-            raise MetarigError("RIGIFY ERROR: Bone '%s': must have a parent and at least one sibling" % (strip_org(bone)))
+            raise MetarigError(
+                    "RIGIFY ERROR: Bone '%s': must have a parent and at least one sibling" %
+                    (strip_org(bone)))
 
         # Sort list by name and distance
         siblings.sort()
@@ -105,9 +107,25 @@ class Rig:
         # Parenting
         eb = self.obj.data.edit_bones
 
+        # turn off inherit scale for all ORG-bones to prevent undesired transformations
+
+        for o in self.org_bones:
+            eb[o].use_inherit_scale = False
+
         for d, b in zip(def_bones, self.org_bones):
             eb[d].use_connect = False
             eb[d].parent = eb[b]
+
+        # Get ORG parent bone
+        org_parent = eb[self.org_bones[0]].parent.name
+
+        # Get DEF parent from ORG parent
+        def_parent = deformer(strip_org(org_parent))
+
+        # Switch parent
+        for o in self.org_bones:
+            eb[o].parent = eb[def_parent]
+        eb[ctrl].parent = eb[def_parent]
 
         # Constraints
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -123,6 +141,14 @@ class Rig:
             con.target_space = 'LOCAL'
             con.owner_space = 'LOCAL'
             con.influence = i / div
+
+            con = pb[b].constraints.new('COPY_SCALE')
+            con.name = "copy_scale"
+            con.target = self.obj
+            con.subtarget = def_parent
+            con.target_space = 'WORLD'
+            con.owner_space = 'WORLD'
+            con.influence = 1
 
             con = pb[b].constraints.new('COPY_ROTATION')
             con.name = "copy_rotation"
@@ -148,14 +174,35 @@ class Rig:
         w = create_widget(self.obj, ctrl)
         if w is not None:
             mesh = w.data
-            verts = [(0.15780271589756012, 2.086162567138672e-07, -0.30000004172325134), (0.15780259668827057, 1.0, -0.2000001072883606), (-0.15780280530452728, 0.9999999403953552, -0.20000004768371582), (-0.15780259668827057, -2.086162567138672e-07, -0.29999998211860657), (-0.15780256688594818, -2.7089754439657554e-07, 0.30000004172325134), (-0.1578027755022049, 0.9999998807907104, 0.19999995827674866), (0.15780262649059296, 0.9999999403953552, 0.19999989867210388), (0.1578027456998825, 1.4633496903115883e-07, 0.29999998211860657), (0.15780268609523773, 0.2500001788139343, -0.27500003576278687), (-0.15780264139175415, 0.24999985098838806, -0.2749999761581421), (0.15780262649059296, 0.7500000596046448, -0.22500008344650269), (-0.1578027606010437, 0.7499998807907104, -0.2250000238418579), (0.15780265629291534, 0.75, 0.22499991953372955), (0.15780271589756012, 0.2500000596046448, 0.2749999761581421), (-0.15780261158943176, 0.2499997615814209, 0.27500003576278687), (-0.1578027307987213, 0.7499998807907104, 0.22499997913837433)]
+            verts = [
+                (0.1578, 0.0, -0.3),
+                (0.1578, 1.0, -0.2),
+                (-0.1578, 1.0, -0.2),
+                (-0.1578, -0.0, -0.3),
+                (-0.1578, -0.0, 0.3),
+                (-0.1578, 1.0, 0.2),
+                (0.1578, 1.0, 0.2),
+                (0.1578, 0.0, 0.3),
+                (0.1578, 0.25, -0.275),
+                (-0.1578, 0.25, -0.275),
+                (0.1578, 0.75, -0.225),
+                (-0.1578, 0.75, -0.225),
+                (0.1578, 0.75, 0.225),
+                (0.1578, 0.25, 0.275),
+                (-0.1578, 0.25, 0.275),
+                (-0.1578, 0.75, 0.225),
+                ]
+
             if 'Z' in self.palm_rotation_axis:
                 # Flip x/z coordinates
-                temp = []
-                for v in verts:
-                    temp += [(v[2], v[1], v[0])]
-                verts = temp
-            edges = [(1, 2), (0, 3), (4, 7), (5, 6), (8, 0), (9, 3), (10, 1), (11, 2), (12, 6), (13, 7), (4, 14), (15, 5), (10, 8), (11, 9), (15, 14), (12, 13)]
+                verts = [v[::-1] for v in verts]
+
+            edges = [
+                (1, 2), (0, 3), (4, 7), (5, 6),
+                (8, 0), (9, 3), (10, 1), (11, 2),
+                (12, 6), (13, 7), (4, 14), (15, 5),
+                (10, 8), (11, 9), (15, 14), (12, 13),
+                ]
             mesh.from_pydata(verts, edges, [])
             mesh.update()
 
@@ -169,7 +216,11 @@ def add_parameters(params):
 
     """
     items = [('X', 'X', ''), ('Z', 'Z', '')]
-    params.palm_rotation_axis = bpy.props.EnumProperty(items=items, name="Palm Rotation Axis", default='X')
+    params.palm_rotation_axis = bpy.props.EnumProperty(
+            items=items,
+            name="Palm Rotation Axis",
+            default='X',
+            )
 
 
 def parameters_ui(layout, params):
