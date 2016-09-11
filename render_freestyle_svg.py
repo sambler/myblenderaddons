@@ -151,12 +151,28 @@ def is_preview_render(scene):
 
 def create_path(scene):
     """Creates the output path for the svg file"""
-    dirname = os.path.dirname(scene.render.frame_path())
+    path = os.path.dirname(scene.render.frame_path())
+    file_dir_path = os.path.dirname(bpy.data.filepath)
+
+    # try to use the given path if it is absolute
+    if os.path.isabs(path):
+        dirname = path
+
+    # otherwise, use current file's location as a start for the relative path
+    elif bpy.data.is_saved and file_dir_path:
+        dirname = os.path.normpath(os.path.join(file_dir_path, path))
+
+    # otherwise, use the folder from which blender was called as the start
+    else:
+        dirname = os.path.abspath(bpy.path.abspath(path))
+
+
     basename = bpy.path.basename(scene.render.filepath)
     if scene.svg_export.mode == 'FRAME':
         frame = "{:04d}".format(scene.frame_current)
     else:
         frame = "{:04d}-{:04d}".format(scene.frame_start, scene.frame_end)
+
     return os.path.join(dirname, basename + frame + ".svg")
 
 
@@ -477,7 +493,7 @@ class SVGFillBuilder:
                     break
                 # if it isn't a hole, it is likely that there are two strokes belonging
                 # to the same object separated by another object. let's try to join them
-                elif (get_object_name(base) == get_object_name(stroke) and 
+                elif (get_object_name(base) == get_object_name(stroke) and
                       diffuse_from_stroke(stroke) == diffuse_from_stroke(stroke)):
                     base = extend_stroke(base, (sv for sv in stroke))
                     break
@@ -512,7 +528,7 @@ class SVGFillBuilder:
             fills = (self.stroke_to_fill(stroke).get("d") for stroke in v)
             merged_points = " ".join(fills)
             base.attrib['d'] += merged_points
-            yield base 
+            yield base
 
     def write(self, strokes):
         """Write SVG data tree to file """
@@ -668,6 +684,21 @@ def register_namespaces(namespaces=namespaces):
         if name != 'svg': # creates invalid xml
             et.register_namespace(name, url)
 
+@persistent
+def handle_versions(self):
+    # We don't modify startup file because it assumes to
+    # have all the default values only.
+    if not bpy.data.is_saved:
+        return
+
+    # Revision https://developer.blender.org/rBA861519e44adc5674545fa18202dc43c4c20f2d1d
+    # changed the default for fills.
+    # fix by Sergey https://developer.blender.org/T46150
+    if bpy.data.version <= (2, 76, 0):
+        for linestyle in bpy.data.linestyles:
+            linestyle.use_export_fills = True
+
+
 
 classes = (
     SVGExporterPanel,
@@ -717,6 +748,9 @@ def register():
     # register namespaces
     register_namespaces()
 
+    # handle regressions
+    bpy.app.handlers.version_update.append(handle_versions)
+
 
 def unregister():
 
@@ -738,7 +772,8 @@ def unregister():
     parameter_editor.callbacks_lineset_post.remove(SVGPathShaderCallback.lineset_post)
     parameter_editor.callbacks_lineset_post.remove(SVGFillShaderCallback.lineset_post)
 
+    bpy.app.handlers.version_update.remove(handle_versions)
+
 
 if __name__ == "__main__":
     register()
-

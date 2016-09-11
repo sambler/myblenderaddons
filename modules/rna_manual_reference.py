@@ -1,4 +1,4 @@
-#  RNA MANUAL REFERENCE
+    #  RNA MANUAL REFERENCE
 #
 # This file maps RNA to online URL's for right mouse context menu documentation access
 #
@@ -76,52 +76,25 @@ url_manual_mapping = (
     ("bpy.types.UserPreferencesSystem.*",          "preferences/system.html"),
     ("bpy.types.UserSolidLight.*",                 "preferences/system.html"),
     # --- Theme ---
-    ("bpy.types.ThemeBoneColorSet.*",              "preferences/themes.html"),
-    ("bpy.types.ThemeClipEditor.*",                "preferences/themes.html"),
-    ("bpy.types.ThemeConsole.*",                   "preferences/themes.html"),
-    ("bpy.types.ThemeDopeSheet.*",                 "preferences/themes.html"),
-    ("bpy.types.ThemeFileBrowser.*",               "preferences/themes.html"),
-    ("bpy.types.ThemeFontStyle.*",                 "preferences/themes.html"),
-    ("bpy.types.ThemeGradientColors.*",            "preferences/themes.html"),
-    ("bpy.types.ThemeGraphEditor.*",               "preferences/themes.html"),
-    ("bpy.types.ThemeImageEditor.*",               "preferences/themes.html"),
-    ("bpy.types.ThemeInfo.*",                      "preferences/themes.html"),
-    ("bpy.types.ThemeLogicEditor.*",               "preferences/themes.html"),
-    ("bpy.types.ThemeNLAEditor.*",                 "preferences/themes.html"),
-    ("bpy.types.ThemeNodeEditor.*",                "preferences/themes.html"),
-    ("bpy.types.ThemeOutliner.*",                  "preferences/themes.html"),
-    ("bpy.types.ThemePanelColors.*",               "preferences/themes.html"),
-    ("bpy.types.ThemeProperties.*",                "preferences/themes.html"),
-    ("bpy.types.ThemeSequenceEditor.*",            "preferences/themes.html"),
-    ("bpy.types.ThemeSpaceGeneric.*",              "preferences/themes.html"),
-    ("bpy.types.ThemeSpaceGradient.*",             "preferences/themes.html"),
-    ("bpy.types.ThemeSpaceListGeneric.*",          "preferences/themes.html"),
-    ("bpy.types.ThemeStyle.*",                     "preferences/themes.html"),
-    ("bpy.types.ThemeTextEditor.*",                "preferences/themes.html"),
-    ("bpy.types.ThemeTimeline.*",                  "preferences/themes.html"),
-    ("bpy.types.ThemeUserInterface.*",             "preferences/themes.html"),
-    ("bpy.types.ThemeUserPreferences.*",           "preferences/themes.html"),
-    ("bpy.types.ThemeView3D.*",                    "preferences/themes.html"),
-    ("bpy.types.ThemeWidgetColors.*",              "preferences/themes.html"),
-    ("bpy.types.ThemeWidgetStateColors.*",         "preferences/themes.html"),
+    ("bpy.types.Theme*",                           "preferences/themes.html"),
     # --- Other ---
-    ("bpy.types.Addon.*",                           "advanced/scripting/python/addons.html"),
+    ("bpy.types.Addon*",                           "advanced/scripting/python/addons.html"),
     ("bpy.types.AddonPreferences.*",                "advanced/scripting/python/addons.html"),
 
     # *** User Interface ***
-    ("bpy.types.Area.*",                    "interface/editors/arranging_areas.html"),
-    ("bpy.types.AreaSpaces.*",              "interface/editors/arranging_areas.html"),
+    ("bpy.types.Area.*",                    "interface/window_system/areas.html"),
+    ("bpy.types.AreaSpaces.*",              "interface/window_system/areas.html"),
     ("bpy.types.ConsoleLine.*",             "advanced/command_line"),
-    ("bpy.types.Header.*",                  "interface/editors/headers.html"),
-    ("bpy.types.Panel.*",                   "interface/editors/panels.html"),
-    ("bpy.types.Region.*",                  "interface/editors/arranging_areas.html"),
+    ("bpy.types.Header.*",                  "interface/window_system/regions.html#header"),
+    ("bpy.types.Panel.*",                   "interface/window_system/tabs_panels.html#panels"),
+    ("bpy.types.Region.*",                  "interface/window_system/regions.html"),
     # ("bpy.types.UILayout.*",              ""),  # Todo
     # ("bpy.types.UIList.*",                ""),  # Todo
     ("bpy.types.Menu.*",                    "interface/controls/buttons_and_controls.html#menu-buttons"),
     ("bpy.types.UIPieMenu.*",               "interface/controls/buttons_and_controls.html#pie-menus"),
     ("bpy.types.UIPopupMenu.*",             "interface/controls/buttons_and_controls.html#pop-up-menus"),
-    ("bpy.types.Window.*",                  "interface/editors"),
-    ("bpy.types.WindowManager.*",           "interface/editors"),
+    ("bpy.types.Window.*",                  "interface/index.html#window-system"),
+    ("bpy.types.WindowManager.*",           "interface/index.html#window-system"),
     # --- Spaces ---
     ("bpy.types.SpaceConsole.*",            "editors/python_console.html"),
     ("bpy.types.SpaceDopeSheetEditor.*",    "editors/dope_sheet"),
@@ -153,9 +126,9 @@ url_manual_mapping = (
     ("bpy.types.NormalEditModifier.*",             "modeling/modifiers/modify/normal_edit.html"),
     ("bpy.types.UVProjectModifier.*",              "modeling/modifiers/modify/uv_project.html"),
     ("bpy.types.UVWarpModifier.*",                 "modeling/modifiers/modify/uv_warp.html"),
-    ("bpy.types.VertexWeightMixModifier.*",        "modeling/modifiers/modify/vertex_weight.html"),
-    ("bpy.types.VertexWeightEditModifier.*",       "modeling/modifiers/modify/vertex_weight.html"),
-    ("bpy.types.VertexWeightProximityModifier.*",  "modeling/modifiers/modify/vertex_weight.html"),
+    ("bpy.types.VertexWeightMixModifier.*",        "modeling/modifiers/modify/weight_mix.html"),
+    ("bpy.types.VertexWeightEditModifier.*",       "modeling/modifiers/modify/weight_edit.html"),
+    ("bpy.types.VertexWeightProximityModifier.*",  "modeling/modifiers/modify/weight_proximity.html"),
     # --- Generate Modifiers ---
     ("bpy.types.ArrayModifier.*",            "modeling/modifiers/generate/array.html"),
     ("bpy.types.BevelModifier.*",            "modeling/modifiers/generate/bevel.html"),
@@ -203,8 +176,9 @@ url_manual_mapping = (
     ("bpy.types.SoftBodyModifier.*",          "physics/soft_body"),
 
     # *** Constraints ***
-    ("bpy.types.Constraint.*",                "rigging/constraints"),
+    ("bpy.types.Constraint.influence",        "rigging/constraints/interface/influence.html"),
     ("bpy.types.Constraint.mute",             "rigging/constraints/interface/the_stack.html"),  # others could be added here?
+    ("bpy.types.Constraint.*",                "rigging/constraints"),
     # --- Motion Tracking Constraints ---
     ("bpy.types.FollowTrackConstraint.*",     "rigging/constraints/motion_tracking/follow_track.html"),
     ("bpy.types.ObjectSolverConstraint.*",    "rigging/constraints/motion_tracking/object_solver.html"),
@@ -239,28 +213,29 @@ url_manual_mapping = (
 
     # *** Render Settings ***
     ("bpy.types.ImageFormatSettings.*",        "data_system/files/media/image_formats.html"),
+    ("bpy.types.RenderSettings.engine",        "render/introduction.html#render-engines"),
+    ("bpy.types.RenderSettings.simplify_subdivision*", "data_system/scenes/properties.html#simplify"),
     ("bpy.types.RenderSettings.filepath",      "render/output/output.html#output-panel"),
     ("bpy.types.RenderSettings.display_mode",  "render/output/display.html#displaying-renders"),
     ("bpy.types.RenderSettings.*",             "render"),  # Catchall, todo - refine
     ("bpy.types.RenderEngine.*",               "render/introduction.html#render-engines"),
-    ("bpy.types.RenderLayer.*",                "render/post_process/layers.html"),
-    ("bpy.types.RenderLayers.*",               "render/post_process/layers.html"),
+    ("bpy.types.RenderLayer*",                 "render/post_process/layers.html"),
     ("bpy.types.RenderPass.*",                 "render/blender_render/passes.html"),
     ("bpy.types.RenderResult.*",               "render/output/display.html"),
-    ("bpy.types.RenderSlot.*",                 "render/output/display.html#display-options"),
-    ("bpy.types.RenderSlots.*",                "render/output/display.html#display-options"),
-    ("bpy.types.RenderView.*",                 "render/workflows/multiview/usage.html#views-setup"),
-    ("bpy.types.RenderViews.*",                "render/workflows/multiview/usage.html#views-setup"),
+    ("bpy.types.RenderSlot*",                  "render/output/display.html#display-options"),
+    ("bpy.types.RenderView*",                  "render/workflows/multiview/usage.html#views-setup"),
+    ("bpy.types.FFmpegSettings.audio_channels", "data_system/scenes/properties.html#audio"),
+    ("bpy.types.FFmpegSettings.audio_mixrate",  "data_system/scenes/properties.html#audio"),
     ("bpy.types.FFmpegSettings.*",             "render/output/video.html#encoding-panel"),
     # --- Baking ---
-    ("bpy.types.BakePixel.*",                  "render/workflows/bake.html"),
-    ("bpy.types.BakeSettings.*",               "render/workflows/bake.html#options"),
+    ("bpy.types.BakePixel.*",                  "render/blender_render/bake.html"),
+    ("bpy.types.BakeSettings.*",               "render/blender_render/bake.html#options"),
 
     # Painting/Sculpting
-    ("bpy.types.Sculpt.*",                     "painting_sculpting/sculpting"),
-    ("bpy.types.SculptToolCapabilities.*",     "painting_sculpting/sculpting"),
-    ("bpy.types.VertexColors.*",               "painting_sculpting/painting/vertex_paint"),
-    ("bpy.types.VertexPaint.*",                "painting_sculpting/painting/vertex_paint/introduction.html"),
+    ("bpy.types.Sculpt.*",                     "sculpt_paint/sculpting"),
+    ("bpy.types.SculptToolCapabilities.*",     "sculpt_paint/sculpting"),
+    ("bpy.types.VertexColors.*",               "sculpt_paint/painting/vertex_paint"),
+    ("bpy.types.VertexPaint.*",                "sculpt_paint/painting/vertex_paint/introduction.html"),
 
     # *** FreeStyle ***
     ("bpy.types.LineStyleAlphaModifier_AlongStroke.*",            "render/freestyle/parameter_editor/line_style/alpha.html#along-stroke"),
@@ -304,21 +279,21 @@ url_manual_mapping = (
     ("bpy.types.LineStyleThicknessModifier_Noise.*",              "render/freestyle/parameter_editor/line_style/thickness.html#noise"),
     ("bpy.types.LineStyleThicknessModifier_Tangent.*",            "render/freestyle/parameter_editor/line_style/thickness.html#tangent"),
     ("bpy.types.FreestyleLineSet.*",                              "render/freestyle/parameter_editor/line_set.html"),
-    ("bpy.types.FreestyleLineStyle.*",                            "render/freestyle/parameter_editor/line_style.html"),
+    ("bpy.types.FreestyleLineStyle.*",                            "render/freestyle/parameter_editor/line_style"),
     # ("bpy.types.FreestyleModuleSettings.*",                     ""), Todo
     # ("bpy.types.FreestyleSettings.*",                           ""), Todo
     ("bpy.types.Linesets.*",                                      "render/freestyle/parameter_editor/line_set.html"),
 
     # *** Materials (blender internal) ***
-    ("bpy.types.Material.diffuse*",  "render/blender_render/materials/properties/diffuse_shaders.html"),
-    ("bpy.types.Material.specular*", "render/blender_render/materials/properties/specular_shaders.html"),
-    ("bpy.types.Material.ambient*",  "render/blender_render/materials/properties/shading.html"),
-    ("bpy.types.Material.preview_render_type", "editors/properties/material.html#material-preview"),
-    ("bpy.types.Material.*",                   "render/blender_render"),  # Catchall, until the section is filled in
-    # ("bpy.types.MaterialSlot.link", "render/blender_render/materials/options.html#material-naming_and_linking"),  # TODO, T42839
-    ("bpy.types.MaterialVolume.*",    "render/blender_render/materials/special_effects/volume.html"),
-    ("bpy.types.MaterialHalo.*",      "render/blender_render/materials/special_effects/halo.html"),
-    ("bpy.types.MaterialStrand.*",    "render/blender_render/materials/properties/strands.html"),
+    ("bpy.types.Material.diffuse*",               "render/blender_render/materials/properties/diffuse_shaders.html"),
+    ("bpy.types.Material.specular*",              "render/blender_render/materials/properties/specular_shaders.html"),
+    ("bpy.types.Material.ambient*",               "render/blender_render/materials/properties/shading.html"),
+    ("bpy.types.Material.preview_render_type",    "editors/properties/material.html#material-preview"),
+    ("bpy.types.Material.*",                      "render/blender_render"),  # Catchall, until the section is filled in
+    # ("bpy.types.MaterialSlot.link",             "render/blender_render/materials/options.html#material-naming_and_linking"),  # TODO, T42839
+    ("bpy.types.MaterialVolume.*",                "render/blender_render/materials/special_effects/volume.html"),
+    ("bpy.types.MaterialHalo.*",                  "render/blender_render/materials/special_effects/halo.html"),
+    ("bpy.types.MaterialStrand.*",                "render/blender_render/materials/properties/strands.html"),
     ("bpy.types.MaterialSubsurfaceScattering.*",  "render/blender_render/materials/properties/subsurface_scattering.html"),
     ("bpy.types.MaterialRaytraceMirror.*",        "render/blender_render/materials/properties/mirror.html"),
     ("bpy.types.MaterialRaytraceTransparency.*",  "render/blender_render/materials/properties/transparency.html#raytraced-transparency"),
@@ -359,21 +334,28 @@ url_manual_mapping = (
     ("bpy.types.MovieClipProxy.*",             "editors/movie_clip_editor/properties/proxy.html"),
     ("bpy.types.MovieClip.*",                  "editors/movie_clip_editor"), # Catchall
 
-    ("bpy.types.ColorManaged*",                "render/post_process/cm_and_exposure.html"),
+    ("bpy.types.ColorManagedSequencer*",       "render/post_process/color_management.html#sequencer"),
+    ("bpy.types.ColorManagedViewSettings*",    "render/post_process/color_management.html#render"),
+    ("bpy.types.ColorManagedDisplaySettings*", "render/post_process/color_management.html#display"),
+    ("bpy.types.ColorManaged*",                "render/post_process/color_management.html"),
     # ("bpy.types.NodeTree.*",                 ""), # dont document
-    ("bpy.types.Scene.*",                      "data_system/scenes.html"),
-    ("bpy.types.Screen.*",                     "interface/editors/screens.html"),
+    ("bpy.types.Scene.camera",                 "data_system/scenes/properties.html#scene"),
+    ("bpy.types.Scene.background_set",         "data_system/scenes/properties.html#scene"),
+    ("bpy.types.Scene.active_clip",            "data_system/scenes/properties.html#scene"),
+    ("bpy.types.Scene.audio_volume*",          "data_system/scenes/properties.html#audio"),
+    ("bpy.types.Scene.gravity",                "physics/introduction.html#gravity"),
+    ("bpy.types.Scene.*",                      "data_system/scenes"),
+    ("bpy.types.UnitSettings.*",               "data_system/scenes/properties.html#units"),
+    ("bpy.types.Screen.*",                     "interface/window_system/screens.html"),
     ("bpy.types.Sound.*",                      "editors/3dview/object/types/speaker.html"),
     ("bpy.types.Speaker.*",                    "editors/3dview/object/types/speaker.html"),
     ("bpy.types.Text.*",                       "editors/text_editor.html"),
     ("bpy.types.Texture.*",                    "render/blender_render/textures"),
     ("bpy.types.VectorFont.*",                 "modeling/texts"),
     ("bpy.types.World.*",                      "render/blender_render/world"),
-    ("bpy.types.WorldLighting.*ao*",           "render/blender_render/lighting/ambient_occlusion.html"),
-    ("bpy.types.WorldLighting.*ambient*",      "render/blender_render/lighting/ambient_occlusion.html"),
-    ("bpy.types.WorldLighting.*environment*",  "render/blender_render/lighting/ambient_light.html"),
+    ("bpy.types.WorldLighting.ao*",            "render/blender_render/world/ambient_occlusion.html"),
     # only other WorldLighting props are in Gather panel
-    ("bpy.types.WorldLighting.*",              "render/blender_render/lighting/ambient_occlusion.html#gather"),
+    ("bpy.types.WorldLighting.*",              "render/blender_render/world/ambient_occlusion.html#gather"),
     ("bpy.types.LatticePoint.*",               "editors/3dview/object/types/lattice.html"),  # TODO refine
     ("bpy.types.DisplaySafeAreas.*",           "editors/3dview/object/types/camera/safe_areas.html"),
     ("bpy.types.TextCharacterFormat.*",        "modeling/texts/introduction.html"),  # TODO refine
@@ -386,27 +368,55 @@ url_manual_mapping = (
     ("bpy.types.BackgroundImage.*",            "editors/3dview/display/background_images.html"),
     ("bpy.types.WalkNavigation.*",             "editors/3dview/navigate/3d_view.html#walk-mode"),
     ("bpy.types.SpaceView3D.cursor_location",  "editors/3dview/3d_cursor.html#numeric-input"),
-    ("bpy.types.Object.location",              "editors/3dview/transform/transform_control/transform_properties.html"),
-    ("bpy.types.Object.lock_location",         "editors/3dview/transform/transform_control/transform_properties.html#transform-properties-locking"),
-    ("bpy.types.Object.rotation_euler",        "editors/3dview/transform/transform_control/transform_properties.html"),
-    ("bpy.types.Object.rotation_quaternion",   "editors/3dview/transform/transform_control/transform_properties.html"),
-    ("bpy.types.Object.rotation_axis_angle",   "editors/3dview/transform/transform_control/transform_properties.html"),
-    ("bpy.types.Object.rotation_mode",         "editors/3dview/transform/transform_control/transform_properties.html"),
-    ("bpy.types.Object.lock_rotations_4d",     "editors/3dview/transform/transform_control/transform_properties.html#transform-properties-locking"),  # Todo
-    ("bpy.types.Object.lock_rotation",         "editors/3dview/transform/transform_control/transform_properties.html#transform-properties-locking"),
-    ("bpy.types.Object.scale",                 "editors/3dview/transform/transform_control/transform_properties.html"),
-    ("bpy.types.Object.lock_scale",            "editors/3dview/transform/transform_control/transform_properties.html#transform-properties-locking"),
-    ("bpy.types.Object.dimensions",            "editors/3dview/transform/transform_control/transform_properties.html"),
+    ("bpy.types.Object.location",              "editors/3dview/object/properties/transforms.html"),
+    ("bpy.types.Object.lock_location",         "editors/3dview/object/properties/transforms.html#transform-properties-locking"),
+    ("bpy.types.Object.rotation_euler",        "editors/3dview/object/properties/transforms.html"),
+    ("bpy.types.Object.rotation_quaternion",   "editors/3dview/object/properties/transforms.html"),
+    ("bpy.types.Object.rotation_axis_angle",   "editors/3dview/object/properties/transforms.html"),
+    ("bpy.types.Object.rotation_mode",         "editors/3dview/object/properties/transforms.html"),
+    ("bpy.types.Object.lock_rotations_4d",     "editors/3dview/object/properties/transforms.html#transform-properties-locking"),  # Todo
+    ("bpy.types.Object.lock_rotation",         "editors/3dview/object/properties/transforms.html#transform-properties-locking"),
+    ("bpy.types.Object.scale",                 "editors/3dview/object/properties/transforms.html"),
+    ("bpy.types.Object.lock_scale",            "editors/3dview/object/properties/transforms.html#transform-properties-locking"),
+    ("bpy.types.Object.dimensions",            "editors/3dview/object/properties/transforms.html"),
+    ("bpy.types.Object.delta*",                "editors/3dview/object/properties/transforms.html#delta-transforms"),
+    ("bpy.types.Object.layers",                "editors/3dview/object/properties/relations/layers.html"),
+    ("bpy.types.Object.dupli_type",            "editors/3dview/object/properties/duplication"),
+    ("bpy.types.Object.dupli_frames*",         "editors/3dview/object/properties/duplication/dupliframes.html"),
+    ("bpy.types.Object.use_dupli_vertices*",   "editors/3dview/object/properties/duplication/dupliverts.html"),
+    ("bpy.types.Object.use_dupli_faces*",      "editors/3dview/object/properties/duplication/duplifaces.html"),
+    ("bpy.types.Object.dupli_group",           "editors/3dview/object/properties/duplication/dupligroup.html"),
+    ("bpy.types.Object.parent",                "editors/3dview/object/properties/relations/parents.html"),
+    ("bpy.types.Object.use_slow_parent*",      "editors/3dview/object/properties/relations/extras.html"),
+    ("bpy.types.Object.slow_parent_offset",    "editors/3dview/object/properties/relations/extras.html"),
+    ("bpy.types.Object.track_axis",            "editors/3dview/object/properties/relations/extras.html"),
+    ("bpy.types.Object.up_axis",               "editors/3dview/object/properties/relations/extras.html"),
+    ("bpy.types.Object.use_extra*",            "editors/3dview/object/properties/relations/extras.html"),
+    ("bpy.types.Object.show*",                 "editors/3dview/object/properties/display.html"),
+    ("bpy.types.Object.draw_type",             "editors/3dview/object/properties/display.html"),
+    ("bpy.types.Object.color",                 "editors/3dview/object/properties/display.html"),
     ("bpy.types.Object.*",                     "editors/3dview/object"),  # Catchall
     ("bpy.types.TransformOrientation.*",       "editors/3dview/transform/transform_control/transform_orientations.html"),
 
+    # === Tool Settings ===
+    ("bpy.types.MeshStatVis.*",                "modeling/meshes/mesh_analysis.html"),
+
     # *** Cycles ***
-    ("bpy.types.CyclesRenderSettings.*",     "render/cycles/settings/integrator.html"),
-    ("bpy.types.CyclesVisibilitySettings.*", "render/cycles/settings/light_paths.html#ray-visibility"),
-    ("bpy.types.CyclesWorldSettings.*",      "render/cycles/world.html"),
-    ("bpy.types.SceneRenderLayer.*pass*",    "render/blender_render/passes.html"),
-    ("bpy.types.SceneRenderLayer.*",         "render/post_process/layers.html"),
-    ("bpy.types.Cycles*",                    "render/cycles"),
+    ("bpy.types.CyclesRenderSettings.use_camera_cull",            "data_system/scenes/properties.html#simplify"),
+    ("bpy.types.CyclesRenderSettings.camera_cull_margin",         "data_system/scenes/properties.html#simplify"),
+    ("bpy.types.CyclesRenderSettings.dicing_rate",                "render/cycles/settings/integrator.html#subdivision-rate"),
+    ("bpy.types.CyclesRenderSettings.preview_dicing_rate",        "render/cycles/settings/integrator.html#subdivision-rate"),
+    ("bpy.types.CyclesRenderSettings.max_subdivisions",           "render/cycles/settings/integrator.html#subdivision-rate"),
+    ("bpy.types.CyclesRenderSettings.*",                          "render/cycles/settings/integrator.html"),  # Catchall
+    ("bpy.types.CyclesVisibilitySettings.*",                      "render/cycles/settings/light_paths.html#ray-visibility"),
+    ("bpy.types.CyclesWorldSettings.*",                           "render/cycles/world.html"),
+    ("bpy.types.SceneRenderLayer.*pass*",                         "render/blender_render/passes.html"),
+    ("bpy.types.SceneRenderLayer.*",                              "render/post_process/layers.html"),
+    ("bpy.types.CyclesMaterialSettings.displacement_method",      "render/cycles/materials/settings.html#displacement"),
+    ("bpy.types.CyclesMaterialSettings.*",                        "render/cycles/materials/settings.html"),  # Catchall
+    ("bpy.types.CyclesObjectSettings.use_adaptive_subdivision",   "render/cycles/materials/displacement.html#true-displacement"),
+    ("bpy.types.CyclesObjectSettings.dicing_rate",                "render/cycles/materials/displacement.html#true-displacement"),
+    ("bpy.types.Cycles*",                                         "render/cycles"),  # Catchall
 
     # Currently all manual links on all sockets and values (such as Fac, Roughness, Color...) are NodeSocket* type.
     # It'd be much better if the name of the socket could be used for the manual reference
@@ -495,7 +505,7 @@ url_manual_mapping = (
     # Other
     ("bpy.types.ShaderNodeGroup.*",           "editors/node_editor/nodes/groups.html"),
     ("bpy.types.ShaderNode*",                 "render/cycles/nodes"),  # Catch all
-    ("bpy.types.ShaderNodeScript.*",          "render/cycles/osl.html"),
+    ("bpy.types.ShaderNodeScript.*",          "render/cycles/nodes/osl.html"),
 
     # *** Compositing Nodes ***
     # Input
@@ -650,8 +660,8 @@ url_manual_mapping = (
     # --- Colision ---
     ("bpy.types.CollisionSettings.*",          "physics/collision.html"),
     # --- Cloth ---
-    ("bpy.types.ClothCollisionSettings.*",     "physics/cloth/collisions.html"),
-    ("bpy.types.ClothSettings.*",              "physics/cloth/cloth_settings.html"),
+    ("bpy.types.ClothCollisionSettings.*",     "physics/cloth/settings/collisions.html"),
+    ("bpy.types.ClothSettings.*",              "physics/cloth/settings"),
     # ("bpy.types.ClothSolverResult.*",        ""), TODO
     # --- Dynamic Paint ---
     ("bpy.types.DynamicPaintBrushSettings.*",         "physics/dynamic_paint/brush.html"),
@@ -681,28 +691,19 @@ url_manual_mapping = (
     # --- Particles ---
     ("bpy.types.Particle.*",                      "physics/particles"),
     ("bpy.types.ParticleBrush.*",                 "physics/particles/mode.html"),  # TODO - refine
-    ("bpy.types.ParticleDupliWeight.*",           "physics/particles/vertexgroups.html"),
+    ("bpy.types.ParticleDupliWeight.*",           "physics/particles/properties/vertexgroups.html"),
     ("bpy.types.ParticleEdit.*",                  "physics/particles/mode.html"),
-    ("bpy.types.ParticleFluidSettings.*",         "physics/particles/physics/fluid.html"),
-    ("bpy.types.ParticleHairKey.*",               "physics/particles/physics/keyed.html"),
-    ("bpy.types.ParticleKey.*",                   "physics/particles/physics/keyed.html"),
+    ("bpy.types.ParticleFluidSettings.*",         "physics/particles/properties/physics/fluid.html"),
+    ("bpy.types.ParticleHairKey.*",               "physics/particles/properties/physics/keyed.html"),
+    ("bpy.types.ParticleKey.*",                   "physics/particles/properties/physics/keyed.html"),
     ("bpy.types.ParticleSettings.*",              "physics/particles"),
     # ("bpy.types.ParticleSettingsTextureSlot.*", ""),  # TODO - manual has no place for this! XXX
     ("bpy.types.ParticleSystem.*",                "physics/particles"),  # TODO
     ("bpy.types.ParticleSystems.*",               "physics/particles"),  # TODO
     ("bpy.types.ParticleTarget.*",                "physics/particles"),  # TODO
 
-    ("bpy.types.PointCache.*",                "physics/baking.html"),
-    ("bpy.types.PointCaches.*",               "physics/baking.html"),
-    ("bpy.types.BoidRule.*",                  "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidRuleAverageSpeed.*",      "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidRuleAvoid.*",             "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidRuleAvoidCollision.*",    "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidRuleFight.*",             "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidRuleFollowLeader.*",      "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidRuleGoal.*",              "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidSettings.*",              "physics/particles/physics/boids.html"),
-    ("bpy.types.BoidState.*",                 "physics/particles/physics/boids.html"),
+    ("bpy.types.PointCache*",                 "physics/baking.html"),
+    ("bpy.types.Boid*",                       "physics/particles/properties/physics/boids.html"),
 
     # *** ID Subclasses ***
     ("bpy.types.Action.*",        "animation/actions.html"),
@@ -715,7 +716,7 @@ url_manual_mapping = (
     ("bpy.types.Lattice.*",       "editors/3dview/object/types/lattice.html"),
     ("bpy.types.Library.*",       "data_system/linked_libraries.html"),
     ("bpy.types.Mask.*",          "editors/movie_clip_editor/masking.html"),
-    ("bpy.types.Brush.*",         "painting_sculpting/introduction.html#brush"),
+    ("bpy.types.Brush.*",         "sculpt_paint/introduction.html#brush"),
     ("bpy.types.Mesh.*",          "modeling/meshes"),    # Catchall, todo - refine
     ("bpy.types.MetaBall.*",      "modeling/metas"),     # Catchall, todo - refine
     ("bpy.types.Nodes.*",         "editors/node_editor/nodes"),
@@ -732,55 +733,25 @@ url_manual_mapping = (
 
     # *** Blend Data ***
     ("bpy.types.ID.*",                          "data_system/data_blocks.html"),
-    ("bpy.types.BlendData.*",                   "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataActions.*",            "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataArmatures.*",          "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataBrushes.*",            "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataCameras.*",            "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataCurves.*",             "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataFonts.*",              "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataGreasePencils.*",      "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataGroups.*",             "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataImages.*",             "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataLamps.*",              "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataLattices.*",           "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataLibraries.*",          "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataLineStyles.*",         "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataMasks.*",              "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataMaterials.*",          "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataMeshes.*",             "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataMetaBalls.*",          "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataMovieClips.*",         "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataNodeTrees.*",          "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataObjects.*",            "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataPalettes.*",           "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataParticles.*",          "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataScenes.*",             "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataScreens.*",            "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataSounds.*",             "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataSpeakers.*",           "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataTexts.*",              "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataTextures.*",           "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataWindowManagers.*",     "data_system/data_blocks.html#data-block-types"),
-    ("bpy.types.BlendDataWorlds.*",             "data_system/data_blocks.html#data-block-types"),
+    ("bpy.types.BlendData*",                    "data_system/data_blocks.html#data-block-types"),
 
     # *** Animation ***
     ("bpy.types.Keyframe.*",                       "animation/actions.html"),
-    ("bpy.types.FCurve.*",                         "editors/graph_editor/fcurves.html"),
-    ("bpy.types.FCurveModifiers.*",                "editors/graph_editor/fmodifiers.html"),
+    ("bpy.types.FCurve.*",                         "editors/graph_editor/fcurves"),
+    ("bpy.types.FCurveModifiers.*",                "editors/graph_editor/fcurves/fmodifiers.html"),
     # ("bpy.types.FCurveSample.*",                 ""), Todo
-    ("bpy.types.FModifier.*",                      "editors/graph_editor/fmodifiers.html"),
-    ("bpy.types.FModifierCycles.*",                "editors/graph_editor/fmodifiers.html#cycles"),
-    ("bpy.types.FModifierEnvelope.*",              "editors/graph_editor/fmodifiers.html#envelope"),
-    ("bpy.types.FModifierEnvelopeControlPoint.*",  "editors/graph_editor/fmodifiers.html#envelope"),
-    ("bpy.types.FModifierFunctionGenerator.*",     "editors/graph_editor/fmodifiers.html#generator"),
-    ("bpy.types.FModifierGenerator.*",             "editors/graph_editor/fmodifiers.html#generator"),
+    ("bpy.types.FModifier.*",                      "editors/graph_editor/fcurves/fmodifiers.html"),
+    ("bpy.types.FModifierCycles.*",                "editors/graph_editor/fcurves/fmodifiers.html#cycles"),
+    ("bpy.types.FModifierEnvelope.*",              "editors/graph_editor/fcurves/fmodifiers.html#envelope"),
+    ("bpy.types.FModifierEnvelopeControlPoint.*",  "editors/graph_editor/fcurves/fmodifiers.html#envelope"),
+    ("bpy.types.FModifierFunctionGenerator.*",     "editors/graph_editor/fcurves/fmodifiers.html#generator"),
+    ("bpy.types.FModifierGenerator.*",             "editors/graph_editor/fcurves/fmodifiers.html#generator"),
     # ("bpy.types.FModifierLimits.*",              ""), Todo
-    ("bpy.types.FModifierNoise.*",                 "editors/graph_editor/fmodifiers.html#noise"),
-    ("bpy.types.FModifierStepped.*",               "editors/graph_editor/fmodifiers.html#stepped"),
+    ("bpy.types.FModifierNoise.*",                 "editors/graph_editor/fcurves/fmodifiers.html#noise"),
+    ("bpy.types.FModifierStepped.*",               "editors/graph_editor/fcurves/fmodifiers.html#stepped"),
     ("bpy.types.TimelineMarker.*",                 "animation/markers.html"),
     ("bpy.types.AnimViz.*",                        "animation/keyframes/visualization.html"),
-    ("bpy.types.AnimVizMotionPaths.*",             "animation/keyframes/visualization.html"),
+    ("bpy.types.AnimVizMotionPaths.*",             "animation/keyframes/visualization.html#motion-paths"),
     ("bpy.types.AnimVizOnionSkinning.*",           "animation/keyframes/visualization.html"),
     ("bpy.types.NlaStrip.*",                       "editors/nla.html#strips"),
     ("bpy.types.NlaTrack.*",                       "editors/nla.html#tracks"),
@@ -846,9 +817,11 @@ url_manual_mapping = (
     ("bpy.types.SteeringActuator.*",       "game_engine/logic/actuators/types/steering.html"),
     ("bpy.types.VisibilityActuator.*",     "game_engine/logic/actuators/types/visibility.html"),
     # Controllers
-    ("bpy.types.Controller.*",              "game_engine/logic/controllers"),
-    ("bpy.types.ExpressionController.*",    "game_engine/logic/controllers/types/expression.html"),
-    ("bpy.types.PythonController.*",        "game_engine/logic/controllers/types/python.html"),
+    ("bpy.types.Controller.*",             "game_engine/logic/controllers"),
+    ("bpy.types.ExpressionController.*",   "game_engine/logic/controllers/types/expression.html"),
+    ("bpy.types.PythonController.*",       "game_engine/logic/controllers/types/python.html"),
+
+    ("bpy.types.*",                        "contents.html"),  # Catchall
 
     # === Operators ===
     # Catch all only for now!
@@ -857,8 +830,8 @@ url_manual_mapping = (
     ("bpy.ops.action.*",                  "animation/actions.html"),
     ("bpy.ops.anim.*",                    "animation"),
     ("bpy.ops.armature.*",                "rigging/armatures"),
-    ("bpy.ops.boid.*",                    "physics/particles/physics/boids.html"),
-    ("bpy.ops.brush.*",                   "painting_sculpting/introduction.html#brush"),  # TODO doc
+    ("bpy.ops.boid.*",                    "physics/particles/properties/physics/boids.html"),
+    ("bpy.ops.brush.*",                   "sculpt_paint/introduction.html#brush"),  # TODO doc
     ("bpy.ops.buttons.*",                 "interface/controls/buttons_and_controls.html"),
     ("bpy.ops.camera.*",                  "editors/3dview/object/types/camera"),
     ("bpy.ops.clip.*",                    "editors/movie_clip_editor/index.html#movie-clip-editor"),
@@ -881,13 +854,10 @@ url_manual_mapping = (
     ("bpy.ops.fluid.*",                   "physics/fluid"),
     ("bpy.ops.font.*",                    "modeling/texts"),
     ("bpy.ops.gpencil.*",                 "interface/grease_pencil"),
-    ("bpy.ops.graph.*",                   "editors/graph_editor/fcurves.html"),
+    ("bpy.ops.graph.*",                   "editors/graph_editor/fcurves"),
     ("bpy.ops.group.*",                   "editors/3dview/object/relationships/groups.html"),
     ("bpy.ops.image.*",                   "render/blender_render/textures/types/image.html"),
-    ("bpy.ops.import_anim.*",             "data_system/files/import_export.html"),
-    ("bpy.ops.import_curve.*",            "data_system/files/import_export.html"),
-    ("bpy.ops.import_mesh.*",             "data_system/files/import_export.html"),
-    ("bpy.ops.import_scene.*",            "data_system/files/import_export.html"),
+    ("bpy.ops.import*",                   "data_system/files/import_export.html"),
     # ("bpy.ops.info.*",                  ""),  # TODO
     ("bpy.ops.lamp.*",                    "render/blender_render/lighting"),  # TODO
     ("bpy.ops.lattice.*",                 "editors/3dview/object/types/lattice.html"),
@@ -922,14 +892,16 @@ url_manual_mapping = (
 
     ("bpy.ops.render.play-rendered-anim", "render/output/display.html#animation-playback"),
     ("bpy.ops.render.*",                  "render"),  # Catchall
+    ("bpy.ops.rigidbody.world*",          "physics/rigid_body/world.html"),
     ("bpy.ops.rigidbody.*",               "physics/rigid_body"),
     ("bpy.ops.safe_areas.*",              "editors/3dview/object/types/camera/safe_areas.html"),
-    ("bpy.ops.scene.*",                   "data_system/scenes.html"),
-    ("bpy.ops.screen.*",                  "interface/editors/screens.html"),
+    ("bpy.ops.scene.*",                   "data_system/scenes"),
+    ("bpy.ops.screen.*",                  "interface/window_system/screens.html"),
     ("bpy.ops.script.*",                  "advanced/scripting"),
-    ("bpy.ops.sculpt.*",                  "painting_sculpting/sculpting"),
+    ("bpy.ops.sculpt.*",                  "sculpt_paint/sculpting"),
     ("bpy.ops.sequencer.*",               "editors/sequencer"),
     # ("bpy.ops.sketch.*",                ""),  # TODO
+    ("bpy.ops.sound.bake_animation",      "data_system/scenes/properties.html#audio"),
     ("bpy.ops.sound.*",                   "editors/3dview/object/types/speaker.html"),
     ("bpy.ops.surface.*",                 "modeling/surfaces"),
     ("bpy.ops.text.*",                    "editors/text_editor.html"),
@@ -942,10 +914,10 @@ url_manual_mapping = (
     ("bpy.ops.transform.translate",       "editors/3dview/transform/basics/grab.html"),
     ("bpy.ops.transform.rotate",          "editors/3dview/transform/basics/rotate.html"),
     ("bpy.ops.transform.resize",          "editors/3dview/transform/basics/scale.html"),
-    ("bpy.ops.transform.mirror",          "modeling/meshes/editing/duplicating/mirror.html"),
+    ("bpy.ops.transform.mirror",          "editors/3dview/transform/mirror.html"),
     ("bpy.ops.transform.*",               "editors/3dview/transform"),  # Catchall
-    ("bpy.ops.object.duplicate_move",     "editors/3dview/transform/duplication/introduction.html#duplicate"),
-    ("bpy.ops.object.duplicate_move_linked",   "editors/3dview/transform/duplication/introduction.html#linked-duplicates"),
+    ("bpy.ops.object.duplicate_move",     "editors/3dview/transform/duplication.html"),
+    ("bpy.ops.object.duplicate_move_linked",   "editors/3dview/transform/duplication.html#linked-duplicates"),
     ("bpy.ops.object.delete",             "modeling/meshes/editing/basics/deleting.html#delete"),
     ("bpy.ops.object.join",               "modeling/meshes/editing/misc.html#join"),
     ("bpy.ops.object.origin_set",         "editors/3dview/transform/origns.html#moving-object-centers"),
@@ -953,18 +925,19 @@ url_manual_mapping = (
     ("bpy.ops.object.shade_flat",         "modeling/meshes/smoothing.html#smooth-shading"),
     ("bpy.ops.object.data_transfer",      "modeling/meshes/editing/data_transfer.html#data"),
     ("bpy.ops.object.datalayout_transfer", "modeling/meshes/editing/data_transfer.html#data-layout"),
+    ("bpy.ops.object.group*",             "editors/3dview/object/properties/relations/groups.html"),
     ("bpy.ops.object.*",                  "editors/3dview/transform"), # Catchall
     ("bpy.ops.ui.*",                      "interface"),
     ("bpy.ops.uv.*",                      "editors/uv_image"),
     # ("bpy.ops.view2d.*",  ""),          #  TODO
     ("bpy.ops.view3d.*",                  "editors/3dview"),  # Catchall
     ("bpy.ops.view3d.background_image_add", "editors/3dview/display/background_images.html"),
+    ("bpy.ops.wm.properties*",            "data_system/custom_properties.html"),
     ("bpy.ops.wm.addon_*",                "preferences/addons.html"),
-    ("bpy.ops.wm.*",                      "interface/editors/"),
+    ("bpy.ops.wm.*",                      "interface/index.html#window-system"),
     ("bpy.ops.world.*",                   "render/blender_render/world"),
+    ("bpy.ops.*",                         "contents.html"),  # CATCHALL!
 
-    # === Tool Settings ===
-    ("bpy.types.MeshStatVis.*",           "modeling/meshes/mesh_analysis.html"),
 )
 
 # may have 'url_reference_mapping'... etc later

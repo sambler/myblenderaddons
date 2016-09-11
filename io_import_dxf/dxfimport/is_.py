@@ -106,7 +106,10 @@ def varying_width(entity):
     if hasattr(entity, "width"):
         ew = entity.width
         if hasattr(ew, "__iter__"):
-            return ew.count(ew[0]) != len(ew) or ew[0][0] != ew[0][1]
+            if len(ew) == 0:
+                return False
+            else:
+                return ew.count(ew[0]) != len(ew) or ew[0][0] != ew[0][1]
     return False
 
 
@@ -137,5 +140,7 @@ def combined(typestr):
 
 
 def extrusion(entity):
+    if entity.extrusion is None:
+        return False
     return Vector(entity.extrusion) != Vector((0, 0, 1)) \
                     or (hasattr(entity, "elevation") and entity.elevation != 0)

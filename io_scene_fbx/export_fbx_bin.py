@@ -1822,8 +1822,8 @@ def fbx_skeleton_from_armature(scene, settings, arm_obj, objects, data_meshes,
 
 def fbx_generate_leaf_bones(settings, data_bones):
     # find which bons have no children
-    child_count = {bo: 0 for bo, _bo_key in data_bones.items()}
-    for bo, _bo_key in data_bones.items():
+    child_count = {bo: 0 for bo in data_bones.keys()}
+    for bo in data_bones.keys():
         if bo.parent and bo.parent.is_bone:
             child_count[bo.parent] += 1
 
@@ -1835,8 +1835,9 @@ def fbx_generate_leaf_bones(settings, data_bones):
     for parent in leaf_parents:
         node_name = parent.name + "_end"
         parent_uuid = parent.fbx_uuid
-        node_uuid = get_fbx_uuid_from_key(node_name + "_node")
-        attr_uuid = get_fbx_uuid_from_key(node_name + "_nodeattr")
+        parent_key = parent.key
+        node_uuid = get_fbx_uuid_from_key(parent_key + "_end_node")
+        attr_uuid = get_fbx_uuid_from_key(parent_key + "_end_nodeattr")
 
         hide = parent.hide
         size = parent.bdata.head_radius * bone_radius_scale
@@ -1881,11 +1882,12 @@ def fbx_animations_do(scene_data, ref_id, f_start, f_end, start_zero, objects=No
     p_rots = {}
 
     for ob_obj in objects:
+        if ob_obj.parented_to_armature:
+            continue
         ACNW = AnimationCurveNodeWrapper
         loc, rot, scale, _m, _mr = ob_obj.fbx_object_tx(scene_data)
         rot_deg = tuple(convert_rad_to_deg_iter(rot))
         force_key = (simplify_fac == 0.0) or (ob_obj.is_bone and force_keying)
-        print(force_key, simplify_fac)
         animdata_ob[ob_obj] = (ACNW(ob_obj.key, 'LCL_TRANSLATION', force_key, force_sek, loc),
                                ACNW(ob_obj.key, 'LCL_ROTATION', force_key, force_sek, rot_deg),
                                ACNW(ob_obj.key, 'LCL_SCALING', force_key, force_sek, scale))
