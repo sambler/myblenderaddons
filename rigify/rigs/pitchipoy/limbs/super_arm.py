@@ -1,7 +1,5 @@
 import bpy, re
-from   .arm            import create_arm
-from   .leg            import create_leg
-from   .paw            import create_paw
+from ..super_widgets import create_hand_widget
 from   .ui             import create_script
 from   .limb_utils     import *
 from   mathutils       import Vector
@@ -12,9 +10,7 @@ from   ....utils       import MetarigError, make_mechanism_name, org
 from   ....utils       import create_limb_widget, connected_children_names
 from   rna_prop_ui     import rna_idprop_ui_prop_get
 from   ..super_widgets import create_ikarrow_widget
-from   ..super_widgets import create_foot_widget, create_ballsocket_widget
 from   math            import trunc
-
 
 extra_script = """
 controls = [%s]
@@ -28,13 +24,13 @@ if is_selected( controls ):
 
 class Rig:
     def __init__(self, obj, bone_name, params):
-        """ Initialize torso rig and key rig properties """
+        """ Initialize arm rig and key rig properties """
         self.obj       = obj
         self.params    = params
 
         self.org_bones = list(
             [bone_name] + connected_children_names(obj, bone_name)
-            )[:4]  # The basic limb is the first 4 bones for a paw
+            )[:3]  # The basic limb is the first 3 bones
 
         self.segments  = params.segments
         self.bbones    = params.bbones
@@ -180,36 +176,26 @@ class Rig:
 
         # Contraints
 
-        # last_name = eb[eb.keys().index(org_bones[-1])+1].name
-        # tweaks['mch'] += [last_name]
-        # tweaks['ctrl'] += [last_name]
-
         for i,b in enumerate( tweaks['mch'] ):
             first  = 0
-            middle = trunc( len( tweaks['mch'] ) / 3 )
-            middle1 = middle + self.segments
-            last   =  len( tweaks['mch'] ) - 1
+            middle = trunc( len( tweaks['mch'] ) / 2 )
+            last   = len( tweaks['mch'] ) - 1
 
-            if i == first or i == middle or i == middle1:
+            if i == first or i == middle:
                 make_constraint( self, b, {
                     'constraint'  : 'COPY_SCALE',
                     'subtarget'   : 'root'
                 })
             elif i != last:
                 targets       = []
+                dt_target_idx = middle
                 factor        = 0
                 if i < middle:
-                    dt_target_idx = middle
                     targets = [first,middle]
-                elif i > middle and i < middle1:
-                    targets = [middle,middle1]
-                    factor = self.segments
-                    dt_target_idx = middle1
                 else:
-                    targets       = [middle1,last]
-                    factor        = self.segments * 2
+                    targets       = [middle,last]
+                    factor        = self.segments
                     dt_target_idx = last
-
 
                 # Use copy transforms constraints to position each bone
                 # exactly in the location respective to its index (between
@@ -228,9 +214,6 @@ class Rig:
                     'subtarget'   : tweaks['ctrl'][ dt_target_idx ],
                 })
 
-            # tweaks['mch'].pop()
-            # tweaks['ctrl'].pop()
-
         # Ctrl bones Locks and Widgets
         pb = self.obj.pose.bones
         for t in tweaks['ctrl']:
@@ -244,7 +227,7 @@ class Rig:
 
         return tweaks
 
-    def create_def(self, tweaks ):
+    def create_def(self, tweaks):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -350,7 +333,7 @@ class Rig:
 
         return def_bones
 
-    def create_ik(self, parent ):
+    def create_ik(self, parent):
         org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode ='EDIT')
@@ -373,7 +356,7 @@ class Rig:
             get_bone_name( org_bones[0], 'mch', 'ik_stretch' )
         )
 
-        eb[ mch_str ].tail = eb[ org_bones[-2] ].head
+        eb[ mch_str ].tail = eb[ org_bones[-1] ].head
 
         # Parenting
         eb[ ctrl    ].parent = eb[ parent ]
@@ -407,11 +390,9 @@ class Rig:
                  'mch_str'    : mch_str
         }
 
-    def create_fk(self, parent ):
+    def create_fk(self, parent):
         org_bones = self.org_bones.copy()
 
-
-        org_bones.pop()
 
         bpy.ops.object.mode_set(mode ='EDIT')
         eb = self.obj.data.edit_bones
@@ -506,24 +487,24 @@ class Rig:
             var.targets[0].data_path = \
                 pb_parent.path_from_id() + '['+ '"' + prop.name + '"' + ']'
 
-    def create_paw( self, bones ):
-
-        org_bones = list(
-            [self.org_bones[0]] + connected_children_names(self.obj, self.org_bones[0])
-        )
-
-        bones['ik']['ctrl']['terminal'] = []
+    def create_arm( self, bones):
+        org_bones = self.org_bones
 
         bpy.ops.object.mode_set(mode='EDIT')
         eb = self.obj.data.edit_bones
 
-        # Create IK paw control
         ctrl = get_bone_name( org_bones[2], 'ctrl', 'ik' )
+
+        # Create IK arm control
         ctrl = copy_bone( self.obj, org_bones[2], ctrl )
 
         # clear parent (so that rigify will parent to root)
         eb[ ctrl ].parent      = None
         eb[ ctrl ].use_connect = False
+
+        # Parent
+        eb[ bones['ik']['mch_target'] ].parent      = eb[ ctrl ]
+        eb[ bones['ik']['mch_target'] ].use_connect = False
 
         # MCH for ik control
         ctrl_socket = copy_bone(self.obj, org_bones[2], get_bone_name( org_bones[2], 'mch', 'ik_socket'))
@@ -537,35 +518,13 @@ class Rig:
         eb[ctrl_root].parent = eb['root']
 
         if eb[org_bones[0]].parent:
-            paw_parent = eb[org_bones[0]].parent
+            arm_parent = eb[org_bones[0]].parent
             ctrl_parent = copy_bone(self.obj, org_bones[2], get_bone_name( org_bones[2], 'mch', 'ik_parent'))
             eb[ctrl_parent].tail = eb[ctrl_parent].head + 0.6*(eb[ctrl_parent].tail-eb[ctrl_parent].head)
             eb[ctrl_parent].use_connect = False
             eb[ctrl_parent].parent = eb[org_bones[0]].parent
         else:
-            paw_parent = None
-
-        # Create heel control bone
-        heel = get_bone_name( org_bones[2], 'ctrl', 'heel_ik' )
-        heel = copy_bone( self.obj, org_bones[2], heel )
-
-        # clear parent
-        eb[ heel ].parent      = None
-        eb[ heel ].use_connect = False
-
-        # Parent
-        eb[ heel ].parent      = eb[ ctrl ]
-        eb[ heel ].use_connect = False
-
-        flip_bone( self.obj, heel )
-
-        eb[ bones['ik']['mch_target'] ].parent      = eb[ heel ]
-        eb[ bones['ik']['mch_target'] ].use_connect = False
-
-        # Reset control position and orientation
-        l = eb[ ctrl ].length
-        orient_bone( self, eb[ ctrl ], 'y', reverse = True )
-        eb[ ctrl ].length = l
+            arm_parent = None
 
         # Set up constraints
 
@@ -576,30 +535,29 @@ class Rig:
             'subtarget'   : ctrl_root,
         })
 
-        if paw_parent:
+        if arm_parent:
             make_constraint( self, ctrl_socket, {
                 'constraint'  : 'COPY_TRANSFORMS',
                 'subtarget'   : ctrl_parent,
-                'influence'   : 0.0,
             })
 
         # Constrain mch target bone to the ik control and mch stretch
+
         make_constraint( self, bones['ik']['mch_target'], {
             'constraint'  : 'COPY_LOCATION',
             'subtarget'   : bones['ik']['mch_str'],
             'head_tail'   : 1.0
         })
 
+
         # Constrain mch ik stretch bone to the ik control
         make_constraint( self, bones['ik']['mch_str'], {
             'constraint'  : 'DAMPED_TRACK',
-            'subtarget'   : heel,
-            'head_tail'   : 1.0
+            'subtarget'   : ctrl,
         })
         make_constraint( self, bones['ik']['mch_str'], {
             'constraint'  : 'STRETCH_TO',
-            'subtarget'   : heel,
-            'head_tail'   : 1.0
+            'subtarget'   : ctrl,
         })
         make_constraint( self, bones['ik']['mch_str'], {
             'constraint'  : 'LIMIT_SCALE',
@@ -613,6 +571,12 @@ class Rig:
         pb = self.obj.pose.bones
         pb_parent = pb[ bones['parent'] ]
 
+        # Modify rotation mode for ik and tweak controls
+        pb[bones['ik']['ctrl']['limb']].rotation_mode = 'ZXY'
+
+        for b in bones['tweak']['ctrl']:
+            pb[b].rotation_mode = 'ZXY'
+
         pb_parent['IK_Strertch'] = 1.0
         prop = rna_idprop_ui_prop_get( pb_parent, 'IK_Strertch', create=True )
         prop["min"]         = 0.0
@@ -624,7 +588,7 @@ class Rig:
         # Add driver to limit scale constraint influence
         b        = bones['ik']['mch_str']
         drv      = pb[b].constraints[-1].driver_add("influence").driver
-        drv.type = 'AVERAGE'
+        drv.type = 'SUM'
 
         var = drv.variables.new()
         var.name = prop.name
@@ -640,87 +604,14 @@ class Rig:
         drv_modifier.coefficients[0] = 1.0
         drv_modifier.coefficients[1] = -1.0
 
-        # Create paw widget
-        create_foot_widget(self.obj, ctrl, bone_transform_name=None)
+        # Create hand widget
+        create_hand_widget(self.obj, ctrl, bone_transform_name=None)
 
-        # Create heel ctrl locks
-        pb[ heel ].lock_location = True, True, True
-
-        # Add ballsocket widget to heel
-        create_ballsocket_widget(self.obj, heel, bone_transform_name=None)
-
-        bpy.ops.object.mode_set(mode='EDIT')
-        eb = self.obj.data.edit_bones
-
-        if len( org_bones ) >= 4:
-            # Create toes control bone
-            toes = get_bone_name( org_bones[3], 'ctrl' )
-            toes = copy_bone( self.obj, org_bones[3], toes )
-
-            eb[ toes ].use_connect = False
-            eb[ toes ].parent      = eb[ org_bones[3] ]
-
-            # Create toes mch bone
-            toes_mch = get_bone_name( org_bones[3], 'mch' )
-            toes_mch = copy_bone( self.obj, org_bones[3], toes_mch )
-
-            eb[ toes_mch ].use_connect = False
-            eb[ toes_mch ].parent      = eb[ ctrl ]
-
-            eb[ toes_mch ].length /= 4
-
-            # Constrain 4th ORG to toes MCH bone
-            make_constraint( self, org_bones[3], {
-                'constraint'  : 'COPY_TRANSFORMS',
-                'subtarget'   : toes_mch
-            })
-
-            make_constraint( self, bones['def'][-1], {
-                'constraint'  : 'DAMPED_TRACK',
-                'subtarget'   : toes,
-                'head_tail'   : 1
-            })
-            make_constraint( self, bones['def'][-1], {
-                'constraint'  : 'STRETCH_TO',
-                'subtarget'   : toes,
-                'head_tail'   : 1
-            })
-
-
-            # Find IK/FK switch property
-            pb   = self.obj.pose.bones
-            prop = rna_idprop_ui_prop_get( pb[ bones['parent'] ], 'IK/FK' )
-
-            # Add driver to limit scale constraint influence
-            b        = org_bones[3]
-            drv      = pb[b].constraints[-1].driver_add("influence").driver
-            drv.type = 'AVERAGE'
-
-            var = drv.variables.new()
-            var.name = prop.name
-            var.type = "SINGLE_PROP"
-            var.targets[0].id = self.obj
-            var.targets[0].data_path = \
-                pb_parent.path_from_id() + '['+ '"' + prop.name + '"' + ']'
-
-            drv_modifier = self.obj.animation_data.drivers[-1].modifiers[0]
-
-            drv_modifier.mode            = 'POLYNOMIAL'
-            drv_modifier.poly_order      = 1
-            drv_modifier.coefficients[0] = 1.0
-            drv_modifier.coefficients[1] = -1.0
-
-            # Create toe circle widget
-            create_circle_widget(self.obj, toes, radius=0.4, head_tail=0.5)
-
-            bones['ik']['ctrl']['terminal'] += [ toes ]
-
-        bones['ik']['ctrl']['terminal'] += [ heel, ctrl ]
-
-        if paw_parent:
-            bones['ik']['mch_foot'] = [ctrl_socket, ctrl_root, ctrl_parent]
+        bones['ik']['ctrl']['terminal'] = [ ctrl ]
+        if arm_parent:
+            bones['ik']['mch_hand'] = [ctrl_socket, ctrl_root, ctrl_parent]
         else:
-            bones['ik']['mch_foot'] = [ctrl_socket, ctrl_root]
+            bones['ik']['mch_hand'] = [ctrl_socket, ctrl_root]
 
         return bones
 
@@ -729,14 +620,14 @@ class Rig:
         bpy.ops.object.mode_set(mode ='OBJECT')
         pb = self.obj.pose.bones
 
-        ctrl = pb[bones['ik']['mch_foot'][0]]
+        ctrl = pb[bones['ik']['mch_hand'][0]]
 
         props  = [ "IK_follow", "root/parent" ]
 
         for prop in props:
             if prop == 'IK_follow':
 
-                ctrl[prop] = True
+                ctrl[prop]=True
                 rna_prop = rna_idprop_ui_prop_get( ctrl, prop, create=True )
                 rna_prop["min"]         = False
                 rna_prop["max"]         = True
@@ -813,57 +704,47 @@ class Rig:
                 var.targets[0].data_path = \
                 ctrl.path_from_id() + '['+ '"' + prop + '"' + ']'
 
-    def generate( self ):
-        bpy.ops.object.mode_set(mode ='EDIT')
-        eb = self.obj.data.edit_bones
+    def generate(self):
+            bpy.ops.object.mode_set(mode ='EDIT')
+            eb = self.obj.data.edit_bones
 
-        # Clear parents for org bones
-        for bone in self.org_bones[1:]:
-            eb[bone].use_connect = False
-            eb[bone].parent      = None
+            # Clear parents for org bones
+            for bone in self.org_bones[1:]:
+                eb[bone].use_connect = False
+                eb[bone].parent      = None
 
-        bones = {}
+            bones = {}
 
-        # Create mch limb parent
-        bones['parent'] = self.create_parent()
-        bones['tweak']  = self.create_tweak()
-        bones['def']    = self.create_def( bones['tweak']['ctrl'] )
-        bones['ik']     = self.create_ik(  bones['parent']        )
-        bones['fk']     = self.create_fk(  bones['parent']        )
+            # Create mch limb parent
+            bones['parent'] = self.create_parent()
+            bones['tweak']  = self.create_tweak()
+            bones['def']    = self.create_def( bones['tweak']['ctrl'] )
+            bones['ik']     = self.create_ik(  bones['parent']        )
+            bones['fk']     = self.create_fk(  bones['parent']        )
 
-        self.org_parenting_and_switch(
-            self.org_bones, bones['ik'], bones['fk']['ctrl'], bones['parent']
-        )
+            self.org_parenting_and_switch(
+                self.org_bones, bones['ik'], bones['fk']['ctrl'], bones['parent']
+            )
 
-        bones = self.create_paw( bones )
-        self.create_drivers(    bones )
+            bones = self.create_arm( bones )
+            self.create_drivers(    bones )
 
-        controls =  [ bones['ik']['ctrl']['limb'], bones['ik']['ctrl']['terminal'][-1], bones['ik']['ctrl']['terminal'][-2] ]
-
-        # Create UI
-        controls_string = ", ".join(["'" + x + "'" for x in controls])
-
-        script = create_script( bones, 'paw' )
-        script += extra_script % (controls_string, bones['ik']['mch_foot'][0], 'IK_follow', 'root/parent','root/parent')
-
-        return [ script ]
+            controls =  [ bones['ik']['ctrl']['limb'], bones['ik']['ctrl']['terminal'][0] ]
 
 
-def add_parameters( params ):
+            # Create UI
+            controls_string = ", ".join(["'" + x + "'" for x in controls])
+
+            script = create_script( bones, 'arm' )
+            script += extra_script % (controls_string, bones['ik']['mch_hand'][0], 'IK_follow', 'root/parent', 'root/parent')
+
+            return [ script ]
+
+
+def add_parameters(params):
     """ Add the parameters of this rig type to the
         RigifyParameters PropertyGroup
     """
-
-    # items = [
-    #     ('arm', 'Arm', ''),
-    #     ('leg', 'Leg', ''),
-    #     ('paw', 'Paw', '')
-    # ]
-    # params.limb_type = bpy.props.EnumProperty(
-    #     items   = items,
-    #     name    = "Limb Type",
-    #     default = 'paw'
-    # )
 
     items = [
         ('x', 'X', ''),
@@ -970,9 +851,9 @@ def create_sample(obj):
     for _ in range(28):
         arm.rigify_layers.add()
 
-    arm.rigify_layers[5].name = 'Paws'
+    arm.rigify_layers[5].name = 'Fingers'
     arm.rigify_layers[5].row = 5
-    arm.rigify_layers[6].name = 'Paws (Tweak)'
+    arm.rigify_layers[6].name = 'Fingers (Tweak)'
     arm.rigify_layers[6].row = 6
     arm.rigify_layers[7].name = 'Arm.L (IK)'
     arm.rigify_layers[7].row = 7
@@ -982,116 +863,158 @@ def create_sample(obj):
     arm.rigify_layers[9].row = 9
 
     bone = arm.edit_bones.new('upper_arm.L')
-    bone.head[:] = 0.0313, -0.1149, 0.2257
-    bone.tail[:] = 0.0313, -0.0878, 0.1235
-    bone.roll = 3.1416
+    bone.head[:] = 0.1953, 0.0267, 1.5846
+    bone.tail[:] = 0.4424, 0.0885, 1.4491
+    bone.roll = 2.0724
     bone.use_connect = False
     bones['upper_arm.L'] = bone.name
     bone = arm.edit_bones.new('forearm.L')
-    bone.head[:] = 0.0313, -0.0878, 0.1235
-    bone.tail[:] = 0.0313, -0.1117, 0.0254
-    bone.roll = 3.1416
+    bone.head[:] = 0.4424, 0.0885, 1.4491
+    bone.tail[:] = 0.6594, 0.0492, 1.3061
+    bone.roll = 2.1535
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['upper_arm.L']]
     bones['forearm.L'] = bone.name
     bone = arm.edit_bones.new('hand.L')
-    bone.head[:] = 0.0313, -0.1117, 0.0254
-    bone.tail[:] = 0.0313, -0.1297, 0.0094
-    bone.roll = 3.1416
+    bone.head[:] = 0.6594, 0.0492, 1.3061
+    bone.tail[:] = 0.7234, 0.0412, 1.2585
+    bone.roll = 2.2103
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['forearm.L']]
     bones['hand.L'] = bone.name
-    bone = arm.edit_bones.new('f_toe.L')
-    bone.head[:] = 0.0313, -0.1297, 0.0094
-    bone.tail[:] = 0.0313, -0.1463, 0.0094
-    bone.roll = 0.0000
-    bone.use_connect = True
+    bone = arm.edit_bones.new('palm.01.L')
+    bone.head[:] = 0.6921, 0.0224, 1.2882
+    bone.tail[:] = 0.7464, 0.0051, 1.2482
+    bone.roll = -2.4928
+    bone.use_connect = False
     bone.parent = arm.edit_bones[bones['hand.L']]
-    bones['f_toe.L'] = bone.name
-    bone = arm.edit_bones.new('f_palm.004.L')
-    bone.head[:] = 0.0393, -0.1278, 0.0100
-    bone.tail[:] = 0.0406, -0.1304, 0.0100
-    bone.roll = -0.0006
+    bones['palm.01.L'] = bone.name
+    bone = arm.edit_bones.new('palm.02.L')
+    bone.head[:] = 0.6970, 0.0389, 1.2877
+    bone.tail[:] = 0.7518, 0.0277, 1.2487
+    bone.roll = -2.5274
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_toe.L']]
-    bones['f_palm.004.L'] = bone.name
-    bone = arm.edit_bones.new('f_palm.001.L')
-    bone.head[:] = 0.0216, -0.1278, 0.0100
-    bone.tail[:] = 0.0199, -0.1331, 0.0100
-    bone.roll = 0.0004
+    bone.parent = arm.edit_bones[bones['hand.L']]
+    bones['palm.02.L'] = bone.name
+    bone = arm.edit_bones.new('palm.03.L')
+    bone.head[:] = 0.6963, 0.0545, 1.2874
+    bone.tail[:] = 0.7540, 0.0521, 1.2482
+    bone.roll = -2.5843
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_toe.L']]
-    bones['f_palm.001.L'] = bone.name
-    bone = arm.edit_bones.new('f_palm.002.L')
-    bone.head[:] = 0.0273, -0.1278, 0.0100
-    bone.tail[:] = 0.0273, -0.1345, 0.0100
-    bone.roll = 3.1416
+    bone.parent = arm.edit_bones[bones['hand.L']]
+    bones['palm.03.L'] = bone.name
+    bone = arm.edit_bones.new('palm.04.L')
+    bone.head[:] = 0.6929, 0.0696, 1.2871
+    bone.tail[:] = 0.7528, 0.0763, 1.2428
+    bone.roll = -2.5155
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_toe.L']]
-    bones['f_palm.002.L'] = bone.name
-    bone = arm.edit_bones.new('f_palm.003.L')
-    bone.head[:] = 0.0341, -0.1278, 0.0100
-    bone.tail[:] = 0.0340, -0.1345, 0.0100
-    bone.roll = 0.0101
+    bone.parent = arm.edit_bones[bones['hand.L']]
+    bones['palm.04.L'] = bone.name
+    bone = arm.edit_bones.new('f_index.01.L')
+    bone.head[:] = 0.7464, 0.0051, 1.2482
+    bone.tail[:] = 0.7718, 0.0013, 1.2112
+    bone.roll = -2.0315
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_toe.L']]
-    bones['f_palm.003.L'] = bone.name
-    bone = arm.edit_bones.new('f_pinky.001.L')
-    bone.head[:] = 0.0406, -0.1304, 0.0074
-    bone.tail[:] = 0.0408, -0.1337, 0.0065
-    bone.roll = -0.6234
+    bone.parent = arm.edit_bones[bones['palm.01.L']]
+    bones['f_index.01.L'] = bone.name
+    bone = arm.edit_bones.new('thumb.01.L')
+    bone.head[:] = 0.6705, 0.0214, 1.2738
+    bone.tail[:] = 0.6857, 0.0015, 1.2404
+    bone.roll = -0.1587
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_palm.004.L']]
-    bones['f_pinky.001.L'] = bone.name
-    bone = arm.edit_bones.new('f_index.001.L')
-    bone.head[:] = 0.0199, -0.1331, 0.0077
-    bone.tail[:] = 0.0193, -0.1372, 0.0060
-    bone.roll = 0.7154
+    bone.parent = arm.edit_bones[bones['palm.01.L']]
+    bones['thumb.01.L'] = bone.name
+    bone = arm.edit_bones.new('f_middle.01.L')
+    bone.head[:] = 0.7518, 0.0277, 1.2487
+    bone.tail[:] = 0.7762, 0.0234, 1.2058
+    bone.roll = -2.0067
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_palm.001.L']]
-    bones['f_index.001.L'] = bone.name
-    bone = arm.edit_bones.new('f_middle.001.L')
-    bone.head[:] = 0.0273, -0.1345, 0.0107
-    bone.tail[:] = 0.0273, -0.1407, 0.0082
-    bone.roll = 0.0000
+    bone.parent = arm.edit_bones[bones['palm.02.L']]
+    bones['f_middle.01.L'] = bone.name
+    bone = arm.edit_bones.new('f_ring.01.L')
+    bone.head[:] = 0.7540, 0.0521, 1.2482
+    bone.tail[:] = 0.7715, 0.0499, 1.2070
+    bone.roll = -2.0082
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_palm.002.L']]
-    bones['f_middle.001.L'] = bone.name
-    bone = arm.edit_bones.new('f_ring.001.L')
-    bone.head[:] = 0.0340, -0.1345, 0.0107
-    bone.tail[:] = 0.0340, -0.1407, 0.0082
-    bone.roll = 0.0000
+    bone.parent = arm.edit_bones[bones['palm.03.L']]
+    bones['f_ring.01.L'] = bone.name
+    bone = arm.edit_bones.new('f_pinky.01.L')
+    bone.head[:] = 0.7528, 0.0763, 1.2428
+    bone.tail[:] = 0.7589, 0.0765, 1.2156
+    bone.roll = -1.9749
     bone.use_connect = False
-    bone.parent = arm.edit_bones[bones['f_palm.003.L']]
-    bones['f_ring.001.L'] = bone.name
-    bone = arm.edit_bones.new('f_pinky.002.L')
-    bone.head[:] = 0.0408, -0.1337, 0.0065
-    bone.tail[:] = 0.0413, -0.1400, 0.0023
-    bone.roll = -0.2560
+    bone.parent = arm.edit_bones[bones['palm.04.L']]
+    bones['f_pinky.01.L'] = bone.name
+    bone = arm.edit_bones.new('f_index.02.L')
+    bone.head[:] = 0.7718, 0.0013, 1.2112
+    bone.tail[:] = 0.7840, -0.0003, 1.1858
+    bone.roll = -1.8799
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['f_pinky.001.L']]
-    bones['f_pinky.002.L'] = bone.name
-    bone = arm.edit_bones.new('f_index.002.L')
-    bone.head[:] = 0.0193, -0.1372, 0.0060
-    bone.tail[:] = 0.0186, -0.1427, 0.0028
-    bone.roll = 0.5229
+    bone.parent = arm.edit_bones[bones['f_index.01.L']]
+    bones['f_index.02.L'] = bone.name
+    bone = arm.edit_bones.new('thumb.02.L')
+    bone.head[:] = 0.6857, 0.0015, 1.2404
+    bone.tail[:] = 0.7056, -0.0057, 1.2145
+    bone.roll = -0.4798
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['f_index.001.L']]
-    bones['f_index.002.L'] = bone.name
-    bone = arm.edit_bones.new('f_middle.002.L')
-    bone.head[:] = 0.0273, -0.1407, 0.0082
-    bone.tail[:] = 0.0273, -0.1496, 0.0030
-    bone.roll = 0.0000
+    bone.parent = arm.edit_bones[bones['thumb.01.L']]
+    bones['thumb.02.L'] = bone.name
+    bone = arm.edit_bones.new('f_middle.02.L')
+    bone.head[:] = 0.7762, 0.0234, 1.2058
+    bone.tail[:] = 0.7851, 0.0218, 1.1749
+    bone.roll = -1.8283
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['f_middle.001.L']]
-    bones['f_middle.002.L'] = bone.name
-    bone = arm.edit_bones.new('f_ring.002.L')
-    bone.head[:] = 0.0340, -0.1407, 0.0082
-    bone.tail[:] = 0.0340, -0.1491, 0.0033
-    bone.roll = 0.0000
+    bone.parent = arm.edit_bones[bones['f_middle.01.L']]
+    bones['f_middle.02.L'] = bone.name
+    bone = arm.edit_bones.new('f_ring.02.L')
+    bone.head[:] = 0.7715, 0.0499, 1.2070
+    bone.tail[:] = 0.7794, 0.0494, 1.1762
+    bone.roll = -1.8946
     bone.use_connect = True
-    bone.parent = arm.edit_bones[bones['f_ring.001.L']]
-    bones['f_ring.002.L'] = bone.name
+    bone.parent = arm.edit_bones[bones['f_ring.01.L']]
+    bones['f_ring.02.L'] = bone.name
+    bone = arm.edit_bones.new('f_pinky.02.L')
+    bone.head[:] = 0.7589, 0.0765, 1.2156
+    bone.tail[:] = 0.7618, 0.0770, 1.1932
+    bone.roll = -1.9059
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['f_pinky.01.L']]
+    bones['f_pinky.02.L'] = bone.name
+    bone = arm.edit_bones.new('f_index.03.L')
+    bone.head[:] = 0.7840, -0.0003, 1.1858
+    bone.tail[:] = 0.7892, 0.0006, 1.1636
+    bone.roll = -1.6760
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['f_index.02.L']]
+    bones['f_index.03.L'] = bone.name
+    bone = arm.edit_bones.new('thumb.03.L')
+    bone.head[:] = 0.7056, -0.0057, 1.2145
+    bone.tail[:] = 0.7194, -0.0098, 1.1995
+    bone.roll = -0.5826
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['thumb.02.L']]
+    bones['thumb.03.L'] = bone.name
+    bone = arm.edit_bones.new('f_middle.03.L')
+    bone.head[:] = 0.7851, 0.0218, 1.1749
+    bone.tail[:] = 0.7888, 0.0216, 1.1525
+    bone.roll = -1.7483
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['f_middle.02.L']]
+    bones['f_middle.03.L'] = bone.name
+    bone = arm.edit_bones.new('f_ring.03.L')
+    bone.head[:] = 0.7794, 0.0494, 1.1762
+    bone.tail[:] = 0.7781, 0.0498, 1.1577
+    bone.roll = -1.6582
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['f_ring.02.L']]
+    bones['f_ring.03.L'] = bone.name
+    bone = arm.edit_bones.new('f_pinky.03.L')
+    bone.head[:] = 0.7618, 0.0770, 1.1932
+    bone.tail[:] = 0.7611, 0.0772, 1.1782
+    bone.roll = -1.7639
+    bone.use_connect = True
+    bone.parent = arm.edit_bones[bones['f_pinky.02.L']]
+    bones['f_pinky.03.L'] = bone.name
 
     bpy.ops.object.mode_set(mode='OBJECT')
     pbone = obj.pose.bones[bones['upper_arm.L']]
@@ -1106,7 +1029,7 @@ def create_sample(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.ik_layers = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.ik_layers = [False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
     try:
@@ -1114,19 +1037,15 @@ def create_sample(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.hose_layers = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-    except AttributeError:
-        pass
-    try:
-        pbone.rigify_parameters.limb_type = "paw"
-    except AttributeError:
-        pass
-    try:
-        pbone.rigify_parameters.fk_layers = [False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.hose_layers = [False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
     try:
         pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.fk_layers = [False, False, False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
     pbone = obj.pose.bones[bones['forearm.L']]
@@ -1143,42 +1062,35 @@ def create_sample(obj):
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_toe.L']]
+    pbone = obj.pose.bones[bones['palm.01.L']]
+    pbone.rigify_type = 'palm'
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'YXZ'
+    pbone = obj.pose.bones[bones['palm.02.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_palm.004.L']]
-    pbone.rigify_type = 'pitchipoy.super_palm'
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_palm.001.L']]
-    pbone.rigify_type = 'pitchipoy.super_palm'
-    pbone.lock_location = (False, False, False)
-    pbone.lock_rotation = (False, False, False)
-    pbone.lock_rotation_w = False
-    pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_palm.002.L']]
+    pbone.rotation_mode = 'YXZ'
+    pbone = obj.pose.bones[bones['palm.03.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_palm.003.L']]
+    pbone.rotation_mode = 'YXZ'
+    pbone = obj.pose.bones[bones['palm.04.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
-    pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_pinky.001.L']]
+    pbone.rotation_mode = 'YXZ'
+    pbone = obj.pose.bones[bones['f_index.01.L']]
     pbone.rigify_type = 'pitchipoy.simple_tentacle'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
@@ -1186,10 +1098,18 @@ def create_sample(obj):
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
     try:
-        pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.separate_extra_layers = True
     except AttributeError:
         pass
-    pbone = obj.pose.bones[bones['f_index.001.L']]
+    try:
+        pbone.rigify_parameters.extra_layers = [False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.tweak_extra_layers = False
+    except AttributeError:
+        pass
+    pbone = obj.pose.bones[bones['thumb.01.L']]
     pbone.rigify_type = 'pitchipoy.simple_tentacle'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
@@ -1197,10 +1117,18 @@ def create_sample(obj):
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
     try:
-        pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.extra_layers = [False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
     except AttributeError:
         pass
-    pbone = obj.pose.bones[bones['f_middle.001.L']]
+    try:
+        pbone.rigify_parameters.separate_extra_layers = True
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.tweak_extra_layers = False
+    except AttributeError:
+        pass
+    pbone = obj.pose.bones[bones['f_middle.01.L']]
     pbone.rigify_type = 'pitchipoy.simple_tentacle'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
@@ -1208,10 +1136,18 @@ def create_sample(obj):
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
     try:
-        pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.separate_extra_layers = True
     except AttributeError:
         pass
-    pbone = obj.pose.bones[bones['f_ring.001.L']]
+    try:
+        pbone.rigify_parameters.extra_layers = [False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.tweak_extra_layers = False
+    except AttributeError:
+        pass
+    pbone = obj.pose.bones[bones['f_ring.01.L']]
     pbone.rigify_type = 'pitchipoy.simple_tentacle'
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
@@ -1219,31 +1155,100 @@ def create_sample(obj):
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
     try:
-        pbone.rigify_parameters.tweak_layers = [False, False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+        pbone.rigify_parameters.separate_extra_layers = True
     except AttributeError:
         pass
-    pbone = obj.pose.bones[bones['f_pinky.002.L']]
+    try:
+        pbone.rigify_parameters.extra_layers = [False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.tweak_extra_layers = False
+    except AttributeError:
+        pass
+    pbone = obj.pose.bones[bones['f_pinky.01.L']]
+    pbone.rigify_type = 'pitchipoy.simple_tentacle'
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    try:
+        pbone.rigify_parameters.separate_extra_layers = True
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.extra_layers = [False, False, False, False, False, True, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
+    except AttributeError:
+        pass
+    try:
+        pbone.rigify_parameters.tweak_extra_layers = False
+    except AttributeError:
+        pass
+    pbone = obj.pose.bones[bones['f_index.02.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_index.002.L']]
+    pbone = obj.pose.bones[bones['thumb.02.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_middle.002.L']]
+    pbone = obj.pose.bones[bones['f_middle.02.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
     pbone.lock_rotation_w = False
     pbone.lock_scale = (False, False, False)
     pbone.rotation_mode = 'QUATERNION'
-    pbone = obj.pose.bones[bones['f_ring.002.L']]
+    pbone = obj.pose.bones[bones['f_ring.02.L']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['f_pinky.02.L']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['f_index.03.L']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['thumb.03.L']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['f_middle.03.L']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['f_ring.03.L']]
+    pbone.rigify_type = ''
+    pbone.lock_location = (False, False, False)
+    pbone.lock_rotation = (False, False, False)
+    pbone.lock_rotation_w = False
+    pbone.lock_scale = (False, False, False)
+    pbone.rotation_mode = 'QUATERNION'
+    pbone = obj.pose.bones[bones['f_pinky.03.L']]
     pbone.rigify_type = ''
     pbone.lock_location = (False, False, False)
     pbone.lock_rotation = (False, False, False)
