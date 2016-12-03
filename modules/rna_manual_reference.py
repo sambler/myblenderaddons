@@ -1,4 +1,4 @@
-    #  RNA MANUAL REFERENCE
+#  RNA MANUAL REFERENCE
 #
 # This file maps RNA to online URL's for right mouse context menu documentation access
 #
@@ -733,6 +733,8 @@ url_manual_mapping = (
     # *** Blend Data ***
     ("bpy.types.ID.*",                          "data_system/data_blocks.html"),
     ("bpy.types.BlendData*",                    "data_system/data_blocks.html#data-block-types"),
+
+    ("bpy.types.bpy_struct*",                  "data_system/custom_properties.html"),
 
     # *** Animation ***
     ("bpy.types.Keyframe.*",                       "animation/actions.html"),

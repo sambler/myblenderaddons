@@ -35,19 +35,17 @@ if "bpy" in locals():
     import importlib
     importlib.reload(ui)
     importlib.reload(operators)
+    importlib.reload(mesh_helpers)
 else:
     import bpy
     from bpy.props import (
             StringProperty,
             BoolProperty,
-            IntProperty,
             FloatProperty,
-            FloatVectorProperty,
             EnumProperty,
             PointerProperty,
             )
     from bpy.types import (
-            Operator,
             AddonPreferences,
             PropertyGroup,
             )
@@ -57,6 +55,7 @@ else:
             )
 
 import math
+
 
 class Print3DSettings(PropertyGroup):
     export_format = EnumProperty(
@@ -119,7 +118,7 @@ class Print3DSettings(PropertyGroup):
             )
 
 
-## Addons Preferences Update Panel
+# Addons Preferences Update Panel
 def update_panel(self, context):
     try:
         bpy.utils.unregister_class(ui.Print3DToolBarObject)
@@ -131,7 +130,8 @@ def update_panel(self, context):
     ui.Print3DToolBarMesh.bl_category = context.user_preferences.addons[__name__].preferences.category
     bpy.utils.register_class(ui.Print3DToolBarMesh)
 
-class printpreferences(bpy.types.AddonPreferences):
+
+class printpreferences(AddonPreferences):
     # this must match the addon name, use '__package__'
     # when defining this in a submodule of a python package.
     bl_idname = __name__
@@ -149,6 +149,7 @@ class printpreferences(bpy.types.AddonPreferences):
         col = row.column()
         col.label(text="Tab Category:")
         col.prop(self, "category", text="")
+
 
 classes = (
     ui.Print3DToolBarObject,
@@ -168,7 +169,7 @@ classes = (
 
     operators.Print3DCleanIsolated,
     operators.Print3DCleanDistorted,
-    operators.Print3DCleanThin,
+    # operators.Print3DCleanThin,
     operators.Print3DCleanNonManifold,
 
     operators.Print3DSelectReport,

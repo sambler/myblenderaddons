@@ -91,7 +91,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             layout.operator_menu_enum("object.modifier_add", "type", icon='MODIFIER')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Mode", icon='EDIT')
@@ -119,7 +119,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_edit_mesh_specials", icon='SOLO_OFF')
             layout.menu("VIEW3D_MT_edit_mesh_extrude", icon='ORTHO')
             UseSeparator(self, context)
-            layout.menu("VIEW3D_MT_edit_mesh_delete", icon='X_VEC')
+            layout.menu("VIEW3D_MT_edit_mesh_delete", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Mode", icon='EDIT')
@@ -223,7 +223,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             layout.operator_menu_enum("object.modifier_add", "type", icon='MODIFIER')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Other", icon='OBJECT_DATA')
@@ -253,7 +253,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
                         icon='SOLO_OFF')
             UseSeparator(self, context)
             layout.operator("curve.delete", text="Delete Object",
-                            icon='X_VEC')
+                            icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Other", icon='OBJECT_DATA')
@@ -284,7 +284,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             layout.operator_menu_enum("object.modifier_add", "type", icon='MODIFIER')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Other", icon='OBJECT_DATA')
@@ -344,7 +344,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_object_specials", text="Specials", icon='SOLO_OFF')
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Other", icon='OBJECT_DATA')
@@ -403,7 +403,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_object_specials", text="Specials", icon='SOLO_OFF')
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             # New Entry For Switching to Editmode
@@ -451,7 +451,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_object_specials", text="Specials", icon='SOLO_OFF')
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             UseSeparator(self, context)
@@ -479,7 +479,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_object_specials", text="Specials", icon='SOLO_OFF')
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             UseSeparator(self, context)
@@ -508,7 +508,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_object_specials", text="Specials", icon='SOLO_OFF')
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Armature", icon='VIEW3D')
@@ -541,7 +541,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
                         icon='BONE_DATA')
             UseSeparator(self, context)
             layout.operator("armature.delete", text="Delete Object",
-                            icon='X_VEC')
+                            icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Armature", icon='VIEW3D')
@@ -605,7 +605,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             layout.operator_menu_enum("object.modifier_add", "type", icon='MODIFIER')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Other", icon='OBJECT_DATA')
@@ -661,7 +661,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_object_specials", text="Specials", icon='SOLO_OFF')
             layout.menu("VIEW3D_MT_Camera_Options", icon='OUTLINER_OB_CAMERA')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             UseSeparator(self, context)
@@ -686,7 +686,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_ParentMenu", icon='ROTACTIVE')
             layout.menu("VIEW3D_MT_GroupMenu", icon='GROUP')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             UseSeparator(self, context)
@@ -716,7 +716,7 @@ class VIEW3D_MT_Space_Dynamic_Menu(Menu):
             layout.menu("VIEW3D_MT_particle", icon='PARTICLEMODE')
             layout.menu("VIEW3D_MT_particle_specials", text="Hair Specials", icon='HAIR')
             UseSeparator(self, context)
-            layout.operator("object.delete", text="Delete Object", icon='X_VEC')
+            layout.operator("object.delete", text="Delete Object", icon='X')
             UseSeparator(self, context)
             layout.menu("VIEW3D_MT_UndoS", icon='ARROW_LEFTRIGHT')
             layout.menu("VIEW3D_MT_Object_Interactive_Mode", icon='VIEW3D')
@@ -1003,6 +1003,7 @@ class InteractiveModeArmature(Menu):
         if context.gpencil_data:
             layout.operator("view3d.interactive_mode_grease_pencil", icon="GREASEPENCIL")
 
+
 # ********** Interactive Mode Other **********
 class InteractiveModeOther(Menu):
     bl_idname = "VIEW3D_MT_Object_Interactive_Other"
@@ -1015,6 +1016,7 @@ class InteractiveModeOther(Menu):
                         icon='OBJECT_DATA')
         if context.gpencil_data:
             layout.operator("view3d.interactive_mode_grease_pencil", icon="GREASEPENCIL")
+
 
 # ********** Grease Pencil Interactive Mode **********
 class VIEW3D_OT_Interactive_Mode_Grease_Pencil(Operator):
@@ -1212,7 +1214,7 @@ class VIEW3D_MT_AutoSmooth(Menu):
         UseSeparator(self, context)
         layout.prop(obj_data, "use_auto_smooth", text="Normals: Auto Smooth")
 
-        # Auto Smooth Angle has two tab spaces to align it with the rest of the menu
+        # Auto Smooth Angle - two tab spaces to align it with the rest of the menu
         layout.prop(obj_data, "auto_smooth_angle",
                     text="       Auto Smooth Angle")
 
@@ -1239,7 +1241,7 @@ class VIEW3D_MT_Edit_Mesh(Menu):
         UseSeparator(self, context)
         layout.menu("VIEW3D_MT_AutoSmooth", icon='META_DATA')
         layout.operator("mesh.loopcut_slide",
-                        text="Loopcut", icon='EDIT_VEC')
+                        text="Loopcut", icon='UV_EDGESEL')
         UseSeparator(self, context)
         layout.operator("mesh.symmetrize")
         layout.operator("mesh.symmetry_snap")
@@ -1252,7 +1254,7 @@ class VIEW3D_MT_Edit_Mesh(Menu):
         UseSeparator(self, context)
 
         layout.prop(toolsettings, "use_mesh_automerge")
-        # Double Threshold text has two tab spaces to align it with the rest of the menu
+        # Double Threshold - two tab spaces to align it with the rest of the menu
         layout.prop(toolsettings, "double_threshold", text="       Double Threshold")
 
         UseSeparator(self, context)
@@ -2676,13 +2678,14 @@ class VIEW3D_MT_Angle_Control(Menu):
 
 # Cursor Menu Operators #
 class VIEW3D_OT_Pivot_Cursor(Operator):
-    "Cursor as Pivot Point"
     bl_idname = "view3d.pivot_cursor"
     bl_label = "Cursor as Pivot Point"
+    bl_description = "Set Pivot Point back to Cursor"
 
     @classmethod
     def poll(cls, context):
-        return bpy.context.space_data.pivot_point != 'CURSOR'
+        space = context.space_data
+        return (hasattr(space, "pivot_point") and space.pivot_point != 'CURSOR')
 
     def execute(self, context):
         bpy.context.space_data.pivot_point = 'CURSOR'
@@ -2690,13 +2693,14 @@ class VIEW3D_OT_Pivot_Cursor(Operator):
 
 
 class VIEW3D_OT_Revert_Pivot(Operator):
-    "Revert Pivot Point"
     bl_idname = "view3d.revert_pivot"
-    bl_label = "Reverts Pivot Point to median"
+    bl_label = "Revert Pivot Point to Median"
+    bl_description = "Set Pivot Point back to Median"
 
     @classmethod
     def poll(cls, context):
-        return bpy.context.space_data.pivot_point != 'MEDIAN_POINT'
+        space = context.space_data
+        return (hasattr(space, "pivot_point") and space.pivot_point != 'MEDIAN_POINT')
 
     def execute(self, context):
         bpy.context.space_data.pivot_point = 'MEDIAN_POINT'
@@ -2758,15 +2762,14 @@ def edgeIntersect(context, operator):
 
 # Cursor Edge Intersection Operator #
 class VIEW3D_OT_CursorToEdgeIntersection(Operator):
-    "Finds the mid-point of the shortest distance between two edges"
-
     bl_idname = "view3d.snap_cursor_to_edge_intersection"
     bl_label = "Cursor to Edge Intersection"
+    bl_description = "Finds the mid-point of the shortest distance between two edges"
 
     @classmethod
     def poll(cls, context):
         obj = context.active_object
-        return obj is not None and obj.type == 'MESH'
+        return (obj is not None and obj.type == 'MESH')
 
     def execute(self, context):
         edgeIntersect(context, self)
@@ -2796,43 +2799,50 @@ class SetObjectMode(Operator):
 
 # Origin To Selected Edit Mode #
 def vfeOrigin(context):
-    cursorPositionX = bpy.context.scene.cursor_location[0]
-    cursorPositionY = bpy.context.scene.cursor_location[1]
-    cursorPositionZ = bpy.context.scene.cursor_location[2]
-    bpy.ops.view3d.snap_cursor_to_selected()
-    bpy.ops.object.mode_set()
-    bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
-    bpy.ops.object.mode_set(mode='EDIT')
-    bpy.context.scene.cursor_location[0] = cursorPositionX
-    bpy.context.scene.cursor_location[1] = cursorPositionY
-    bpy.context.scene.cursor_location[2] = cursorPositionZ
+    try:
+        cursorPositionX = context.scene.cursor_location[0]
+        cursorPositionY = context.scene.cursor_location[1]
+        cursorPositionZ = context.scene.cursor_location[2]
+        bpy.ops.view3d.snap_cursor_to_selected()
+        bpy.ops.object.mode_set()
+        bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+        bpy.ops.object.mode_set(mode='EDIT')
+        context.scene.cursor_location[0] = cursorPositionX
+        context.scene.cursor_location[1] = cursorPositionY
+        context.scene.cursor_location[2] = cursorPositionZ
+        return True
+    except:
+        return False
 
 
 class SetOriginToSelected(Operator):
-    '''Tooltip'''
     bl_idname = "object.setorigintoselected"
     bl_label = "Set Origin to Selected"
+    bl_description = "Set Origin to Selected"
 
     @classmethod
     def poll(cls, context):
-        return context.active_object is not None
+        return (context.area.type == "VIEW_3D" and context.active_object is not None)
 
     def execute(self, context):
-        vfeOrigin(context)
+        check = vfeOrigin(context)
+        if not check:
+            self.report({"ERROR"}, "Set Origin to Selected could not be performed")
+            return {'CANCELLED'}
+
         return {'FINISHED'}
 
 
 # Code thanks to Isaac Weaver (wisaac) D1963
-
 class SnapCursSelToCenter(Operator):
     bl_idname = "view3d.snap_cursor_selected_to_center"
     bl_label = "Snap Cursor & Selection to Center"
-    bl_description = ("Snap 3D cursor and selected objects to the center n"
+    bl_description = ("Snap 3D cursor and selected objects to the center \n"
                       "Works only in Object Mode")
 
     @classmethod
     def poll(cls, context):
-        return (context.mode == "OBJECT")
+        return (context.area.type == "VIEW_3D" and context.mode == "OBJECT")
 
     def execute(self, context):
         context.space_data.cursor_location = (0, 0, 0)
@@ -2841,9 +2851,10 @@ class SnapCursSelToCenter(Operator):
         return {'FINISHED'}
 
 
+# Preferences utility functions
+
 # Draw Separator #
 def UseSeparator(operator, context):
-    # pass the preferences use_separators bool to enable/disable them
     useSep = bpy.context.user_preferences.addons[__name__].preferences.use_separators
     if useSep:
         operator.layout.separator()
@@ -2851,12 +2862,10 @@ def UseSeparator(operator, context):
 
 # Use compact brushes menus #
 def UseBrushesLists():
-    # pass the prefrences use_brushes_lists bool to enable/disable them
     # separate function just for more convience
     useLists = bpy.context.user_preferences.addons[__name__].preferences.use_brushes_lists
-    if useLists:
-        return True
-    return False
+
+    return bool(useLists)
 
 
 # Addon Preferences #
@@ -2866,14 +2875,14 @@ class VIEW3D_MT_Space_Dynamic_Menu_Pref(bpy.types.AddonPreferences):
     use_separators = bpy.props.BoolProperty(
         name="Use Separators in the menus",
         default=True,
-        description=("Use separators in the menus, a trade-off between n"
+        description=("Use separators in the menus, a trade-off between \n"
                      "readability vs. using more space for displaying items")
     )
 
     use_brushes_lists = bpy.props.BoolProperty(
         name="Use compact menus for brushes",
         default=False,
-        description=("Use more compact menus instead  n"
+        description=("Use more compact menus instead  \n"
                      "of thumbnails for displaying brushes")
     )
 
@@ -2997,9 +3006,6 @@ def register():
 # Unegister Classes & Hotkeys #
 
 def unregister():
-    for cls in classes:
-        bpy.utils.unregister_class(cls)
-
     wm = bpy.context.window_manager
     kc = wm.keyconfigs.addon
     if kc:
@@ -3009,6 +3015,10 @@ def unregister():
                 if kmi.properties.name == "VIEW3D_MT_Space_Dynamic_Menu":
                     km.keymap_items.remove(kmi)
                     break
+    for cls in classes:
+        # prevent multiple removal attempt
+        if "bl_rna" in cls.__dict__:
+            bpy.utils.unregister_class(cls)
 
 if __name__ == "__main__":
     register()
