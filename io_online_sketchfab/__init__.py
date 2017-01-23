@@ -21,7 +21,7 @@ bl_info = {
     "author": "Bart Crouch",
     "version": (1, 2, 2),
     "blender": (2, 7, 0),
-    "location": "Tools > Upload tab",
+    "location": "Tools > File I/O tab",
     "description": "Upload your model to Sketchfab",
     "warning": "",
     "wiki_url": "",
@@ -287,7 +287,7 @@ class ExportSketchfab(bpy.types.Operator):
 class VIEW3D_PT_sketchfab(bpy.types.Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
-    bl_category = "Sketchfab"
+    bl_category = "File I/O"
     bl_context = "objectmode"
     bl_label = "Sketchfab"
 
@@ -443,7 +443,7 @@ class SfabAddonPreferences(bpy.types.AddonPreferences):
     category = bpy.props.StringProperty(
             name="Tab Category",
             description="Choose a name for the category of the panel",
-            default="Sketchfab",
+            default="File I/O",
             update=update_panel)
 
     def draw(self, context):
@@ -473,7 +473,7 @@ def register():
 
     load_token()
     bpy.app.handlers.load_post.append(load_token)
-
+    update_panel(None, bpy.context)
 
 def unregister():
     for cls in classes:

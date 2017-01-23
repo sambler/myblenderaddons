@@ -172,6 +172,7 @@ class OscPanelMesh(Panel):
 
         col.operator("mesh.object_to_mesh_osc", icon="MESH_MONKEY")
         col.operator("mesh.select_side_osc", icon="VERTEXSEL")
+        col.operator("mesh.select_doubles", icon="VERTEXSEL")
         colrow = col.row(align=1)
         colrow.operator("mesh.resym_save_map", icon="UV_SYNC_SELECT")
         colrow = col.row(align=1)
@@ -186,12 +187,7 @@ class OscPanelMesh(Panel):
         colrow.operator("mesh.overlap_uv_faces", icon="UV_FACESEL")
         colrow = col.row(align=1)
         colrow.operator("view3d.modal_operator", icon="STICKY_UVS_DISABLE")
-        colrow = col.row(align=1)
-        colrow.operator("file.export_groups_osc", icon='GROUP_VCOL')
-        colrow.operator("file.import_groups_osc", icon='GROUP_VCOL')
-        colrow = col.row(align=1)
-        colrow.operator("mesh.export_vertex_colors", icon='COLOR')
-        colrow.operator("mesh.import_vertex_colors", icon='COLOR')
+
 
 
 class OscPanelShapes(Panel):
@@ -235,14 +231,6 @@ class OscPanelRender(Panel):
         col = layout.column(align=1)
 
         colrow = col.row(align=1)
-        colrow.operator(
-            "render.copy_render_settings_osc",
-            icon="LIBRARY_DATA_DIRECT",
-            text="Copy Render Settings").mode = "render"
-        colrow.operator(
-            "render.copy_render_settings_osc",
-            icon="LIBRARY_DATA_DIRECT",
-            text="Copy Cycles Settings").mode = "cycles"
         col.operator(
             "file.create_batch_maker_osc",
             icon="LINENUMBERS_ON",

@@ -23,7 +23,7 @@ bl_info = {
     "author": "Campbell Barton",
     "version": (0, 2),
     "blender": (2, 57, 0),
-    "location": "View3D > Tool Shelf or Console",
+    "location": "Properties: Scene > Math Vis Console and Python Console: Menu",
     "description": "Display console defined mathutils variables in the 3D view",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"
                 "Scripts/3D_interaction/Math_Viz",
@@ -44,9 +44,10 @@ from bpy.props import StringProperty, BoolProperty, BoolVectorProperty, FloatPro
 
 
 class PanelConsoleVars(bpy.types.Panel):
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'TOOLS'
-    bl_label = "Console Vars"
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = 'scene'
+    bl_label = "Math Vis Console"
     bl_idname = "mathvis.panel_console_vars"
     bl_category = "Math Vis"
     bl_options = {'DEFAULT_CLOSED'}
@@ -78,7 +79,7 @@ class PanelConsoleVars(bpy.types.Panel):
 class DeleteVar(bpy.types.Operator):
     bl_idname = "mathvis.delete_var"
     bl_label = "Delete Var"
-    bl_description = "Remove the variable from the Console."
+    bl_description = "Remove the variable from the Console"
     bl_options = {'REGISTER'}
 
     key = StringProperty(name="Key")
@@ -87,7 +88,7 @@ class DeleteVar(bpy.types.Operator):
         locals = utils.console_namespace()
         utils.VarStates.delete(self.key)
         del locals[self.key]
-        draw.tag_redraw_all_view3d_areas()
+        draw.tag_redraw_areas()
         return {'FINISHED'}
 
 
@@ -101,7 +102,7 @@ class ToggleDisplay(bpy.types.Operator):
 
     def execute(self, context):
         utils.VarStates.toggle_display_state(self.key)
-        draw.tag_redraw_all_view3d_areas()
+        draw.tag_redraw_areas()
         return {'FINISHED'}
 
 
@@ -115,7 +116,7 @@ class ToggleLock(bpy.types.Operator):
 
     def execute(self, context):
         utils.VarStates.toggle_lock_state(self.key)
-        draw.tag_redraw_all_view3d_areas()
+        draw.tag_redraw_areas()
         return {'FINISHED'}
 
 
@@ -127,19 +128,19 @@ class ToggleMatrixBBoxDisplay(bpy.types.Operator):
 
     def execute(self, context):
         utils.VarStates.toggle_show_bbox()
-        draw.tag_redraw_all_view3d_areas()
+        draw.tag_redraw_areas()
         return {'FINISHED'}
 
 
 class CleanupConsole(bpy.types.Operator):
     bl_idname = "mathvis.cleanup_console"
     bl_label = "Cleanup Math Vis Console"
-    bl_description = "Remove all visualised variables from the Console."
+    bl_description = "Remove all visualized variables from the Console"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
         utils.cleanup_math_data()
-        draw.tag_redraw_all_view3d_areas()
+        draw.tag_redraw_areas()
         return {'FINISHED'}
 
 
@@ -149,7 +150,7 @@ def menu_func_cleanup(self, context):
 
 def console_hook():
     utils.VarStates.store_states()
-    draw.tag_redraw_all_view3d_areas()
+    draw.tag_redraw_areas()
     context = bpy.context
     for window in context.window_manager.windows:
         window.screen.areas.update()

@@ -101,6 +101,7 @@ def defRenderAll(frametype, scenes):
 
 
 class renderAll (Operator):
+    """Renders all scenes executing the Oscurart overrides if those are set up. Saves the renders in their respective folders using the scenes and render layers names."""
     bl_idname = "render.render_all_scenes_osc"
     bl_label = "Render All Scenes"
 
@@ -117,6 +118,7 @@ bpy.types.Scene.use_render_scene = bpy.props.BoolProperty()
 
 
 class renderSelected (Operator):
+    """Renders the seleccted scenes on the checkboxes, executing the Oscurart overrides if it was set up. Saves the renders in their respective folders using the scenes and render layers names."""
     bl_idname = "render.render_selected_scenes_osc"
     bl_label = "Render Selected Scenes"
 
@@ -132,6 +134,7 @@ class renderSelected (Operator):
 
 
 class renderCurrent (Operator):
+    """Renders the active scene executing the Oscurart overrides if it was set up. Saves the renders in their respective folders using the scenes and render layers names."""
     bl_idname = "render.render_current_scene_osc"
     bl_label = "Render Current Scene"
 
@@ -173,6 +176,7 @@ def OscRenderCropFunc():
 
 
 class renderCrop (Operator):
+    """It renders croping the image in to a X number of pieces. Usefull for rendering really big images."""
     bl_idname = "render.render_crop_osc"
     bl_label = "Render Crop: Render!"
 
@@ -256,6 +260,7 @@ def defoscBatchMaker(TYPE, BIN):
 
 
 class oscBatchMaker (Operator):
+    """It creates .bat(win) or .sh(unix) file, to execute and render from Console/Terminal."""
     bl_idname = "file.create_batch_maker_osc"
     bl_label = "Make render batch"
     bl_options = {'REGISTER', 'UNDO'}
@@ -376,6 +381,7 @@ while REPITE:
 
 
 class oscPythonBatchMaker (Operator):
+    """It creates a file as “Make Render Batch” but it requires Phyton installed and the respective environment variables set up. If the render crahses, the batch automatically erase the broken frame and writes it again. Its not recommended if there is more than one machine rendering."""
     bl_idname = "file.create_batch_python"
     bl_label = "Make Batch Python"
     bl_options = {'REGISTER', 'UNDO'}
@@ -406,6 +412,7 @@ bpy.utils.register_class(VarColArchivos)
 
 
 class SumaFile(Operator):
+    """Look for broken rendered files and shows it."""
     bl_idname = "object.add_broken_file"
     bl_label = "Add Broken Files"
 
@@ -428,6 +435,7 @@ class SumaFile(Operator):
 
 
 class ClearFile(Operator):
+    """Erase the list of broken frames.""" 
     bl_idname = "object.clear_broken_file"
     bl_label = "Clear Broken Files"
 
@@ -437,6 +445,7 @@ class ClearFile(Operator):
 
 
 class DeleteFiles(Operator):
+    """Erase the broken frames files from Disk."""
     bl_idname = "object.delete_broken_file"
     bl_label = "Delete Broken Files"
 
@@ -477,177 +486,3 @@ class BrokenFramesPanel (Panel):
         colrow.operator("object.delete_broken_file")
 
 
-# --------------------------------COPY RENDER SETTINGS--------------------
-
-def defCopyRenderSettings(mode):
-
-    sc = bpy.context.scene
-    sceneslist = bpy.data.scenes[:]
-    sceneslist.remove(sc)
-
-    excludes = {
-        'name',
-        'objects',
-        'object_bases',
-        'has_multiple_engines',
-        'display_settings',
-        'broken_files',
-        'rna_type',
-        'frame_subframe',
-        'view_settings',
-        'tool_settings',
-        'render',
-        'user_clear',
-        'animation_data_create',
-        'collada_export',
-        'keying_sets',
-        'icon_props',
-        'image_settings',
-        'library',
-        'bake',
-        'active_layer',
-        'frame_current_final',
-        'sequence_editor_clear',
-        'rigidbody_world',
-        'unit_settings',
-        'orientations',
-        '__slots__',
-        'ray_cast',
-        'sequencer_colorspace_settings',
-        'ffmpeg',
-        'is_movie_format',
-        'frame_path',
-        'frame_set',
-        'network_render',
-        'animation_data_clear',
-        'is_nla_tweakmode',
-        'keying_sets_all',
-        'sequence_editor',
-        '__doc__',
-        'ovlist',
-        'file_extension',
-        'users',
-        'node_tree',
-        'is_updated_data',
-        'bl_rna',
-        'is_library_indirect',
-        'cycles_curves',
-        'timeline_markers',
-        'statistics',
-        'use_shading_nodes',
-        'use_game_engine',
-        'sequence_editor_create',
-        'is_updated',
-        '__module__',
-        'update_tag',
-        'update',
-        'animation_data',
-        'cycles',
-        'copy',
-        'game_settings',
-        'layers',
-        '__weakref__',
-        'string',
-        'double',
-        'overrides',
-        'use_render_scene',
-        'engine',
-        'use_nodes',
-        'world'}
-
-    if mode == "render":
-        scenerenderdict = {}
-        scenedict = {}
-        sceneimagesettingdict = {}
-        for prop in dir(bpy.context.scene.render):
-            if prop not in excludes:
-                try:
-                    scenerenderdict[prop] = getattr(
-                        bpy.context.scene.render, prop)
-                except:
-                    print("%s does not exist." % (prop))
-
-        for prop in dir(bpy.context.scene):
-            if prop not in excludes:
-                try:
-                    scenedict[prop] = getattr(bpy.context.scene, prop)
-                except:
-                    print("%s does not exist." % (prop))
-
-        for prop in dir(bpy.context.scene.render.image_settings):
-            if prop not in excludes:
-                try:
-                    sceneimagesettingdict[prop] = getattr(
-                        bpy.context.scene.render.image_settings,
-                        prop)
-                except:
-                    print("%s does not exist." % (prop))
-
-        """
-        scenerenderdict = {prop: getattr(bpy.context.scene.render, prop) for prop in dir(bpy.context.scene.render)}
-        scenedict = {prop: getattr(bpy.context.scene, prop) for prop in dir(bpy.context.scene) if prop not in excludes}
-        sceneimagesettingdict = {prop: getattr(bpy.context.scene.render.image_settings, prop)
-                                 for prop in dir(bpy.context.scene.render.image_settings)}
-        """
-
-        # render
-        for escena in sceneslist:
-            for prop, value in scenerenderdict.items():
-                try:
-                    setattr(escena.render, prop, value)
-                except:
-                    print("%s was not copied!" % (prop))
-                    pass
-
-        # scene
-        for escena in sceneslist:
-            for prop, value in scenedict.items():
-                try:
-                    setattr(escena, prop, value)
-                except:
-                    print("%s was not copied!" % (prop))
-                    pass
-        # imageSettings
-        for escena in sceneslist:
-            for prop, value in sceneimagesettingdict.items():
-                try:
-                    setattr(escena.render.image_settings, prop, value)
-                except:
-                    print("%s was not copied!" % (prop))
-                    pass
-
-    if mode == "cycles":
-        scenecyclesdict = {}
-        for prop in dir(bpy.context.scene.cycles):
-            if prop not in excludes:
-                try:
-                    scenecyclesdict[prop] = getattr(
-                        bpy.context.scene.cycles, prop)
-                except:
-                    print("%s does not exist." % (prop))
-
-        """
-        scenecyclesdict = {prop: getattr(bpy.context.scene.cycles, prop) for prop in dir(bpy.context.scene.cycles)}
-        """
-        # cycles
-        for escena in sceneslist:
-            for prop, value in scenecyclesdict.items():
-                try:
-                    setattr(escena.cycles, prop, value)
-                except:
-                    print("%s was not copied!" % (prop))
-                    pass
-
-
-class copyRenderSettings(Operator):
-    bl_idname = "render.copy_render_settings_osc"
-    bl_label = "Copy Render Settings"
-    # bl_options = {'REGISTER', 'UNDO'}
-
-    mode = bpy.props.StringProperty(default="")
-
-    def execute(self, context):
-
-        defCopyRenderSettings(self.mode)
-
-        return {'FINISHED'}

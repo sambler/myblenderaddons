@@ -1103,7 +1103,8 @@ class Panel_UDKImport(bpy.types.Panel):
     bl_idname = "OBJECT_PT_udk_import"
     bl_space_type = "VIEW_3D"
     bl_region_type = "TOOLS"
-    bl_category = "Import/Export"
+    bl_category = "File I/O"
+    bl_context = "objectmode"
 
     filepath = StringProperty(
             subtype='FILE_PATH',
