@@ -50,6 +50,95 @@ for member in dir(properties_texture):
         pass
 del properties_texture
 
+# Physics Main wrapping every class 'as is'
+from bl_ui import properties_physics_common
+for member in dir(properties_physics_common):
+    subclass = getattr(properties_physics_common, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_common
+
+# Physics Rigid Bodies wrapping every class 'as is'
+from bl_ui import properties_physics_rigidbody
+for member in dir(properties_physics_rigidbody):
+    subclass = getattr(properties_physics_rigidbody, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_rigidbody
+
+# Physics Rigid Body Constraint wrapping every class 'as is'
+from bl_ui import properties_physics_rigidbody_constraint
+for member in dir(properties_physics_rigidbody_constraint):
+    subclass = getattr(properties_physics_rigidbody_constraint, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_rigidbody_constraint
+
+# Physics Smoke wrapping every class 'as is'
+from bl_ui import properties_physics_smoke
+for member in dir(properties_physics_smoke):
+    subclass = getattr(properties_physics_smoke, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_smoke
+
+# Physics softbody wrapping every class 'as is'
+from bl_ui import properties_physics_softbody
+for member in dir(properties_physics_softbody):
+    subclass = getattr(properties_physics_softbody, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_softbody
+
+# Physics Fluid wrapping every class 'as is'
+from bl_ui import properties_physics_fluid
+for member in dir(properties_physics_fluid):
+    subclass = getattr(properties_physics_fluid, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_fluid
+
+# Physics Field wrapping every class 'as is'
+from bl_ui import properties_physics_field
+for member in dir(properties_physics_field):
+    subclass = getattr(properties_physics_field, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_field
+
+# Physics Cloth wrapping every class 'as is'
+from bl_ui import properties_physics_cloth
+for member in dir(properties_physics_cloth):
+    subclass = getattr(properties_physics_cloth, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_cloth
+
+# Physics Dynamic Paint wrapping every class 'as is'
+from bl_ui import properties_physics_dynamicpaint
+for member in dir(properties_physics_dynamicpaint):
+    subclass = getattr(properties_physics_dynamicpaint, member)
+    try:
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
+del properties_physics_dynamicpaint
 
 # Example of wrapping every class 'as is' except some
 from bl_ui import properties_material
@@ -59,6 +148,8 @@ for member in dir(properties_material):
                         properties_material.MATERIAL_PT_game_settings,
                         properties_material.MATERIAL_PT_physics):
         try:
+            #mat=context.material
+            #if mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and not (mat.pov.material_use_nodes or mat.use_nodes):
             subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
         except:
             pass
@@ -86,6 +177,7 @@ for member in dir(properties_particle):  # add all "particle" panels from blende
         pass
 del properties_particle
 
+    
 class RenderButtonsPanel():
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -392,11 +484,18 @@ del properties_data_lamp
 ###############################################################################
         
 class RENDER_PT_povray_export_settings(RenderButtonsPanel, bpy.types.Panel):
-    bl_label = "Export Settings"
+    bl_label = "INI Options"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'POVRAY_RENDER'}
 
+
     def draw_header(self, context):
-        self.layout.label(icon='CONSOLE')
+        scene = context.scene
+        if scene.pov.tempfiles_enable:
+            self.layout.prop(scene.pov, "tempfiles_enable", text="", icon='AUTO')
+        else:
+            self.layout.prop(scene.pov, "tempfiles_enable", text="", icon='CONSOLE')
+
     def draw(self, context):
         layout = self.layout
 
@@ -409,47 +508,87 @@ class RENDER_PT_povray_export_settings(RenderButtonsPanel, bpy.types.Panel):
         col.label(text="Command line switches:")
         col.prop(scene.pov, "command_line_switches", text="")
         split = layout.split()
-        split.prop(scene.pov, "tempfiles_enable", text="OS Tempfiles")
+
+        layout.active = not scene.pov.tempfiles_enable
+        #if not scene.pov.tempfiles_enable:
+        split.prop(scene.pov, "deletefiles_enable", text="Delete files")
         split.prop(scene.pov, "pov_editor", text="POV Editor")
-        if not scene.pov.tempfiles_enable:
-            split.prop(scene.pov, "deletefiles_enable", text="Delete files")
 
-        if not scene.pov.tempfiles_enable:
-            col = layout.column()
-            col.prop(scene.pov, "scene_name", text="Name")
-            col.prop(scene.pov, "scene_path", text="Path to files")
-            #col.prop(scene.pov, "scene_path", text="Path to POV-file")
-            #col.prop(scene.pov, "renderimage_path", text="Path to image")
+        col = layout.column()
+        col.prop(scene.pov, "scene_name", text="Name")
+        col.prop(scene.pov, "scene_path", text="Path to files")
+        #col.prop(scene.pov, "scene_path", text="Path to POV-file")
+        #col.prop(scene.pov, "renderimage_path", text="Path to image")
 
-            split = layout.split()
-            split.prop(scene.pov, "indentation_character", text="Indent")
-            if scene.pov.indentation_character == 'SPACE':
-                split.prop(scene.pov, "indentation_spaces", text="Spaces")
+        split = layout.split()
+        split.prop(scene.pov, "indentation_character", text="Indent")
+        if scene.pov.indentation_character == 'SPACE':
+            split.prop(scene.pov, "indentation_spaces", text="Spaces")
 
-            row = layout.row()
-            row.prop(scene.pov, "comments_enable", text="Comments")
-            row.prop(scene.pov, "list_lf_enable", text="Line breaks in lists")
+        row = layout.row()
+        row.prop(scene.pov, "comments_enable", text="Comments")
+        row.prop(scene.pov, "list_lf_enable", text="Line breaks in lists")
 
 
 class RENDER_PT_povray_render_settings(RenderButtonsPanel, bpy.types.Panel):
     bl_label = "Render Settings"
     bl_icon = 'SETTINGS'
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'POVRAY_RENDER'}
 
     def draw_header(self, context):
-        self.layout.label(icon='SETTINGS')
+        scene = context.scene
+        if scene.pov.global_settings_advanced:
+            self.layout.prop(scene.pov, "global_settings_advanced", text="", icon='PREFERENCES')
+        else:
+            self.layout.prop(scene.pov, "global_settings_advanced", text="", icon='SETTINGS')
     def draw(self, context):
         layout = self.layout
 
         scene = context.scene
-        layout.active = (scene.pov.max_trace_level != 0)
+        #layout.active = (scene.pov.max_trace_level != 0)
 
         col = layout.column()
 
         col.label(text="Global Settings:")
         col.prop(scene.pov, "max_trace_level", text="Ray Depth")
+        
+        layout.active = scene.pov.global_settings_advanced
+        layout.prop(scene.pov,"charset")
+        align = True
+        row = layout.row(align = align)
+        row.prop(scene.pov,"adc_bailout")
+        row = layout.row(align = align)
+        row.prop(scene.pov,"ambient_light")
+        row = layout.row(align = align)
+        row.prop(scene.pov,"irid_wavelength")
+        row = layout.row(align = align)  
+        row.prop(scene.pov,"max_intersections")
+        row = layout.row(align = align)        
+        row.prop(scene.pov,"number_of_waves")
+        row = layout.row(align = align)
+        row.prop(scene.pov,"noise_generator")
 
-        col.label(text="Global Photons:")
+class RENDER_PT_povray_photons(RenderButtonsPanel, bpy.types.Panel):
+    bl_label = "Photons"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'POVRAY_RENDER'}
+
+    # def draw_header(self, context):
+        # self.layout.label(icon='SETTINGS')
+
+    def draw_header(self, context):
+        scene = context.scene
+        if scene.pov.photon_enable:
+            self.layout.prop(scene.pov, "photon_enable", text="", icon='PMARKER_ACT')
+        else:
+            self.layout.prop(scene.pov, "photon_enable", text="", icon='PMARKER')
+    def draw(self, context):
+        scene = context.scene
+        layout = self.layout
+        layout.active = scene.pov.photon_enable
+        col = layout.column()
+        #col.label(text="Global Photons:")
         col.prop(scene.pov, "photon_max_trace_level", text="Photon Depth")
 
         split = layout.split()
@@ -461,10 +600,22 @@ class RENDER_PT_povray_render_settings(RenderButtonsPanel, bpy.types.Panel):
         col = split.column()
         col.prop(scene.pov, "photon_adc_bailout", text="Photon ADC")
         col.prop(scene.pov, "photon_gather_max")
-
+        
+        
+        box = layout.box()
+        box.label('Photon Map File:')
+        row = box.row()
+        row.prop(scene.pov, "photon_map_file_save_load",expand = True)
+        if scene.pov.photon_map_file_save_load in {'save'}:
+            box.prop(scene.pov, "photon_map_dir")
+            box.prop(scene.pov, "photon_map_filename")
+        if scene.pov.photon_map_file_save_load in {'load'}:
+            box.prop(scene.pov, "photon_map_file")
+        #end main photons
 
 class RENDER_PT_povray_antialias(RenderButtonsPanel, bpy.types.Panel):
     bl_label = "Anti-Aliasing"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'POVRAY_RENDER'}
 
 
@@ -524,6 +675,7 @@ class RENDER_PT_povray_antialias(RenderButtonsPanel, bpy.types.Panel):
 
 class RENDER_PT_povray_radiosity(RenderButtonsPanel, bpy.types.Panel):
     bl_label = "Radiosity"
+    bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'POVRAY_RENDER'}
     def draw_header(self, context):
         scene = context.scene
@@ -554,24 +706,24 @@ class RENDER_PT_povray_radiosity(RenderButtonsPanel, bpy.types.Panel):
 
             col = split.column()
             col.prop(scene.pov, "radio_adc_bailout", slider=True)
+            col.prop(scene.pov, "radio_minimum_reuse", text="Min Reuse")            
             col.prop(scene.pov, "radio_gray_threshold", slider=True)
-            col.prop(scene.pov, "radio_low_error_factor", slider=True)
             col.prop(scene.pov, "radio_pretrace_start", slider=True)
-
+            col.prop(scene.pov, "radio_low_error_factor", slider=True)
+            
             col = split.column()
             col.prop(scene.pov, "radio_brightness")
-            col.prop(scene.pov, "radio_minimum_reuse", text="Min Reuse")
+            col.prop(scene.pov, "radio_maximum_reuse", text="Max Reuse")
             col.prop(scene.pov, "radio_nearest_count")
             col.prop(scene.pov, "radio_pretrace_end", slider=True)
 
-            split = layout.split()
-
-            col = split.column()
+            col = layout.column()
             col.label(text="Estimation Influence:")
-            col.prop(scene.pov, "radio_media")
+            col.prop(scene.pov, "radio_always_sample")
             col.prop(scene.pov, "radio_normal")
+            col.prop(scene.pov, "radio_media")
+            col.prop(scene.pov, "radio_subsurface")
 
-            split.prop(scene.pov, "radio_always_sample")
 
 
 class RENDER_PT_povray_media(WorldButtonsPanel, bpy.types.Panel):
@@ -611,10 +763,89 @@ class RENDER_PT_povray_media(WorldButtonsPanel, bpy.types.Panel):
 ##
 ##        layout.active = scene.pov.baking_enable
 
+class MATERIAL_PT_povray_activate_node(MaterialButtonsPanel, bpy.types.Panel):
+    bl_label = "Activate Node Settings"
+    bl_context = "material"
+    bl_options = {'HIDE_HEADER'}
+    COMPAT_ENGINES = {'POVRAY_RENDER'}
+
+    @classmethod
+    def poll(cls, context):
+        engine = context.scene.render.engine
+        mat=context.material
+        ob = context.object
+        return mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and not (mat.pov.material_use_nodes or mat.use_nodes)
+    
+    def draw(self, context):
+        layout = self.layout
+        # layout.operator("pov.material_use_nodes", icon='SOUND')#'NODETREE')
+        # the above replaced with a context hook below:
+        layout.operator("WM_OT_context_toggle", text="Use POV-Ray Nodes", icon='NODETREE').data_path = \
+                        "material.pov.material_use_nodes"
+        
+class MATERIAL_PT_povray_active_node(MaterialButtonsPanel, bpy.types.Panel):
+    bl_label = "Active Node Settings"
+    bl_context = "material"
+    bl_options = {'HIDE_HEADER'}
+    COMPAT_ENGINES = {'POVRAY_RENDER'}
+
+    @classmethod
+    def poll(cls, context):
+        engine = context.scene.render.engine
+        mat=context.material
+        ob = context.object
+        return mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and mat.pov.material_use_nodes
+
+
+    def draw(self, context):
+        layout = self.layout
+        mat = context.material
+        node_tree = mat.node_tree
+        if node_tree:
+            node = node_tree.nodes.active
+            if mat.use_nodes:
+                if node:
+                    layout.prop(mat.pov,"material_active_node")
+                    if node.bl_idname=="PovrayMaterialNode":
+                        layout.context_pointer_set("node", node)
+                        if hasattr(node, "draw_buttons_ext"):
+                            node.draw_buttons_ext(context, layout)
+                        elif hasattr(node, "draw_buttons"):
+                            node.draw_buttons(context, layout)
+                        value_inputs = [socket for socket in node.inputs if socket.enabled and not socket.is_linked]
+                        if value_inputs:
+                            layout.separator()
+                            layout.label("Inputs:")
+                            for socket in value_inputs:
+                                row = layout.row()
+                                socket.draw(context, row, node, socket.name)
+                    else:
+                        layout.context_pointer_set("node", node)
+                        if hasattr(node, "draw_buttons_ext"):
+                            node.draw_buttons_ext(context, layout)
+                        elif hasattr(node, "draw_buttons"):
+                            node.draw_buttons(context, layout)
+                        value_inputs = [socket for socket in node.inputs if socket.enabled and not socket.is_linked]
+                        if value_inputs:
+                            layout.separator()
+                            layout.label("Inputs:")
+                            for socket in value_inputs:
+                                row = layout.row()
+                                socket.draw(context, row, node, socket.name)
+                else:
+                    layout.label("No active nodes!")
+
 
 class MATERIAL_PT_povray_reflection(MaterialButtonsPanel, bpy.types.Panel):
     bl_label = "POV-Ray Reflection"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
+
+    @classmethod
+    def poll(cls, context):
+        engine = context.scene.render.engine
+        mat=context.material
+        ob = context.object
+        return mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and not (mat.pov.material_use_nodes or mat.use_nodes)
 
     def draw(self, context):
         layout = self.layout
@@ -644,6 +875,14 @@ class MATERIAL_PT_povray_fade_color(MaterialButtonsPanel, bpy.types.Panel):
     bl_label = "POV-Ray Absorption"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
 
+    @classmethod
+    def poll(cls, context):
+        engine = context.scene.render.engine
+        mat=context.material
+        ob = context.object
+        return mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and not (mat.pov.material_use_nodes or mat.use_nodes)
+    
+    
     def draw_header(self, context):
         mat = context.material
 
@@ -665,6 +904,15 @@ class MATERIAL_PT_povray_caustics(MaterialButtonsPanel, bpy.types.Panel):
     bl_label = "Caustics"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
 
+    
+    @classmethod
+    def poll(cls, context):
+        engine = context.scene.render.engine
+        mat=context.material
+        ob = context.object
+        return mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and not (mat.pov.material_use_nodes or mat.use_nodes)
+    
+    
     def draw_header(self, context):
         mat = context.material
         if mat.pov.caustics_enable:
@@ -702,6 +950,7 @@ class MATERIAL_PT_povray_replacement_text(MaterialButtonsPanel, bpy.types.Panel)
     bl_label = "Custom POV Code"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
 
+    
     def draw(self, context):
         layout = self.layout
 
@@ -1377,6 +1626,55 @@ def menu_func_import(self, context):
         self.layout.operator("import_scene.pov",icon="FORCE_LENNARDJONES")
 
         
+##############Nodes
+
+# def find_node_input(node, name):
+    # for input in node.inputs:
+        # if input.name == name:
+            # return input
+
+# def panel_node_draw(layout, id_data, output_type, input_name):
+    # if not id_data.use_nodes:
+        # #layout.operator("pov.material_use_nodes", icon='SOUND')#'NODETREE')
+        # #layout.operator("pov.use_shading_nodes", icon='NODETREE')
+        # layout.operator("WM_OT_context_toggle", icon='NODETREE').data_path = \
+                        # "material.pov.material_use_nodes"        
+        # return False
+
+    # ntree = id_data.node_tree
+
+    # node = find_node(id_data, output_type)
+    # if not node:
+        # layout.label(text="No output node")
+    # else:
+        # input = find_node_input(node, input_name)
+        # layout.template_node_view(ntree, node, input)
+
+    # return True
+
+class Node_map_create_menu(bpy.types.Menu):
+    """Create maps"""
+    bl_idname = "Node_map_create_menu"
+    bl_label = "Create map"
+
+    def draw(self,context):
+        layout = self.layout
+        layout.operator("node.map_create")
+
+def menu_func_nodes(self, context):
+    ob = context.object
+    if hasattr(ob,'active_material'):
+        mat=context.object.active_material
+        if mat and context.space_data.tree_type == 'ObjectNodeTree':
+            self.layout.prop(mat.pov,"material_use_nodes")
+            self.layout.menu("Node_map_create_menu")
+            self.layout.operator("wm.updatepreviewkey")
+        if hasattr(mat,'active_texture') and context.scene.render.engine == 'POVRAY_RENDER':
+            tex=mat.active_texture
+            if tex and context.space_data.tree_type == 'TextureNodeTree':
+                self.layout.prop(tex.pov,"texture_use_nodes")
+
+
 ###############################################################################
 # Camera Povray Settings
 ############################################################################### 
@@ -1409,6 +1707,29 @@ class CAMERA_PT_povray_cam_dof(CameraDataButtonsPanel, bpy.types.Panel):
         col.prop(cam.pov, "dof_confidence")
 
 
+            
+class CAMERA_PT_povray_cam_nor(CameraDataButtonsPanel, bpy.types.Panel):
+    bl_label = "POV-Ray Perturbation"
+    COMPAT_ENGINES = {'POVRAY_RENDER'}
+
+    def draw_header(self, context):
+        cam = context.camera
+
+        self.layout.prop(cam.pov, "normal_enable", text="")
+
+    def draw(self, context):
+        layout = self.layout
+
+        cam = context.camera
+
+        layout.active = cam.pov.normal_enable
+
+        layout.prop(cam.pov,"normal_patterns")
+        layout.prop(cam.pov,"cam_normal")
+        layout.prop(cam.pov,"turbulence")
+        layout.prop(cam.pov,"scale")
+
+
 class CAMERA_PT_povray_replacement_text(CameraDataButtonsPanel, bpy.types.Panel):
     bl_label = "Custom POV Code"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
@@ -1424,7 +1745,7 @@ class CAMERA_PT_povray_replacement_text(CameraDataButtonsPanel, bpy.types.Panel)
 
 
 class TEXT_PT_povray_custom_code(TextButtonsPanel, bpy.types.Panel):
-    bl_label = "P.O.V-Ray"
+    bl_label = "POV-Ray"
     COMPAT_ENGINES = {'POVRAY_RENDER'}
 
     def draw(self, context):
