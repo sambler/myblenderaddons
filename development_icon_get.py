@@ -23,11 +23,11 @@ bl_info = {
     "name": "Icon Viewer",
     "description": "Click an icon to copy its name to the clipboard",
     "author": "roaoao",
-    "version": (1, 3, 1),
+    "version": (1, 3, 2),
     "blender": (2, 75, 0),
     "location": "Spacebar > Icon Viewer, Text Editor > Properties",
-    "wiki_url": (
-        "https://wiki.blender.org/index.php/User:Raa/Addons/Icon_Viewer"),
+    "wiki_url": "https://wiki.blender.org/index.php/Extensions:2.6"
+                "/Py/Scripts/Development/Display_All_Icons",
     "category": "Development"
 }
 
@@ -44,10 +44,8 @@ HISTORY = []
 
 
 def ui_scale():
-    ret = bpy.context.user_preferences.system.dpi / DPI
-    if bpy.context.user_preferences.system.virtual_pixel_mode == 'DOUBLE':
-        ret *= 2
-    return ret
+    prefs = bpy.context.user_preferences.system
+    return prefs.dpi * prefs.pixel_size / DPI
 
 
 def prefs():
@@ -187,7 +185,7 @@ class IV_Preferences(bpy.types.AddonPreferences):
         name="Close Popup On Click",
         description=(
             "Close the popup on click.\n"
-            "Not supported by some windows (User Preferences, Render)."
+            "Not supported by some windows (User Preferences, Render)"
             ),
         default=False)
     auto_focus_filter = bpy.props.BoolProperty(
@@ -195,10 +193,10 @@ class IV_Preferences(bpy.types.AddonPreferences):
         description="Auto focus input field", default=True)
     show_panel = bpy.props.BoolProperty(
         name="Show Panel",
-        description="Show the panel in Text Editor", default=True)
+        description="Show the panel in the Text Editor", default=True)
     show_header = bpy.props.BoolProperty(
         name="Show Header",
-        description="Show the header in Python Console",
+        description="Show the header in the Python Console",
         default=True)
 
     def draw(self, context):
@@ -421,14 +419,16 @@ class IV_OT_icons_show(bpy.types.Operator):
         col = self.layout
         self.draw_header(col)
 
+        history_num_cols = int(
+            (self.width - POPUP_PADDING) / (ui_scale() * ICON_SIZE))
         num_cols = min(
             self.get_num_cols(len(pr.popup_icons.filtered_icons)),
-            int((self.width - POPUP_PADDING) / (ui_scale() * ICON_SIZE)))
+            history_num_cols)
 
         subcol = col.column(True)
 
         if HISTORY and pr.show_history:
-            pr.popup_icons.draw(subcol.box(), num_cols, HISTORY)
+            pr.popup_icons.draw(subcol.box(), history_num_cols, HISTORY)
 
         pr.popup_icons.draw(subcol.box(), num_cols)
 
@@ -472,8 +472,14 @@ class IV_OT_icons_show(bpy.types.Operator):
 
 
 def register():
+    if bpy.app.background:
+        return
+
     bpy.utils.register_module(__name__)
 
 
 def unregister():
+    if bpy.app.background:
+        return
+
     bpy.utils.unregister_module(__name__)

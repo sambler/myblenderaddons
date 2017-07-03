@@ -54,7 +54,7 @@ class RenderCopySettingsPrepare(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.scene != None
+        return context.scene is not None
 
     def execute(self, context):
         cp_sett = context.scene.render_copy_settings
@@ -144,7 +144,7 @@ class RenderCopySettingsPreset(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.scene != None
+        return context.scene is not None
 
     def execute(self, context):
         cp_sett = context.scene.render_copy_settings
@@ -179,7 +179,7 @@ class RenderCopySettings(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.scene != None
+        return context.scene is not None
 
     def execute(self, context):
         regex = None
@@ -189,6 +189,12 @@ class RenderCopySettings(bpy.types.Operator):
         do_copy(context, affected_settings=affected_settings, allowed_scenes=allowed_scenes)
         return {'FINISHED'}
 
+
+classes = (
+    RenderCopySettingsPrepare,
+    RenderCopySettingsPreset,
+    RenderCopySettings,
+)
 
 if __name__ == "__main__":
     bpy.ops.scene.render_copy_settings()

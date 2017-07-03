@@ -64,7 +64,7 @@ class PieSelectionsOM(Menu):
         layout = self.layout
         pie = layout.menu_pie()
         # 4 - LEFT
-        pie.operator("object.select_by_layer", text="Select By Layer", icon='GROUP_VERTEX')
+        pie.operator("object.select_by_layer", text="Select By Layer", icon='LAYER_ACTIVE')
         # 6 - RIGHT
         pie.operator("object.select_random", text="Select Random", icon='GROUP_VERTEX')
         # 2 - BOTTOM
@@ -78,7 +78,7 @@ class PieSelectionsOM(Menu):
         # 1 - BOTTOM - LEFT
         pie.operator("object.select_camera", text="Select Camera", icon='CAMERA_DATA')
         # 3 - BOTTOM - RIGHT
-        pie.menu("pie.selectionsmore", text="Select More", icon='GROUP_VERTEX')
+        pie.menu("pie.selectionsmore", text="Select Menu", icon='RESTRICT_SELECT_OFF')
 
 # Pie Selection Edit Mode
 
@@ -91,25 +91,21 @@ class PieSelectionsEM(Menu):
         layout = self.layout
         pie = layout.menu_pie()
         # 4 - LEFT
-        pie.operator("mesh.loop_multi_select", text="Select Ring", icon='ZOOM_PREVIOUS').ring = True
-        # 6 - RIGHT
-        pie.operator("mesh.loop_multi_select", text="Select Loop", icon='ZOOM_PREVIOUS').ring = False
-        # 2 - BOTTOM
-        pie.operator("mesh.select_all", text="Invert Selection", icon='ZOOM_PREVIOUS').action = 'INVERT'
-        # 8 - TOP
-        pie.operator("mesh.select_all", text="Select All Toggle", icon='RENDER_REGION').action = 'TOGGLE'
-        # 7 - TOP - LEFT
-        pie.operator("view3d.select_circle", text="Circle Select", icon='BORDER_LASSO')
-        # 9 - TOP - RIGHT
         pie.operator("view3d.select_border", text="Border Select", icon='BORDER_RECT')
+        # 6 - RIGHT
+        pie.menu("object.selectloopselection", text="Select Loop Menu", icon='LOOPSEL')
+        # 2 - BOTTOM
+        pie.operator("mesh.select_all", text="Select None", icon='RESTRICT_SELECT_ON').action = 'DESELECT'
+        # 8 - TOP
+        pie.operator("mesh.select_all", text="Select All", icon='RESTRICT_SELECT_OFF').action = 'SELECT'
+        # 7 - TOP - LEFT
+        pie.operator("mesh.select_all", text="Select All Toggle", icon='ARROW_LEFTRIGHT').action = 'TOGGLE'
+        # 9 - TOP - RIGHT
+        pie.operator("mesh.select_all", text="Invert Selection", icon='FULLSCREEN_EXIT').action = 'INVERT'
         # 1 - BOTTOM - LEFT
-        box = pie.split().column()
-        row = box.row(align=True)
-        box.operator("mesh.select_nth", text="Checker Select", icon='PARTICLE_POINT')
-        box.operator("mesh.loop_to_region", text="Select Loop Inner Region", icon='FACESEL')
-        box.operator("mesh.select_similar", text="Select Similar", icon='GHOST')
+        pie.operator("view3d.select_circle", text="Circle Select", icon='BORDER_LASSO')
         # 3 - BOTTOM - RIGHT
-        pie.menu("object.selectallbyselection", text="Multi Select", icon='RENDER_REGION')
+        pie.menu("object.selectallbyselection", text="Multi Select Menu", icon='SNAP_EDGE')
 
 # Select All By Selection
 
@@ -144,11 +140,25 @@ class SelectAllBySelection(Menu):
         prop.value = "(True, True, True)"
         prop.data_path = "tool_settings.mesh_select_mode"
 
+class SelectLoopSelection(Menu):
+    bl_idname = "object.selectloopselection"
+    bl_label = "Verts Edges Faces"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'INVOKE_REGION_WIN'
+
+        layout.operator("mesh.loop_multi_select", text="Select Loop", icon='LOOPSEL').ring = False
+        layout.operator("mesh.loop_multi_select", text="Select Ring", icon='EDGESEL').ring = True
+        layout.operator("mesh.loop_to_region", text="Select Loop Inner Region", icon='FACESEL')
+
 classes = (
     PieSelectionsOM,
     PieSelectionsEM,
     SelectAllBySelection,
     PieSelectionsMore,
+    SelectLoopSelection
     )
 
 addon_keymaps = []

@@ -83,8 +83,8 @@ class OscPanelControl(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'TOOLS'
     bl_category = "Oscurart Tools"
-    bl_label = "Panels Switcher"
-    #bl_options = {'DEFAULT_CLOSED'}
+    bl_label = "Oscurart Tools"
+    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         layout = self.layout
@@ -291,6 +291,7 @@ class OscPanelFiles(Panel):
         col = layout.column(align=1)
         col.operator("file.save_incremental_osc", icon="NEW")
         col.operator("image.reload_images_osc", icon="IMAGE_COL")
+        col.operator("file.collect_all_images", icon="IMAGE_COL")
         col.operator("file.sync_missing_groups", icon="LINK_AREA")
         col = layout.column(align=1)
         colrow = col.row(align=1)
@@ -409,7 +410,7 @@ class OscurartToolsAddonPreferences(bpy.types.AddonPreferences):
     category = bpy.props.StringProperty(
             name="Category",
             description="Choose a name for the category of the panel",
-            default="Oscurart Tools",
+            default="Tools",
             update=update_panel,
             )
 

@@ -40,7 +40,7 @@ if "bpy" in locals():
 
 else:
     import bpy
-    import addon_utils # To use some other addons
+    #import addon_utils # To use some other addons
     import nodeitems_utils #for Nodes
     from nodeitems_utils import NodeCategory, NodeItem #for Nodes
     from bpy.types import (
@@ -64,9 +64,9 @@ else:
             update_files,
             )
 
-
 def string_strip_hyphen(name):
     return name.replace("-", "")
+
 
 ###############################################################################
 # Scene POV properties.
@@ -97,7 +97,7 @@ class RenderPovSettingsScene(PropertyGroup):
             name="Export scene path",
             # Bug in POV-Ray RC3
             # description="Path to directory where the exported scene "
-                        # "(POV and INI) is created",  
+                        # "(POV and INI) is created",
             description="Path to directory where the files are created",
             maxlen=1024, subtype="DIR_PATH")
     renderimage_path = StringProperty(
@@ -116,12 +116,12 @@ class RenderPovSettingsScene(PropertyGroup):
             name="Enable Radiosity",
             description="Enable POV-Rays radiosity calculation",
             default=False)
-            
+
     radio_display_advanced = BoolProperty(
             name="Advanced Options",
             description="Show advanced options",
             default=False)
-            
+
     media_enable = BoolProperty(
             name="Enable Media",
             description="Enable POV-Rays atmospheric media",
@@ -136,7 +136,7 @@ class RenderPovSettingsScene(PropertyGroup):
             name="Media Color", description="The atmospheric media color",
             precision=4, step=0.01, min=0, soft_max=1,
             default=(0.001, 0.001, 0.001),
-            options={'ANIMATABLE'}, 
+            options={'ANIMATABLE'},
             subtype='COLOR')
 
     baking_enable = BoolProperty(
@@ -182,7 +182,7 @@ class RenderPovSettingsScene(PropertyGroup):
                    ("1", "recursive AA", "Type 2 Sampling in POV-Ray"),
                    ("2", "stochastic AA", "Type 3 Sampling in UberPOV")),
             default="1")
-            
+
     antialias_confidence = FloatProperty(
             name="Antialias Confidence",
             description="how surely the computed color "
@@ -220,8 +220,8 @@ class RenderPovSettingsScene(PropertyGroup):
             description="Number of reflections/refractions allowed on ray "
                         "path",
             min=1, max=256, default=5)
-            
-#######NEW from Lanuhum            
+
+#######NEW from Lanuhum
     adc_bailout_enable = BoolProperty(
             name="Enable",
             description="",
@@ -238,10 +238,11 @@ class RenderPovSettingsScene(PropertyGroup):
             default=False)
 
     ambient_light = FloatVectorProperty(
-            name="Ambient Light", description="Ambient light is used to simulate the effect of inter-diffuse reflection",
+            name="Ambient Light",
+            description="Ambient light is used to simulate the effect of inter-diffuse reflection",
             precision=4, step=0.01, min=0, soft_max=1,
-            default=(1, 1, 1), options={'ANIMATABLE'}, subtype='COLOR')
-
+            default=(1, 1, 1), options={'ANIMATABLE'}, subtype='COLOR',
+    )
     global_settings_advanced = BoolProperty(
             name="Advanced",
             description="",
@@ -253,13 +254,17 @@ class RenderPovSettingsScene(PropertyGroup):
             default=False)
 
     irid_wavelength = FloatVectorProperty(
-            name="Irid Wavelength", description="Iridescence calculations depend upon the dominant wavelengths of the primary colors of red, green and blue light.",
+            name="Irid Wavelength",
+            description=(
+                "Iridescence calculations depend upon the dominant "
+                "wavelengths of the primary colors of red, green and blue light"
+            ),
             precision=4, step=0.01, min=0, soft_max=1,
             default=(0.25,0.18,0.14), options={'ANIMATABLE'}, subtype='COLOR')
 
     charset = EnumProperty(
             name="Charset",
-            description="This allows you to specify the assumed character set of all text strings.",
+            description="This allows you to specify the assumed character set of all text strings",
             items=(("ascii", "ASCII", ""),
                    ("utf8", "UTF-8", ""),
                    ("sys", "SYS", "")),
@@ -272,7 +277,7 @@ class RenderPovSettingsScene(PropertyGroup):
 
     max_intersections = IntProperty(
             name="Max Intersections",
-            description="POV-Ray uses a set of internal stacks to collect ray/object intersection points.",
+            description="POV-Ray uses a set of internal stacks to collect ray/object intersection points",
             min=2, max=1024, default=64)
 
     number_of_waves_enable = BoolProperty(
@@ -282,7 +287,10 @@ class RenderPovSettingsScene(PropertyGroup):
 
     number_of_waves = IntProperty(
             name="Number Waves",
-            description="The waves and ripples patterns are generated by summing a series of waves, each with a slightly different center and size.",
+            description=(
+                "The waves and ripples patterns are generated by summing a series of waves, "
+                "each with a slightly different center and size"
+            ),
             min=1, max=10, default=1000)
 
     noise_generator_enable = BoolProperty(
@@ -292,7 +300,7 @@ class RenderPovSettingsScene(PropertyGroup):
 
     noise_generator = IntProperty(
             name="Noise Generator",
-            description="There are three noise generators implemented.",
+            description="There are three noise generators implemented",
             min=1, max=3, default=2)
 
     ########################### PHOTONS #######################################
@@ -310,7 +318,7 @@ class RenderPovSettingsScene(PropertyGroup):
             name="Count",
             description="Photons count",
             min=1, max=100000000, default=20000)
-            
+
     photon_spacing = FloatProperty(
             name="Spacing",
             description="Average distance between photons on surfaces. half "
@@ -339,7 +347,7 @@ class RenderPovSettingsScene(PropertyGroup):
     photon_gather_max = IntProperty(
             name="Gather Max", description="Maximum number of photons gathered for each point",
             min=1, max=256, default=100)
- 
+
     photon_map_file_save_load = EnumProperty(
             name="Operation",
             description="Load or Save photon map file",
@@ -362,7 +370,7 @@ class RenderPovSettingsScene(PropertyGroup):
             name="File",
             description="",
             maxlen=1024, subtype="FILE_PATH")
- 
+
 
     radio_adc_bailout = FloatProperty(
             name="ADC Bailout",
@@ -423,7 +431,7 @@ class RenderPovSettingsScene(PropertyGroup):
     radio_maximum_reuse = FloatProperty(
             name="Maximum Reuse",
             description="The maximum reuse parameter works in conjunction with, and is similar to that of minimum reuse, "
-                        "the only difference being that it is an upper bound rather than a lower one.",
+                        "the only difference being that it is an upper bound rather than a lower one",
             min=0.0, max=1.0,default=0.2, precision=3)
 
     radio_nearest_count = IntProperty(
@@ -561,7 +569,7 @@ class RenderPovSettingsMaterial(PropertyGroup):
 
 
             # NODES
-        
+
     def use_material_nodes_callback(self, context):
         if hasattr(context.space_data, "tree_type"):
             context.space_data.tree_type = 'ObjectNodeTree'
@@ -597,7 +605,7 @@ class RenderPovSettingsMaterial(PropertyGroup):
                 tmap.location = 0,200
                 links.new(tmap.outputs[0],output.inputs[0])
                 tmap.select = True
-                tree.nodes.active = tmap                
+                tree.nodes.active = tmap
         else:
             mat.use_nodes=False
 
@@ -656,12 +664,12 @@ class RenderPovSettingsMaterial(PropertyGroup):
     object_preview_transform = BoolProperty(name="Transform object", description="",default=False)
     object_preview_scale = FloatProperty(name="XYZ", min=0.5, max=2.0, default=1.0)
     object_preview_rotate = FloatVectorProperty(name="Rotate", description="", min=-180.0, max=180.0,default=(0.0,0.0,0.0), subtype='XYZ')
-    object_preview_bgcontrast = FloatProperty(name="Contrast", min=0.0, max=1.0, default=0.5)    
-    
-        
+    object_preview_bgcontrast = FloatProperty(name="Contrast", min=0.0, max=1.0, default=0.5)
+
+
 ###############################################################################
-# Povray Nodes 
-###############################################################################        
+# Povray Nodes
+###############################################################################
 class PovraySocketUniversal(bpy.types.NodeSocket):
     bl_idname = 'PovraySocketUniversal'
     bl_label = 'Povray Socket'
@@ -681,7 +689,7 @@ class PovraySocketUniversal(bpy.types.NodeSocket):
             for link in links:
                 if link.from_node==node:
                     inps=link.to_node.inputs
-                    for inp in inps: 
+                    for inp in inps:
                         if inp.bl_idname=="PovraySocketFloat_0_1" and inp.is_linked:
                             prop="value_0_1"
                             if prop not in value:
@@ -995,7 +1003,7 @@ node_categories = [
         NodeItem("PovrayMirrorNode"),
         NodeItem("PovrayIridescenceNode"),
         NodeItem("PovraySubsurfaceNode"),
-        ]), 
+        ]),
 
     PovrayShaderNodeCategory("CYCLES", "Cycles", items=[
         NodeItem("ShaderNodeAddShader"),
@@ -1100,7 +1108,7 @@ node_categories = [
         ]),
     ]
 ############### end nodes
-    
+
 ###############################################################################
 # Texture POV properties.
 ###############################################################################
@@ -1126,7 +1134,7 @@ class RenderPovSettingsTexture(PropertyGroup):
     #                    "it points at. pigment {} expected",
     #        default="")
 
-    
+
 
     tex_pattern_type = EnumProperty(
             name="Texture_Type",
@@ -1140,7 +1148,7 @@ class RenderPovSettingsTexture(PropertyGroup):
                    ('cells', 'Cells', '', 'PLUGIN', 6),
                    ('crackle', 'Crackle', '', 'PLUGIN', 7),
                    ('cubic', 'Cubic', '', 'PLUGIN', 8),
-                   ('cylindrical', 'Cylindrical', '', 'PLUGIN', 9), 
+                   ('cylindrical', 'Cylindrical', '', 'PLUGIN', 9),
                    ('density_file', 'Density', '(.df3)', 'PLUGIN', 10),
                    ('dents', 'Dents', '', 'PLUGIN', 11),
                    ('fractal', 'Fractal', '', 'PLUGIN', 12),
@@ -1175,7 +1183,7 @@ class RenderPovSettingsTexture(PropertyGroup):
     magnet_style = EnumProperty(
             name="Magnet style",
             description="magnet or julia",
-            items=(('mandel', "Mandelbrot", ""),('julia', "Julia", "")),                   
+            items=(('mandel', "Mandelbrot", ""),('julia', "Julia", "")),
             default='julia')
 
     magnet_type = IntProperty(
@@ -1196,87 +1204,87 @@ class RenderPovSettingsTexture(PropertyGroup):
             description="Select the orientation of warp",
             items=(('x', "X", ""), ('y', "Y", ""), ('z', "Z", "")),
             default='y')
-            
+
     wave_type = EnumProperty(
             name="Waves type",
             description="Select the type of waves",
             items=(('ramp', "Ramp", ""), ('sine', "Sine", ""), ('scallop', "Scallop", ""),
                    ('cubic', "Cubic", ""), ('poly', "Poly", ""), ('triangle', 'Triangle', "")),
-            default='ramp')            
+            default='ramp')
 
     gen_noise = IntProperty(
             name="Noise Generators",
             description="Noise Generators",
-            min=1, max=3, default=1) 
+            min=1, max=3, default=1)
 
     warp_dist_exp = FloatProperty(
             name="Distance exponent",
             description="Distance exponent",
             min=0.0, max=100.0, default=1.0)
-            
+
     warp_tor_major_radius = FloatProperty(
             name="Major radius",
             description="Torus is distance from major radius",
-            min=0.0, max=5.0, default=1.0)            
+            min=0.0, max=5.0, default=1.0)
 
 
     warp_turbulence_x = FloatProperty(
             name="Turbulence X",
             description="Turbulence X",
             min=0.0, max=5.0, default=0.0)
-            
+
     warp_turbulence_y = FloatProperty(
             name="Turbulence Y",
             description="Turbulence Y",
-            min=0.0, max=5.0, default=0.0) 
+            min=0.0, max=5.0, default=0.0)
 
     warp_turbulence_z = FloatProperty(
             name="Turbulence Z",
             description="Turbulence Z",
             min=0.0, max=5.0, default=0.0)
-            
+
     modifier_octaves = IntProperty(
             name="Turbulence octaves",
             description="Turbulence octaves",
-            min=1, max=10, default=1)            
+            min=1, max=10, default=1)
 
     modifier_lambda = FloatProperty(
             name="Turbulence lambda",
             description="Turbulence lambda",
             min=0.0, max=5.0, default=1.00)
-            
+
     modifier_omega = FloatProperty(
             name="Turbulence omega",
             description="Turbulence omega",
-            min=0.0, max=10.0, default=1.00) 
+            min=0.0, max=10.0, default=1.00)
 
     modifier_phase = FloatProperty(
             name="Phase",
             description="The phase value causes the map entries to be shifted so that the map "
                         "starts and ends at a different place",
             min=0.0, max=2.0, default=0.0)
-            
+
     modifier_frequency = FloatProperty(
             name="Frequency",
             description="The frequency keyword adjusts the number of times that a color map "
                         "repeats over one cycle of a pattern",
-            min=0.0, max=25.0, default=2.0) 
+            min=0.0, max=25.0, default=2.0)
 
     modifier_turbulence = FloatProperty(
             name="Turbulence",
             description="Turbulence",
-            min=0.0, max=5.0, default=2.0) 
-            
+            min=0.0, max=5.0, default=2.0)
+
     modifier_numbers = IntProperty(
             name="Numbers",
             description="Numbers",
-            min=1, max=27, default=2)             
+            min=1, max=27, default=2)
 
     modifier_control0 = IntProperty(
             name="Control0",
             description="Control0",
             min=0, max=100, default=1)
-            
+
     modifier_control1 = IntProperty(
             name="Control1",
             description="Control1",
@@ -1285,17 +1293,17 @@ class RenderPovSettingsTexture(PropertyGroup):
     brick_size_x = FloatProperty(
             name="Brick size x",
             description="",
-            min=0.0000, max=1.0000, default=0.2500) 
+            min=0.0000, max=1.0000, default=0.2500)
 
     brick_size_y = FloatProperty(
             name="Brick size y",
             description="",
             min=0.0000, max=1.0000, default=0.0525)
-            
+
     brick_size_z = FloatProperty(
             name="Brick size z",
             description="",
-            min=0.0000, max=1.0000, default=0.1250) 
+            min=0.0000, max=1.0000, default=0.1250)
 
     brick_mortar = FloatProperty(
             name="Mortar",
@@ -1402,7 +1410,7 @@ class RenderPovSettingsTexture(PropertyGroup):
             name="Pavement pattern 35",
             description="maximum: 35",
             min=1, max=35, default=35)
-            
+
     pave_tiles= IntProperty(
             name="Pavement tiles",
             description="If sides = 6, maximum tiles 5!!!",
@@ -1411,11 +1419,11 @@ class RenderPovSettingsTexture(PropertyGroup):
     pave_form= IntProperty(
             name="Pavement form",
             description="",
-            min=0, max=4, default=0)            
-             
+            min=0, max=4, default=0)
+
     #########FUNCTIONS#############################################################################
     #########FUNCTIONS#############################################################################
-    
+
     func_list = EnumProperty(
             name="Functions",
             description="Select the function for create pattern",
@@ -1425,20 +1433,20 @@ class RenderPovSettingsTexture(PropertyGroup):
                    ("f_bicorn","Bicorn",""), ("f_bifolia","Bifolia",""),
                    ("f_blob","Blob",""), ("f_blob2","Blob2",""),
                    ("f_boy_surface","Boy surface",""), ("f_comma","Comma",""),
-                   ("f_cross_ellipsoids","Cross ellipsoids",""), 
+                   ("f_cross_ellipsoids","Cross ellipsoids",""),
                    ("f_crossed_trough","Crossed trough",""), ("f_cubic_saddle","Cubic saddle",""),
                    ("f_cushion","Cushion",""), ("f_devils_curve","Devils curve",""),
                    ("f_devils_curve_2d","Devils curve 2d",""),
                    ("f_dupin_cyclid","Dupin cyclid",""), ("f_ellipsoid","Ellipsoid",""),
                    ("f_enneper","Enneper",""), ("f_flange_cover","Flange cover",""),
-                   ("f_folium_surface","Folium surface",""), 
+                   ("f_folium_surface","Folium surface",""),
                    ("f_folium_surface_2d","Folium surface 2d",""), ("f_glob","Glob",""),
                    ("f_heart","Heart",""), ("f_helical_torus","Helical torus",""),
                    ("f_helix1","Helix1",""), ("f_helix2","Helix2",""), ("f_hex_x","Hex x",""),
                    ("f_hex_y","Hex y",""), ("f_hetero_mf","Hetero mf",""),
                    ("f_hunt_surface","Hunt surface",""),
                    ("f_hyperbolic_torus","Hyperbolic torus",""),
-                   ("f_isect_ellipsoids","Isect ellipsoids",""), 
+                   ("f_isect_ellipsoids","Isect ellipsoids",""),
                    ("f_kampyle_of_eudoxus","Kampyle of eudoxus",""),
                    ("f_kampyle_of_eudoxus_2d","Kampyle of eudoxus 2d",""),
                    ("f_klein_bottle","Klein bottle",""),
@@ -1467,7 +1475,7 @@ class RenderPovSettingsTexture(PropertyGroup):
                    ("f_torus_gumdrop","Torus gumdrop",""), ("f_umbrella","Umbrella",""),
                    ("f_witch_of_agnesi","Witch of agnesi",""),
                    ("f_witch_of_agnesi_2d","Witch of agnesi 2d","")),
-                  
+
             default='NONE')
 
     func_x = FloatProperty(
@@ -1551,48 +1559,48 @@ class RenderPovSettingsTexture(PropertyGroup):
     func_P9 = FloatProperty(
             name="P9",
             description="",
-            min=0.0, max=25.0, default=1.0)            
+            min=0.0, max=25.0, default=1.0)
 
     #########################################
     tex_rot_x = FloatProperty(
             name="Rotate X",
             description="",
-            min=-180.0, max=180.0, default=0.0) 
+            min=-180.0, max=180.0, default=0.0)
 
     tex_rot_y = FloatProperty(
             name="Rotate Y",
             description="",
-            min=-180.0, max=180.0, default=0.0) 
+            min=-180.0, max=180.0, default=0.0)
 
     tex_rot_z = FloatProperty(
             name="Rotate Z",
             description="",
-            min=-180.0, max=180.0, default=0.0) 
-            
+            min=-180.0, max=180.0, default=0.0)
+
     tex_mov_x = FloatProperty(
             name="Move X",
             description="",
-            min=-100000.0, max=100000.0, default=0.0) 
+            min=-100000.0, max=100000.0, default=0.0)
 
     tex_mov_y = FloatProperty(
             name="Move Y",
             description="",
-            min=-100000.0, max=100000.0, default=0.0) 
+            min=-100000.0, max=100000.0, default=0.0)
 
     tex_mov_z = FloatProperty(
             name="Move Z",
             description="",
-            min=-100000.0, max=100000.0, default=0.0)             
+            min=-100000.0, max=100000.0, default=0.0)
 
     tex_scale_x = FloatProperty(
             name="Scale X",
             description="",
-            min=0.0, max=10000.0, default=1.0) 
+            min=0.0, max=10000.0, default=1.0)
 
     tex_scale_y = FloatProperty(
             name="Scale Y",
             description="",
-            min=0.0, max=10000.0, default=1.0) 
+            min=0.0, max=10000.0, default=1.0)
 
     tex_scale_z = FloatProperty(
             name="Scale Z",
@@ -1639,19 +1647,19 @@ class RenderPovSettingsObject(PropertyGroup):
 
     #############POV-Ray specific object properties.############################
     object_as = StringProperty(maxlen=1024)
-    
+
     imported_loc = FloatVectorProperty(
         name="Imported Pov location",
-        precision=6, 
+        precision=6,
         default=(0.0, 0.0, 0.0))
-        
+
     imported_loc_cap = FloatVectorProperty(
         name="Imported Pov location",
-        precision=6, 
+        precision=6,
         default=(0.0, 0.0, 2.0))
 
     unlock_parameters = BoolProperty(name="Lock",default = False)
-    
+
     curveshape = EnumProperty(
             name="Povray Shape Type",
             items=(("birail", "Birail", ""),
@@ -1661,7 +1669,7 @@ class RenderPovSettingsObject(PropertyGroup):
                    ("prism", "Prism", ""),
                    ("sphere_sweep", "Sphere Sweep", "")),
             default="sphere_sweep")
-            
+
     mesh_write_as = EnumProperty(
             name="Mesh Write As",
             items=(("blobgrid", "Blob Grid", ""),
@@ -1672,7 +1680,7 @@ class RenderPovSettingsObject(PropertyGroup):
     object_ior = FloatProperty(
             name="IOR", description="IOR",
             min=1.0, max=10.0,default=1.0)
-            
+
     # shape_as_light = StringProperty(name="Light",maxlen=1024)
     # fake_caustics_power = FloatProperty(
             # name="Power", description="Fake caustics power",
@@ -1690,23 +1698,23 @@ class RenderPovSettingsObject(PropertyGroup):
     # reflection = BoolProperty(name="Reflection",description="",default=False)
     # pass_through = BoolProperty(name="Pass through",description="",default=False)
     no_shadow = BoolProperty(name="No Shadow",default=False)
-    
+
     no_image = BoolProperty(name="No Image",default=False)
-    
+
     no_reflection = BoolProperty(name="No Reflection",default=False)
-    
+
     no_radiosity = BoolProperty(name="No Radiosity",default=False)
-    
+
     inverse = BoolProperty(name="Inverse",default=False)
-    
+
     sturm = BoolProperty(name="Sturm",default=False)
-    
+
     double_illuminate = BoolProperty(name="Double Illuminate",default=False)
-    
+
     hierarchy = BoolProperty(name="Hierarchy",default=False)
-    
+
     hollow = BoolProperty(name="Hollow",default=False)
-    
+
     boundorclip = EnumProperty(
             name="Boundorclip",
             items=(("none", "None", ""),
@@ -1714,33 +1722,33 @@ class RenderPovSettingsObject(PropertyGroup):
                    ("clipped_by", "Clipped_by", "")),
             default="none")
     boundorclipob = StringProperty(maxlen=1024)
-    
+
     addboundorclip = BoolProperty(description="",default=False)
-    
+
     blob_threshold = FloatProperty(name="Threshold",min=0.00, max=10.0, default=0.6)
 
     blob_strength = FloatProperty(name="Strength",min=-10.00, max=10.0, default=1.00)
-    
+
     res_u = IntProperty(name="U",min=100, max=1000, default=500)
-    
+
     res_v = IntProperty(name="V",min=100, max=1000, default=500)
-    
+
     contained_by = EnumProperty(
             name="Contained by",
             items=(("box", "Box", ""),
                    ("sphere", "Sphere", "")),
             default="box")
-            
+
     container_scale = FloatProperty(name="Container Scale",min=0.0, max=10.0, default=1.00)
-    
+
     threshold = FloatProperty(name="Threshold",min=0.0, max=10.0, default=0.00)
-    
+
     accuracy = FloatProperty(name="Accuracy",min=0.0001, max=0.1, default=0.001)
-    
+
     max_gradient = FloatProperty(name="Max Gradient",min=0.0, max=100.0, default=5.0)
-    
+
     all_intersections = BoolProperty(name="All Intersections",default=False)
-    
+
     max_trace = IntProperty(name="Max Trace",min=1, max=100,default=1)
 
 
@@ -1756,12 +1764,12 @@ class RenderPovSettingsObject(PropertyGroup):
 
     imported_cyl_loc = FloatVectorProperty(
         name="Imported Pov location",
-        precision=6, 
+        precision=6,
         default=(0.0, 0.0, 0.0))
-        
+
     imported_cyl_loc_cap = FloatVectorProperty(
         name="Imported Pov location",
-        precision=6, 
+        precision=6,
         default=(0.0, 0.0, 2.0))
 
     def prop_update_sphere(self, context):
@@ -1778,7 +1786,7 @@ class RenderPovSettingsObject(PropertyGroup):
     cone_cap_radius = FloatProperty(
         name = "Cap radius", description = "The second radius of the cone",
         default = 0.3, min = 0.0, max = 100.0, update=prop_update_cone)
-        
+
     cone_segments = IntProperty(
         name = "Segments", description = "Radial segmentation of proxy mesh",
         default = 16, min = 3, max = 265, update=prop_update_cone)
@@ -1788,12 +1796,12 @@ class RenderPovSettingsObject(PropertyGroup):
         default = 2.0, min = 0.01, max = 100.0, update=prop_update_cone)
 
     cone_base_z = FloatProperty()
-    cone_cap_z = FloatProperty()    
+    cone_cap_z = FloatProperty()
 
 ###########Parametric
     def prop_update_parametric(self, context):
         bpy.ops.pov.parametric_update()
-    
+
     u_min = FloatProperty(name = "U Min",
                     description = "",
                     default = 0.0, update=prop_update_parametric)
@@ -1817,7 +1825,7 @@ class RenderPovSettingsObject(PropertyGroup):
 
     def prop_update_torus(self, context):
         bpy.ops.pov.torus_update()
-        
+
     torus_major_segments = IntProperty(
                     name = "Segments", description = "Radial segmentation of proxy mesh",
                     default = 48, min = 3, max = 720, update=prop_update_torus)
@@ -1842,14 +1850,14 @@ class RenderPovSettingsObject(PropertyGroup):
                       description = "The angle after which rainbow dissolves into background",
                       default = 360, min = 0.0, max = 360)
 
-###########HeightFields 
+###########HeightFields
 
     quality = IntProperty(name = "Quality",
                       description = "",
                       default = 100, min = 1, max = 100)
-                
+
     hf_filename = StringProperty(maxlen = 1024)
-    
+
     hf_gamma = FloatProperty(
             name="Gamma",
             description="Gamma",
@@ -1874,7 +1882,7 @@ class RenderPovSettingsObject(PropertyGroup):
             name="Hierarchy",
             description="Height field hierarchy",
             default=True)
- 
+
 ##############Superellipsoid
     def prop_update_superellipsoid(self, context):
         bpy.ops.pov.superellipsoid_update()
@@ -1888,7 +1896,7 @@ class RenderPovSettingsObject(PropertyGroup):
             name="Parameter 2",
             description="",
             min=0.00, max=10.0, default=0.04)
-            
+
     se_u = IntProperty(name = "U-segments",
                     description = "radial segmentation",
                     default = 20, min = 4, max = 265,
@@ -1923,11 +1931,11 @@ class RenderPovSettingsObject(PropertyGroup):
                    ("sphere_sweep", "Sphere Sweep", ""),
                    ("sor", "Surface of Revolution", "")),
             default="sphere_sweep")
-            
+
 #############Supertorus
     def prop_update_supertorus(self, context):
         bpy.ops.pov.supertorus_update()
-        
+
     st_major_radius = FloatProperty(
             name="Major radius",
             description="Major radius",
@@ -1962,7 +1970,7 @@ class RenderPovSettingsObject(PropertyGroup):
             description="Max gradient",
             min=0.0001, max=100.00, default=10.00,
             update=prop_update_supertorus)
-            
+
     st_R = FloatProperty(name = "big radius",
                       description = "The radius inside the tube",
                       default = 1.0, min = 0.01, max = 100.0,
@@ -2015,9 +2023,9 @@ class RenderPovSettingsObject(PropertyGroup):
                       default = 1, min = 0.01, max = 10)
     loft_height = FloatProperty(name = "Height",
                       description = "Manipulates the shape of the Ring",
-                      default = 2, min = 0.01, max = 10.0)       
+                      default = 2, min = 0.01, max = 10.0)
 
-###################Prism                     
+###################Prism
     prism_n = IntProperty(name = "Sides",
                     description = "Number of sides",
                     default = 5, min = 3, max = 720)
@@ -2027,7 +2035,7 @@ class RenderPovSettingsObject(PropertyGroup):
 
 ##################Isosurface
     iso_function_text = StringProperty(name="Function Text",maxlen=1024)#,update=iso_props_update_callback)
-    
+
 ##################PolygonToCircle
     polytocircle_resolution = IntProperty(name = "Resolution",
                     description = "",
@@ -2044,12 +2052,12 @@ class RenderPovSettingsObject(PropertyGroup):
 
 #################Avogadro
     # filename_ext = ".png"
-    
+
     # filter_glob = StringProperty(
             # default="*.exr;*.gif;*.hdr;*.iff;*.jpeg;*.jpg;*.pgm;*.png;*.pot;*.ppm;*.sys;*.tga;*.tiff;*.EXR;*.GIF;*.HDR;*.IFF;*.JPEG;*.JPG;*.PGM;*.PNG;*.POT;*.PPM;*.SYS;*.TGA;*.TIFF",
             # options={'HIDDEN'},
             # )
-                    
+
 ###############################################################################
 # Camera POV properties.
 ###############################################################################
@@ -2094,19 +2102,19 @@ class RenderPovSettingsCamera(PropertyGroup):
     normal_patterns = EnumProperty(
             name="Pattern",
             description="",
-            items=(('agate', "Agate", ""), ('boxed', "Boxed", ""), ('bumps', "Bumps", ""), ('cells', "Cells", ""), 
+            items=(('agate', "Agate", ""), ('boxed', "Boxed", ""), ('bumps', "Bumps", ""), ('cells', "Cells", ""),
                    ('crackle', "Crackle", ""),('dents', "Dents", ""),
                    ('granite', "Granite", ""),
                    ('leopard', "Leopard", ""),
-                   ('marble', "Marble", ""), ('onion', "Onion", ""), ('pavement', "Pavement", ""), ('planar', "Planar", ""), 
+                   ('marble', "Marble", ""), ('onion', "Onion", ""), ('pavement', "Pavement", ""), ('planar', "Planar", ""),
                    ('quilted', "Quilted", ""), ('ripples', "Ripples", ""),  ('radial', "Radial", ""),
-                   ('spherical', "Spherical", ""),('spiral1', "Spiral1", ""), ('spiral2', "Spiral2", ""), ('spotted', "Spotted", ""), 
+                   ('spherical', "Spherical", ""),('spiral1', "Spiral1", ""), ('spiral2', "Spiral2", ""), ('spotted', "Spotted", ""),
                    ('square', "Square", ""),('tiling', "Tiling", ""),
                    ('waves', "Waves", ""), ('wood', "Wood", ""),('wrinkles', "Wrinkles", "")),
             default='agate')
     turbulence = FloatProperty(name="Turbulence", min=0.0, max=100.0, default=0.1)
     scale = FloatProperty(name="Scale", min=0.0,default=1.0)
-    
+
     ##################################CustomPOV Code############################
     # Only DUMMIES below for now:
     replacement_text = StringProperty(
@@ -2116,7 +2124,7 @@ class RenderPovSettingsCamera(PropertyGroup):
             default="")
 
 
-            
+
 ###############################################################################
 # Text POV properties.
 ###############################################################################
@@ -2141,16 +2149,22 @@ class PovrayPreferences(AddonPreferences):
                         ('uberpov', 'Unofficial UberPOV', '', 'PLUGIN', 1)),
                 default='povray'
                 )
-    
+
     filepath_povray = StringProperty(
                 name="Binary Location",
                 description="Path to renderer executable",
                 subtype='FILE_PATH',
                 )
+    docpath_povray = StringProperty(
+                name="Includes Location",
+                description="Path to Insert Menu files",
+                subtype='FILE_PATH',
+                )	
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "branch_feature_set_povray")
         layout.prop(self, "filepath_povray")
+        layout.prop(self, "docpath_povray")
 
 
 
@@ -2161,26 +2175,28 @@ class PovrayPreferences(AddonPreferences):
 
 
 
-        
+
 
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_add.prepend(ui.menu_func_add)
     bpy.types.INFO_MT_file_import.append(ui.menu_func_import)
-    #used for parametric objects:
-    addon_utils.enable("add_mesh_extra_objects", default_set=False, persistent=True)
-    
+    bpy.types.TEXT_MT_templates.append(ui.menu_func_templates)
+    # was used for parametric objects but made the other addon unreachable on
+    # unregister for other tools to use created a user action call instead
+    #addon_utils.enable("add_mesh_extra_objects", default_set=False, persistent=True)
+
     #bpy.types.TEXTURE_PT_context_texture.prepend(TEXTURE_PT_povray_type)
-    
+
     bpy.types.NODE_HT_header.append(ui.menu_func_nodes)
-    nodeitems_utils.register_node_categories("POVRAYNODES", node_categories)    
+    nodeitems_utils.register_node_categories("POVRAYNODES", node_categories)
     bpy.types.Scene.pov = PointerProperty(type=RenderPovSettingsScene)
     bpy.types.Material.pov = PointerProperty(type=RenderPovSettingsMaterial)
     bpy.types.Texture.pov = PointerProperty(type=RenderPovSettingsTexture)
     bpy.types.Object.pov = PointerProperty(type=RenderPovSettingsObject)
     bpy.types.Camera.pov = PointerProperty(type=RenderPovSettingsCamera)
     bpy.types.Text.pov = PointerProperty(type=RenderPovSettingsText)
-    
+
 
 
 def unregister():
@@ -2192,9 +2208,10 @@ def unregister():
     del bpy.types.Text.pov
     nodeitems_utils.unregister_node_categories("POVRAYNODES")
     bpy.types.NODE_HT_header.remove(ui.menu_func_nodes)
-    
+
     #bpy.types.TEXTURE_PT_context_texture.remove(TEXTURE_PT_povray_type)
-    addon_utils.disable("add_mesh_extra_objects", default_set=False)
+    #addon_utils.disable("add_mesh_extra_objects", default_set=False)
+    bpy.types.TEXT_MT_templates.remove(ui.menu_func_templates)
     bpy.types.INFO_MT_file_import.remove(ui.menu_func_import)
     bpy.types.INFO_MT_add.remove(ui.menu_func_add)
     bpy.utils.unregister_module(__name__)

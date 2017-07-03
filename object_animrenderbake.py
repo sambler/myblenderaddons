@@ -23,7 +23,7 @@ bl_info = {
     "blender": (2, 75, 0),
     "location": "Properties > Render > Bake Panel",
     "description": "Renderbakes a series of frames",
-    "category": "Object",
+    "category": "Render",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.6/Py/"
                 "Scripts/Object/Animated_Render_Baker",
 }
@@ -59,7 +59,7 @@ class OBJECT_OT_animrenderbake(bpy.types.Operator):
         if start >= end:
             self.report({'ERROR'}, "Start frame must be smaller than end frame")
             return {'CANCELLED'}
-            
+
         selected = context.selected_objects
 
         # Only single object baking for now
