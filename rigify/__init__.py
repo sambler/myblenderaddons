@@ -27,7 +27,6 @@ bl_info = {
     "location": "Armature properties, Bone properties, View3d tools panel, Armature Add menu",
     "wiki_url": "http://wiki.blender.org/index.php/Extensions:2.5/Py/"
                 "Scripts/Rigging/Rigify",
-    "tracker_url": "http://github.com/cessen/rigify/issues",
     "category": "Rigging"}
 
 
@@ -306,7 +305,7 @@ def register():
 
     IDStore.rigify_target_rigs = bpy.props.CollectionProperty(type=RigifyName)
     IDStore.rigify_target_rig = bpy.props.StringProperty(name="Rigify Target Rig",
-                                                         description="Defines which rig to overwrite. If unset, a new one called 'rig' will be created.",
+                                                         description="Defines which rig to overwrite. If unset, a new one called 'rig' will be created",
                                                          default="")
 
     IDStore.rigify_rig_uis = bpy.props.CollectionProperty(type=RigifyName)
@@ -317,6 +316,10 @@ def register():
     IDStore.rigify_rig_basename = bpy.props.StringProperty(name="Rigify Rig Name",
                                                      description="Defines the name of the Rig. If unset, in 'new' mode 'rig' will be used, in 'overwrite' mode the target rig name will be used",
                                                      default="")
+
+    IDStore.rigify_transfer_only_selected = bpy.props.BoolProperty(name="Transfer Only Selected", description="Transfer selected bones only", default=True)
+    IDStore.rigify_transfer_start_frame = bpy.props.IntProperty(name="Start Frame", description="First Frame to Transfer", default=0, min= 0)
+    IDStore.rigify_transfer_end_frame = bpy.props.IntProperty(name="End Frame", description="Last Frame to Transfer", default=0, min= 0)
 
     if (ui and 'legacy' in str(ui)) or bpy.context.user_preferences.addons['rigify'].preferences.legacy_mode:
         # update legacy on restart or reload
@@ -347,6 +350,9 @@ def unregister():
     del IDStore.rigify_rig_uis
     del IDStore.rigify_rig_ui
     del IDStore.rigify_rig_basename
+    del IDStore.rigify_transfer_only_selected
+    del IDStore.rigify_transfer_start_frame
+    del IDStore.rigify_transfer_end_frame
 
     bpy.utils.unregister_class(RigifyName)
     bpy.utils.unregister_class(RigifyParameters)

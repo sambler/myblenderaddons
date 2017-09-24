@@ -28,7 +28,7 @@ import shutil
 
 
 class reloadImages (Operator):
-    """Reloads all bitmaps in the scene."""
+    """Reloads all bitmaps in the scene"""
     bl_idname = "image.reload_images_osc"
     bl_label = "Reload Images"
     bl_options = {"REGISTER", "UNDO"}
@@ -42,7 +42,7 @@ class reloadImages (Operator):
 # ------------------------ SAVE INCREMENTAL ------------------------
 
 class saveIncremental(Operator):
-    """Saves incremental version of the blend file Ex: “_v01” "_v02"."""
+    """Saves incremental version of the blend file Ex: "_v01", "_v02\""""
     bl_idname = "file.save_incremental_osc"
     bl_label = "Save Incremental File"
     bl_options = {"REGISTER", "UNDO"}
@@ -57,7 +57,7 @@ class saveIncremental(Operator):
             basename = os.path.basename(filepath)
             bpy.ops.wm.save_as_mainfile(
                 filepath=os.path.join(os.path.dirname(filepath), "%s_v%s.blend" %
-                                       (basename.rpartition("_v")[0], str(modnum))))  
+                                       (basename.rpartition("_v")[0], str(modnum))))
 
         else:
             output = filepath.rpartition(".blend")[0] + "_v01"
@@ -91,7 +91,7 @@ class replaceFilePath(Operator):
 # ---------------------- SYNC MISSING GROUPS --------------------------
 
 class reFreshMissingGroups(Operator):
-    """Search on the libraries of the linked source and relink groups and link newones if there are. Usefull to use with the mesh cache tools."""
+    """Search on the libraries of the linked source and relink groups and link newones if there are. Usefull to use with the mesh cache tools"""
     bl_idname = "file.sync_missing_groups"
     bl_label = "Sync Missing Groups"
     bl_options = {"REGISTER", "UNDO"}
@@ -102,33 +102,41 @@ class reFreshMissingGroups(Operator):
                 with bpy.data.libraries.load(group.library.filepath, link=True) as (linked, local):
                     local.groups = linked.groups
         return {'FINISHED'}
-    
-    
-# ---------------------- COLLECT IMAGES --------------------------   
+
+
+# ---------------------- COLLECT IMAGES --------------------------
 
 
 class collectImagesOsc(Operator):
-    """Collect all images in the blend file and put them in IMAGES folder."""
+    """Collect all images in the blend file and put them in IMAGES folder"""
     bl_idname = "file.collect_all_images"
     bl_label = "Collect Images"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        
+
         imagespath = "%s/IMAGES"  % (os.path.dirname(bpy.data.filepath))
-        
+
         if not os.path.exists(imagespath):
             os.mkdir(imagespath)
 
         bpy.ops.file.make_paths_absolute()
 
         for image in bpy.data.images:
-            if not os.path.exists(os.path.join(imagespath,os.path.basename(image.filepath))):
-                shutil.copy(image.filepath, os.path.join(imagespath,os.path.basename(image.filepath)))
-                image.filepath = os.path.join(imagespath,os.path.basename(image.filepath))
-            else:
-                print("%s exists." % (image.name))
-                
-        bpy.ops.file.make_paths_relative()                
-                
+            try:
+                image.update()
+            
+                if image.has_data:
+                    if not os.path.exists(os.path.join(imagespath,os.path.basename(image.filepath))):
+                        shutil.copy(image.filepath, os.path.join(imagespath,os.path.basename(image.filepath)))
+                        image.filepath = os.path.join(imagespath,os.path.basename(image.filepath))
+                    else:
+                        print("%s exists." % (image.name))
+                else:
+                    print("%s missing path." % (image.name))   
+            except:
+                print("%s missing path." % (image.name))             
+
+        bpy.ops.file.make_paths_relative()
+
         return {'FINISHED'}

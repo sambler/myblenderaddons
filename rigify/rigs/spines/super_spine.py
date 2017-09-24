@@ -1,7 +1,7 @@
 import bpy
 from mathutils import Vector
 from ...utils import copy_bone, flip_bone, put_bone, org, align_bone_y_axis, align_bone_x_axis
-from ...utils import strip_org, make_deformer_name, connected_children_names 
+from ...utils import strip_org, make_deformer_name, connected_children_names
 from ...utils import create_circle_widget, create_sphere_widget, create_neck_bend_widget, create_neck_tweak_widget
 from ..widgets import create_ballsocket_widget
 from ...utils import MetarigError, make_mechanism_name, create_cube_widget
@@ -1099,28 +1099,42 @@ def parameters_ui(layout, params):
     r = layout.row()
     r.prop(params, "tweak_extra_layers")
     r.active = params.tweak_extra_layers
-    
+
     col = r.column(align=True)
     row = col.row(align=True)
+
+    bone_layers = bpy.context.active_pose_bone.bone.layers[:]
 
     for i in range(8):
-        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+        icon = "NONE"
+        if bone_layers[i]:
+            icon = "LAYER_ACTIVE"
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="", icon=icon)
 
     row = col.row(align=True)
 
-    for i in range(16,24):
-        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+    for i in range(16, 24):
+        icon = "NONE"
+        if bone_layers[i]:
+            icon = "LAYER_ACTIVE"
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="", icon=icon)
 
     col = r.column(align=True)
     row = col.row(align=True)
 
-    for i in range(8,16):
-        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+    for i in range(8, 16):
+        icon = "NONE"
+        if bone_layers[i]:
+            icon = "LAYER_ACTIVE"
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="", icon=icon)
 
     row = col.row(align=True)
 
-    for i in range(24,32):
-        row.prop(params, "tweak_layers", index=i, toggle=True, text="")
+    for i in range(24, 32):
+        icon = "NONE"
+        if bone_layers[i]:
+            icon = "LAYER_ACTIVE"
+        row.prop(params, "tweak_layers", index=i, toggle=True, text="", icon=icon)
 
 
 def create_sample(obj):
@@ -1136,7 +1150,7 @@ def create_sample(obj):
     bone.roll = 0.0000
     bone.use_connect = False
     bones['spine'] = bone.name
- 
+
     bone = arm.edit_bones.new('spine.001')
     bone.head[:] = 0.0000, 0.0172, 1.1573
     bone.tail[:] = 0.0000, 0.0004, 1.2929
@@ -1144,7 +1158,7 @@ def create_sample(obj):
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['spine']]
     bones['spine.001'] = bone.name
- 
+
     bone = arm.edit_bones.new('spine.002')
     bone.head[:] = 0.0000, 0.0004, 1.2929
     bone.tail[:] = 0.0000, 0.0059, 1.4657
@@ -1152,7 +1166,7 @@ def create_sample(obj):
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['spine.001']]
     bones['spine.002'] = bone.name
- 
+
     bone = arm.edit_bones.new('spine.003')
     bone.head[:] = 0.0000, 0.0059, 1.4657
     bone.tail[:] = 0.0000, 0.0114, 1.6582
@@ -1160,7 +1174,7 @@ def create_sample(obj):
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['spine.002']]
     bones['spine.003'] = bone.name
- 
+
     bone = arm.edit_bones.new('spine.004')
     bone.head[:] = 0.0000, 0.0114, 1.6582
     bone.tail[:] = 0.0000, -0.013, 1.7197
@@ -1168,7 +1182,7 @@ def create_sample(obj):
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['spine.003']]
     bones['spine.004'] = bone.name
- 
+
     bone = arm.edit_bones.new('spine.005')
     bone.head[:] = 0.0000, -0.013, 1.7197
     bone.tail[:] = 0.0000, -0.0247, 1.7813
@@ -1176,7 +1190,7 @@ def create_sample(obj):
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['spine.004']]
     bones['spine.005'] = bone.name
- 
+
     bone = arm.edit_bones.new('spine.006')
     bone.head[:] = 0.0000, -0.0247, 1.7813
     bone.tail[:] = 0.0000, -0.0247, 1.9796
@@ -1184,7 +1198,7 @@ def create_sample(obj):
     bone.use_connect = True
     bone.parent = arm.edit_bones[bones['spine.005']]
     bones['spine.006'] = bone.name
- 
+
 
     bpy.ops.object.mode_set(mode='OBJECT')
     pbone = obj.pose.bones[bones['spine']]

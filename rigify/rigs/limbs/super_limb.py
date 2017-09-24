@@ -23,6 +23,15 @@ class Rig:
 
         return self.limb.generate()
 
+    @staticmethod
+    def get_future_names(bones):
+        if bones[0].rigify_parameters.limb_type == 'arm':
+            return armRig.get_future_names(bones)
+        elif bones[0].rigify_parameters.limb_type == 'leg':
+            return legRig.get_future_names(bones)
+        elif bones[0].rigify_parameters.limb_type == 'paw':
+            return pawRig.get_future_names(bones)
+
 
 def add_parameters(params):
     """ Add the parameters of this rig type to the
@@ -30,14 +39,14 @@ def add_parameters(params):
     """
 
     items = [
-        ('arm', 'Arm', ''), 
-        ('leg', 'Leg', ''), 
+        ('arm', 'Arm', ''),
+        ('leg', 'Leg', ''),
         ('paw', 'Paw', '')
     ]
 
     params.limb_type = bpy.props.EnumProperty(
-        items   = items, 
-        name    = "Limb Type", 
+        items   = items,
+        name    = "Limb Type",
         default = 'arm'
     )
 
@@ -48,8 +57,8 @@ def add_parameters(params):
     ]
 
     params.rotation_axis = bpy.props.EnumProperty(
-        items   = items, 
-        name    = "Rotation Axis", 
+        items   = items,
+        name    = "Rotation Axis",
         default = 'automatic'
     )
 
@@ -65,7 +74,7 @@ def add_parameters(params):
         min         = 1,
         description = 'Number of segments'
     )
-    
+
     params.bbones = bpy.props.IntProperty(
         name        = 'bbone segments',
         default     = 10,
@@ -74,9 +83,9 @@ def add_parameters(params):
     )
 
     # Setting up extra layers for the FK and tweak
-    params.tweak_extra_layers = bpy.props.BoolProperty( 
-        name        = "tweak_extra_layers", 
-        default     = True, 
+    params.tweak_extra_layers = bpy.props.BoolProperty(
+        name        = "tweak_extra_layers",
+        default     = True,
         description = ""
         )
 
@@ -85,11 +94,11 @@ def add_parameters(params):
         description = "Layers for the tweak controls to be on",
         default     = tuple( [ i == 1 for i in range(0, 32) ] )
         )
-        
+
     # Setting up extra layers for the FK and tweak
-    params.fk_extra_layers = bpy.props.BoolProperty( 
-        name        = "fk_extra_layers", 
-        default     = True, 
+    params.fk_extra_layers = bpy.props.BoolProperty(
+        name        = "fk_extra_layers",
+        default     = True,
         description = ""
         )
 
@@ -121,32 +130,46 @@ def parameters_ui(layout, params):
     r = layout.row()
     r.prop(params, "bbones")
 
-    for layer in [ 'fk', 'tweak' ]:
+    bone_layers = bpy.context.active_pose_bone.bone.layers[:]
+
+    for layer in ['fk', 'tweak']:
         r = layout.row()
         r.prop(params, layer + "_extra_layers")
         r.active = params.tweak_extra_layers
-        
+
         col = r.column(align=True)
         row = col.row(align=True)
 
         for i in range(8):
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="")
+            icon = "NONE"
+            if bone_layers[i]:
+                icon = "LAYER_ACTIVE"
+            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
 
         row = col.row(align=True)
 
         for i in range(16,24):
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="")
+            icon = "NONE"
+            if bone_layers[i]:
+                icon = "LAYER_ACTIVE"
+            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
 
         col = r.column(align=True)
         row = col.row(align=True)
 
         for i in range(8,16):
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="")
+            icon = "NONE"
+            if bone_layers[i]:
+                icon = "LAYER_ACTIVE"
+            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
 
         row = col.row(align=True)
 
         for i in range(24,32):
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="")
+            icon = "NONE"
+            if bone_layers[i]:
+                icon = "LAYER_ACTIVE"
+            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
 
 
 def create_sample(obj):
@@ -190,7 +213,7 @@ def create_sample(obj):
     except AttributeError:
         pass
     try:
-        pbone.rigify_parameters.ik_layers = [ 
+        pbone.rigify_parameters.ik_layers = [
             False, False, False, False, False, False, False, False, True, False,
             False, False, False, False, False, False, False, False, False, False,
             False, False, False, False, False, False, False, False, False, False,

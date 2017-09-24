@@ -19,8 +19,8 @@
 bl_info = {
     "name": "Skinify Rig",
     "author": "Albert Makac (karab44)",
-    "version": (0, 8, 9),
-    "blender": (2, 7, 8),
+    "version": (0, 11, 0),
+    "blender": (2, 7, 9),
     "location": "Properties > Bone > Skinify Rig (visible on pose mode only)",
     "description": "Creates a mesh object from selected bones",
     "warning": "",
@@ -46,7 +46,6 @@ from mathutils import (
         )
 from bpy.app.handlers import persistent
 from enum import Enum
-
 
 # can the armature data properties group_prop and row be fetched directly from the rigify script?
 horse_data = \
@@ -120,6 +119,47 @@ class Rig_type(Enum):
 
 
 rig_type = Rig_type.OTHER
+
+
+class Idx_Store(object):
+    def __init__(self, rig_type):
+        self.rig_type = rig_type
+        self.hand_r_merge = []
+        self.hand_l_merge = []
+        self.hands_pretty = []
+        self.root = []
+
+        if not self.rig_type == Rig_type.LEGACY and \
+                not self.rig_type == Rig_type.HUMAN and \
+                not self.rig_type == Rig_type.PITCHIPOY:
+            return
+
+        if self.rig_type == Rig_type.LEGACY:
+            self.hand_l_merge = [7, 12, 16, 21, 26, 27]
+            self.hand_r_merge = [30, 31, 36, 40, 45, 50]
+            self.hands_pretty = [6, 29]
+            self.root = [59]
+
+        if self.rig_type == Rig_type.HUMAN or self.rig_type == Rig_type.PITCHIPOY:
+            self.hand_l_merge = [9, 10, 15, 19, 24, 29]
+            self.hand_r_merge = [32, 33, 37, 42, 47, 52]
+            self.hands_pretty = [8, 31]
+            self.root = [56]
+
+    def get_all_idx(self):
+        return self.hand_l_merge, self.hand_r_merge, self.hands_pretty, self.root
+
+    def get_hand_l_merge_idx(self):
+        return self.hand_l_merge
+
+    def get_hand_r_merge_idx(self):
+        return self.hand_r_merge
+
+    def get_hands_pretty_idx(self):
+        return self.hands_pretty
+
+    def get_root_idx(self):
+        return self.root
 
 
 # initialize properties
@@ -437,6 +477,8 @@ def generate_mesh(shape_object, size, thickness=0.8, finger_thickness=0.25, sub_
         bpy.ops.mesh.select_all(action='SELECT')
         bpy.ops.mesh.remove_doubles()
 
+    idx_store = Idx_Store(rig_type)
+
     # fix rigify and pitchipoy hands topology
     if connect_mesh and connect_parents and generate_all is False and \
             (rig_type == Rig_type.LEGACY or rig_type == Rig_type.PITCHIPOY or rig_type == Rig_type.HUMAN) and \
@@ -444,11 +486,8 @@ def generate_mesh(shape_object, size, thickness=0.8, finger_thickness=0.25, sub_
         # thickness will set palm vertex for both hands look pretty
         corrective_thickness = 2.5
         # left hand verts
-        merge_idx = []
-        if rig_type == Rig_type.LEGACY:
-            merge_idx = [7, 8, 13, 17, 22, 27]
-        elif rig_type == Rig_type.PITCHIPOY or rig_type == Rig_type.HUMAN:
-            merge_idx = [9, 14, 18, 23, 24, 29]
+        merge_idx = idx_store.get_hand_l_merge_idx()
+
         select_vertices(shape_object, merge_idx)
         bpy.ops.mesh.merge(type='CENTER')
         bpy.ops.transform.skin_resize(override,
@@ -460,10 +499,7 @@ def generate_mesh(shape_object, size, thickness=0.8, finger_thickness=0.25, sub_
         bpy.ops.mesh.select_all(action='DESELECT')
 
         # right hand verts
-        if rig_type == Rig_type.LEGACY:
-            merge_idx = [30, 35, 39, 44, 45, 50]
-        elif rig_type == Rig_type.PITCHIPOY or rig_type == Rig_type.HUMAN:
-            merge_idx = [32, 37, 41, 46, 51, 52]
+        merge_idx = idx_store.get_hand_r_merge_idx()
 
         select_vertices(shape_object, merge_idx)
         bpy.ops.mesh.merge(type='CENTER')
@@ -476,13 +512,8 @@ def generate_mesh(shape_object, size, thickness=0.8, finger_thickness=0.25, sub_
 
         # making hands even more pretty
         bpy.ops.mesh.select_all(action='DESELECT')
-        hands_idx = []  # left and right hand vertices
-        if rig_type == Rig_type.LEGACY:
-            # hands_idx = [8, 33]  # L and R
-            hands_idx = [6, 29]
-        elif rig_type == Rig_type.PITCHIPOY or rig_type == Rig_type.HUMAN:
-            # hands_idx = [10, 35]  # L and R
-            hands_idx = [8, 31]
+        hands_idx = idx_store.get_hands_pretty_idx()
+
         select_vertices(shape_object, hands_idx)
         # change the thickness to make hands look less blocky and more sexy
         corrective_thickness = 0.7
@@ -496,12 +527,9 @@ def generate_mesh(shape_object, size, thickness=0.8, finger_thickness=0.25, sub_
 
     # todo optionally take root from rig's hip tail or head depending on scenario
 
-    root_idx = []
-    if rig_type == Rig_type.LEGACY and selected_bones_num == total_bones_num:
-        root_idx = [59]
-    elif (rig_type == Rig_type.PITCHIPOY or rig_type == Rig_type.HUMAN) and selected_bones_num == total_bones_num:
-        root_idx = [56]
-    elif selected_bones_num == total_bones_num:
+    root_idx = idx_store.get_root_idx()
+
+    if selected_bones_num == total_bones_num:
         root_idx = [0]
 
     if len(root_idx) > 0:
@@ -617,10 +645,10 @@ def main(context):
 
 
 class BONE_OT_custom_shape(Operator):
-    '''Creates a mesh object at the selected bones positions'''
     bl_idname = "object.skinify_rig"
     bl_label = "Skinify Rig"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Creates a mesh object at the selected bones positions"
+    bl_options = {'UNDO', 'INTERNAL'}
 
     @classmethod
     def poll(cls, context):

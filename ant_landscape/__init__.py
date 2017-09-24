@@ -21,7 +21,7 @@
 
 bl_info = {
     "name": "A.N.T.Landscape",
-    "author": "Jim Hazevoet",
+    "author": "Jimmy Hazevoet",
     "version": (0, 1, 8),
     "blender": (2, 78, 0),
     "location": "View3D > Tool Shelf",
@@ -35,14 +35,14 @@ bl_info = {
 if "bpy" in locals():
     import importlib
     importlib.reload(add_mesh_ant_landscape)
-    importlib.reload(ant_landscape_refresh)
     importlib.reload(mesh_ant_displace)
     importlib.reload(ant_functions)
+    importlib.reload(ant_noise)
 else:
     from ant_landscape import add_mesh_ant_landscape
-    from ant_landscape import ant_landscape_refresh
     from ant_landscape import mesh_ant_displace
     from ant_landscape import ant_functions
+    from ant_landscape import ant_noise
 
 import bpy
 
@@ -54,14 +54,12 @@ from bpy.props import (
         PointerProperty,
         EnumProperty,
         )
-
 from .ant_functions import (
         draw_ant_refresh,
         draw_ant_main,
         draw_ant_noise,
         draw_ant_displace,
         )
-
 
 # ------------------------------------------------------------
 # Menu's and panels
@@ -78,6 +76,7 @@ def menu_func_landscape(self, context):
 
 # Landscape Add Panel
 class panel_func_add_landscape(bpy.types.Panel):
+    bl_idname = "ANTLANDSCAPE_PT_add"
     bl_space_type = "VIEW_3D"
     bl_context = "objectmode"
     bl_region_type = "TOOLS"
@@ -92,6 +91,7 @@ class panel_func_add_landscape(bpy.types.Panel):
 
 # Landscape Tools:
 class AntLandscapeToolsPanel(bpy.types.Panel):
+    bl_idname = "ANTLANDSCAPE_PT_tools"
     bl_space_type = "VIEW_3D"
     bl_context = "objectmode"
     bl_region_type = "TOOLS"
@@ -114,7 +114,7 @@ class AntLandscapeToolsPanel(bpy.types.Panel):
             col.operator('mesh.eroder', text="Landscape Eroder", icon='SMOOTHCURVE')
 
 
-# Landscape Settings / Properties:
+# Landscape Main Settings
 class AntMainSettingsPanel(bpy.types.Panel):
     bl_idname = "ANTMAIN_PT_layout"
     bl_options = {'DEFAULT_CLOSED'}
@@ -156,7 +156,7 @@ class AntMainSettingsPanel(bpy.types.Panel):
             col.prop(ant, "mesh_size_y")
 
 
-# Landscape Settings / Properties:
+# Landscape Noise Settings
 class AntNoiseSettingsPanel(bpy.types.Panel):
     bl_idname = "ANTNOISE_PT_layout"
     bl_options = {'DEFAULT_CLOSED'}
@@ -180,7 +180,7 @@ class AntNoiseSettingsPanel(bpy.types.Panel):
         col.scale_y = 1.5
         if ant.sphere_mesh:
             col.operator('mesh.ant_landscape_regenerate', text="Regenerate", icon="LOOP_FORWARDS")
-        else:      
+        else:
             col.operator('mesh.ant_landscape_refresh', text="Refresh", icon="FILE_REFRESH")
 
         box.prop(ant, "noise_type")
@@ -194,7 +194,8 @@ class AntNoiseSettingsPanel(bpy.types.Panel):
         col = box.column(align=True)
         col.prop(ant, "noise_offset_x")
         col.prop(ant, "noise_offset_y")
-        col.prop(ant, "noise_offset_z")
+        if ant.sphere_mesh:
+            col.prop(ant, "noise_offset_z")
         col.prop(ant, "noise_size_x")
         col.prop(ant, "noise_size_y")
         if ant.sphere_mesh:
@@ -274,7 +275,7 @@ class AntNoiseSettingsPanel(bpy.types.Panel):
             col.prop(ant, "frequency")
             col.prop(ant, "distortion")
             col.separator()
-            col.prop(ant, "vl_basis_type")
+            box.prop(ant, "vl_basis_type")
             col.separator()
             row = col.row(align=True)
             row.prop(ant, "hard_noise", expand=True)
@@ -285,7 +286,7 @@ class AntNoiseSettingsPanel(bpy.types.Panel):
             col.prop(ant, "offset")
             col.prop(ant, "distortion")
             col.separator()
-            col.prop(ant, "vl_basis_type")
+            box.prop(ant, "vl_basis_type")
         elif ant.noise_type == "distorted_heteroTerrain":
             col.prop(ant, "noise_depth")
             col.prop(ant, "dimension")
@@ -301,7 +302,7 @@ class AntNoiseSettingsPanel(bpy.types.Panel):
             col.prop(ant, "offset")
             col.prop(ant, "gain")
             col.separator()
-            col.prop(ant, "vl_basis_type")
+            box.prop(ant, "vl_basis_type")
         elif ant.noise_type == "rocks_noise":
             col.prop(ant, "noise_depth")
             col.prop(ant, "distortion")
@@ -316,15 +317,44 @@ class AntNoiseSettingsPanel(bpy.types.Panel):
             col.prop(ant, "offset")
             col.prop(ant, "distortion")
             col.separator()
-            col.prop(ant, "vl_basis_type")
+            box.prop(ant, "vl_basis_type")
         elif ant.noise_type == "planet_noise":
             col.prop(ant, "noise_depth")
             col.separator()
             row = col.row(align=True)
             row.prop(ant, "hard_noise", expand=True)
 
+        # Effects mix
+        col = box.column(align=False)
+        box.prop(ant, "fx_type")
+        if ant.fx_type != "0":
+            if int(ant.fx_type) <= 12:
+                box.prop(ant, "fx_bias")
 
-# Landscape Settings / Properties:
+            box.prop(ant, "fx_mix_mode")
+            col = box.column(align=True)
+            col.prop(ant, "fx_mixfactor")
+
+            col = box.column(align=True)
+            col.prop(ant, "fx_loc_x")
+            col.prop(ant, "fx_loc_y")
+            col.prop(ant, "fx_size")
+
+            col = box.column(align=True)
+            col.prop(ant, "fx_depth")
+            if ant.fx_depth != 0:
+                col.prop(ant, "fx_frequency")
+                col.prop(ant, "fx_amplitude")
+            col.prop(ant, "fx_turb")
+
+            col = box.column(align=True)
+            row = col.row(align=True).split(0.92, align=True)
+            row.prop(ant, "fx_height")
+            row.prop(ant, "fx_invert", toggle=True, text="", icon='ARROW_LEFTRIGHT')
+            col.prop(ant, "fx_offset")
+
+
+# Landscape Displace Settings
 class AntDisplaceSettingsPanel(bpy.types.Panel):
     bl_idname = "ANTDISP_PT_layout"
     bl_options = {'DEFAULT_CLOSED'}
@@ -348,7 +378,7 @@ class AntDisplaceSettingsPanel(bpy.types.Panel):
         col.scale_y = 1.5
         if ant.sphere_mesh:
             col.operator('mesh.ant_landscape_regenerate', text="Regenerate", icon="LOOP_FORWARDS")
-        else:      
+        else:
             col.operator('mesh.ant_landscape_refresh', text="Refresh", icon="FILE_REFRESH")
 
         col = box.column(align=True)
@@ -375,7 +405,7 @@ class AntDisplaceSettingsPanel(bpy.types.Panel):
             col = box.column()
             col.prop(ant, "strata")
         col = box.column()
-        col.prop(ant, "use_vgroup", toggle=True)
+        col.prop_search(ant, "vert_group", ob, "vertex_groups")
 
 
 # ------------------------------------------------------------
@@ -679,6 +709,134 @@ class AntLandscapePropertiesGroup(bpy.types.PropertyGroup):
             max=10000.0,
             description="Height offset"
             )
+    fx_mixfactor = FloatProperty(
+            name="Mix Factor",
+            default=0.0,
+            min=-1.0,
+            max=1.0,
+            description="Effect mix factor: -1.0 = Noise, +1.0 = Effect"
+            )
+    fx_mix_mode = EnumProperty(
+            name="Effect Mix",
+            default="0",
+            description="Effect mix mode",
+            items = [
+                ("0", "Mix", "Mix", 0),
+                ("1", "Add", "Add", 1),
+                ("2", "Sub", "Subtract", 2),
+                ("3", "Mul", "Multiply", 3),
+                ("4", "Abs", "Absolute", 4),
+                ("5", "Scr", "Screen", 5),
+                ("6", "Mod", "Modulo", 6),
+                ("7", "Min", "Minimum", 7),
+                ("8", "Max", "Maximum", 8)
+                ]
+            )
+    fx_type = EnumProperty(
+            name="Effect Type",
+            default="0",
+            description="Effect type",
+            items = [
+                ("0", "None", "No effect", 0),
+                ("1", "Gradient", "Gradient", 1),
+                ("2", "Waves", "Waves - Bumps", 2),
+                ("3", "Zigzag", "Zigzag", 3),
+                ("4", "Wavy", "Wavy", 4),
+                ("5", "Bump", "Bump", 5),
+                ("6", "Dots", "Dots", 6),
+                ("7", "Rings", "Rings", 7),
+                ("8", "Spiral", "Spiral", 8),
+                ("9", "Square", "Square", 9),
+                ("10", "Blocks", "Blocks", 10),
+                ("11", "Grid", "Grid", 11),
+                ("12", "Tech", "Tech", 12),
+                ("13", "Crackle", "Crackle", 13),
+                ("14", "Cracks", "Cracks", 14),
+                ("15", "Rock", "Rock noise", 15),
+                ("16", "Lunar", "Craters", 16),
+                ("17", "Cosine", "Cosine", 17),
+                ("18", "Spikey", "Spikey", 18),
+                ("19", "Stone", "Stone", 19),
+                ("20", "Flat Turb", "Flat turbulence", 20),
+                ("21", "Flat Voronoi", "Flat voronoi", 21)
+                ]
+            )
+    fx_bias = EnumProperty(
+            name="Effect Bias",
+            default="0",
+            description="Effect bias type",
+            items = [
+                ("0", "Sin", "Sin", 0),
+                ("1", "Cos", "Cos", 1),
+                ("2", "Tri", "Tri", 2),
+                ("3", "Saw", "Saw", 3),
+                ("4", "None", "None", 4)]
+            )
+    fx_turb = FloatProperty(
+            name="Distortion",
+            default=0.0,
+            min=0.0,
+            max=1000.0,
+            description="Effect turbulence distortion"
+            )
+    fx_depth = IntProperty(
+            name="Depth",
+            default=0,
+            min=0,
+            max=16,
+            description="Effect depth - number of frequencies"
+            )
+    fx_amplitude = FloatProperty(
+            name="Amp",
+            default=0.5,
+            min=0.01,
+            max=1.0,
+            description="Amplitude"
+            )
+    fx_frequency = FloatProperty(
+            name="Freq",
+            default=2.0,
+            min=0.01,
+            max=5.0,
+            description="Frequency"
+            )
+    fx_size = FloatProperty(
+            name="Effect Size",
+            default=1.0,
+            min=0.01,
+            max=1000.0,
+            description="Effect size"
+            )
+    fx_loc_x = FloatProperty(
+            name="Offset X",
+            default=0.0,
+            description="Effect x offset"
+            )
+    fx_loc_y = FloatProperty(
+            name="Offset Y",
+            default=0.0,
+            description="Effect y offset"
+            )
+    fx_height = FloatProperty(
+            name="Intensity",
+            default=1.0,
+            min=-1000.0,
+            max=1000.0,
+            description="Effect intensity scale"
+            )
+    fx_invert = BoolProperty(
+            name="Invert",
+            default=False,
+            description="Effect invert"
+            )
+    fx_offset = FloatProperty(
+            name="Offset",
+            default=0.0,
+            min=-1000.0,
+            max=1000.0,
+            description="Effect height offset"
+            )
+
     edge_falloff = EnumProperty(
             name="Falloff",
             default="3",
@@ -724,10 +882,9 @@ class AntLandscapePropertiesGroup(bpy.types.PropertyGroup):
             max=10000.0,
             description="Minimum, flattens terrain at seabed level"
             )
-    use_vgroup = BoolProperty(
-            name="Vertex Group Weight",
-            default=False,
-            description="Use active vertex group weight"
+    vert_group = StringProperty(
+            name="Vertex Group",
+            default=""
             )
     strata = FloatProperty(
             name="Amount",

@@ -3,21 +3,20 @@
 
 import bpy
 from bpy.types import (
-            Operator,
-            Panel,
-            )
+        Operator,
+        Panel,
+        )
 from bpy.props import StringProperty
 from .warning_messages_utils import (
-            warning_messages,
-            c_data_has_images,
-            )
+        warning_messages,
+        c_data_has_images,
+        )
 
 
 class TEXTURE_OT_patern_rename(Operator):
     bl_idname = "texture.patern_rename"
     bl_label = "Texture Renamer"
-    bl_description = ("Replace the Texture names pattern with \n"
-                      "the attached Image ones. \n"
+    bl_description = ("Replace the Texture names pattern with the attached Image ones\n"
                       "Works on all Textures (Including Brushes) \n \n"
                       "The First field - the name pattern to replace \n"
                       "The Second - searches for existing names \n")
@@ -89,7 +88,6 @@ class TEXTURE_OT_patern_rename(Operator):
 class TEXTURE_PT_rename_panel(Panel):
     # Creates a Panel in the scene context of the properties editor
     bl_label = "Texture Rename"
-    bl_idname = "SCENE_PT_layout"
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "texture"
@@ -107,6 +105,7 @@ def register():
 def unregister():
     bpy.utils.unregister_module(__name__)
     pass
+
 
 if __name__ == "__main__":
     register()

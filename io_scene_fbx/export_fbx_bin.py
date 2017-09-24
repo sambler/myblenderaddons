@@ -2176,7 +2176,7 @@ def fbx_data_from_scene(scene, settings):
 
         if settings.use_mesh_modifiers or ob.type in BLENDER_OTHER_OBJECT_TYPES or is_ob_material:
             # We cannot use default mesh in that case, or material would not be the right ones...
-            use_org_data = not is_ob_material
+            use_org_data = not (is_ob_material or ob.type in BLENDER_OTHER_OBJECT_TYPES)
             tmp_mods = []
             if use_org_data and ob.type == 'MESH':
                 # No need to create a new mesh in this case, if no modifier is active!
@@ -3129,7 +3129,7 @@ def save(operator, context,
                 # Find the 'most used' source scene, and use its unit settings. This is somewhat weak, but should work
                 # fine in most cases, and avoids stupid issues like T41931.
                 best_src_scene = None
-                best_src_scene_users = 0
+                best_src_scene_users = -1
                 for sce, nbr_users in src_scenes.items():
                     if (nbr_users) > best_src_scene_users:
                         best_src_scene_users = nbr_users

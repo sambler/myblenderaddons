@@ -47,13 +47,22 @@ outdated_types = {"pitchipoy.limbs.super_limb": "limbs.super_limb",
                   "pitchipoy.limbs.super_leg": "limbs.super_limb",
                   "pitchipoy.limbs.super_front_paw": "limbs.super_limb",
                   "pitchipoy.limbs.super_rear_paw": "limbs.super_limb",
+                  "pitchipoy.limbs.super_finger": "limbs.super_finger",
                   "pitchipoy.super_torso_turbo": "spines.super_spine",
                   "pitchipoy.simple_tentacle": "limbs.simple_tentacle",
                   "pitchipoy.super_face": "faces.super_face",
                   "pitchipoy.super_palm": "limbs.super_palm",
                   "pitchipoy.super_copy": "basic.super_copy",
+                  "pitchipoy.tentacle": "",
                   "palm": "limbs.super_palm",
-                  "basic.copy": "basic.super_copy"}
+                  "basic.copy": "basic.super_copy",
+                  "biped.arm": "",
+                  "biped.leg": "",
+                  "finger": "",
+                  "neck_short": "",
+                  "misc.delta": "",
+                  "spine": ""
+                  }
 
 #=======================================================================
 # Error handling
@@ -106,6 +115,14 @@ def strip_org(name):
         return name
 org_name = strip_org
 
+
+def strip_mch(name):
+    """ Returns the name with ORG_PREFIX stripped from it.
+        """
+    if name.startswith(MCH_PREFIX):
+        return name[len(MCH_PREFIX):]
+    else:
+        return name
 
 def org(name):
     """ Prepends the ORG_PREFIX to a name if it doesn't already have
@@ -160,9 +177,18 @@ def upgradeMetarigTypes(metarig, revert=False):
         rig_defs = outdated_types
 
     for bone in metarig.pose.bones:
-        rg_type = bone.rigify_type
-        if rg_type in rig_defs:
-            bone.rigify_type = rig_defs[rg_type]
+        rig_type = bone.rigify_type
+        if rig_type in rig_defs:
+            bone.rigify_type = rig_defs[rig_type]
+            if 'leg' in rig_type:
+                bone.rigfy_parameters.limb_type = 'leg'
+            if 'arm' in rig_type:
+                bone.rigfy_parameters.limb_type = 'arm'
+            if 'paw' in rig_type:
+                bone.rigfy_parameters.limb_type = 'paw'
+            if rig_type == "basic.copy":
+                bone.rigify_parameters.make_widget = False
+
 
 
 #=======================
@@ -202,7 +228,7 @@ def copy_bone_simple(obj, bone_name, assign_name=''):
         edit_bone_1 = obj.data.edit_bones[bone_name]
         edit_bone_2 = obj.data.edit_bones.new(assign_name)
         bone_name_1 = bone_name
-        bone_name_2 = edit_bone_2.name    
+        bone_name_2 = edit_bone_2.name
 
         # Copy edit bone attributes
         edit_bone_2.layers = list(edit_bone_1.layers)
@@ -883,7 +909,7 @@ def get_rig_type(rig_type):
     """
     name = ".%s.%s" % (RIG_DIR, rig_type)
     submod = importlib.import_module(name, package=MODULE_NAME)
-    imp.reload(submod)
+    importlib.reload(submod)
     return submod
 
 
@@ -893,7 +919,7 @@ def get_metarig_module(metarig_name, path=METARIG_DIR):
 
     name = ".%s.%s" % (path, metarig_name)
     submod = importlib.import_module(name, package=MODULE_NAME)
-    imp.reload(submod)
+    importlib.reload(submod)
     return submod
 
 
@@ -1171,3 +1197,68 @@ def gamma_correct(color):
     for i, component in enumerate(color):
         corrected_color[i] = linsrgb_to_srgb(color[i])
     return corrected_color
+
+
+#=============================================
+# Keyframing functions
+#=============================================
+
+
+def get_keyed_frames(rig):
+    frames = []
+    if rig.animation_data:
+        if rig.animation_data.action:
+            fcus = rig.animation_data.action.fcurves
+            for fc in fcus:
+                for kp in fc.keyframe_points:
+                    if kp.co[0] not in frames:
+                        frames.append(kp.co[0])
+
+    frames.sort()
+
+    return frames
+
+
+def bones_in_frame(f, rig, *args):
+    """
+    True if one of the bones listed in args is animated at frame f
+    :param f: the frame
+    :param rig: the rig
+    :param args: bone names
+    :return:
+    """
+
+    if rig.animation_data and rig.animation_data.action:
+        fcus = rig.animation_data.action.fcurves
+    else:
+        return False
+
+    for fc in fcus:
+        animated_frames = [kp.co[0] for kp in fc.keyframe_points]
+        for bone in args:
+            if bone in fc.data_path.split('"') and f in animated_frames:
+                return True
+
+    return False
+
+
+def overwrite_prop_animation(rig, bone, prop_name, value, frames):
+    act = rig.animation_data.action
+    if not act:
+        return
+
+    bone_name = bone.name
+    curve = None
+
+    for fcu in act.fcurves:
+        words = fcu.data_path.split('"')
+        if words[0] == "pose.bones[" and words[1] == bone_name and words[-2] == prop_name:
+            curve = fcu
+            break
+
+    if not curve:
+        return
+
+    for kp in curve.keyframe_points:
+        if kp.co[0] in frames:
+            kp.co[1] = value
