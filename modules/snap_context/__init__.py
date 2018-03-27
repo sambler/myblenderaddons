@@ -67,7 +67,7 @@ class SnapContext():
 
     def __init__(self, region, space):
         import gpu
-        from .bgl_ext import VoidBufValue
+        import ctypes
 
         self.freed = False
         self.snap_objects = []
@@ -92,8 +92,8 @@ class SnapContext():
         self._texture = self._offscreen.color_texture
         bgl.glBindTexture(bgl.GL_TEXTURE_2D, self._texture)
 
-        NULL = VoidBufValue(0)
-        bgl.glTexImage2D(bgl.GL_TEXTURE_2D, 0, bgl.GL_R32UI, self.region.width, self.region.height, 0, bgl.GL_RED_INTEGER, bgl.GL_UNSIGNED_INT, NULL.buf)
+        NULL = bgl.Buffer(bgl.GL_INT, 1, (ctypes.c_int32 * 1).from_address(0))
+        bgl.glTexImage2D(bgl.GL_TEXTURE_2D, 0, bgl.GL_R32UI, self.region.width, self.region.height, 0, bgl.GL_RED_INTEGER, bgl.GL_UNSIGNED_INT, NULL)
         del NULL
 
         bgl.glTexParameteri(bgl.GL_TEXTURE_2D, bgl.GL_TEXTURE_MIN_FILTER, bgl.GL_NEAREST)
@@ -191,6 +191,11 @@ class SnapContext():
     def __del__(self):
         if not self.freed:
             self._offscreen.free()
+            # Some objects may still be being referenced
+            for snap_obj in self.snap_objects:
+                del snap_obj.data
+                del snap_obj.mat
+                del snap_obj
             del self.snap_objects
 
     ## PUBLIC ##
@@ -276,7 +281,7 @@ class SnapContext():
                 MVP = proj_mat * snap_obj.mat
                 mat_inv = snap_obj.mat.inverted()
                 ray_orig_local = mat_inv * ray_orig
-                ray_dir_local = ray_dir * snap_obj.mat
+                ray_dir_local = mat_inv.to_3x3() * ray_dir
                 in_threshold = _Internal.intersect_boundbox_threshold(self, MVP, ray_orig_local, ray_dir_local, bbmin, bbmax)
             else:
                 proj_co = _Internal.project_co_v3(self, snap_obj.mat.translation)

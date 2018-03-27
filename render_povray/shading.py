@@ -245,13 +245,11 @@ def writeMaterial(using_uberpov, DEF_MAT_NAME, scene, tabWrite, safety, comments
         for t in material.texture_slots:
             if t and t.use and t.texture is not None:
                 if (t.texture.type == 'IMAGE' and t.texture.image) or t.texture.type != 'IMAGE':
-                    validPath=True
-            else:
-                validPath=False
-            if(t and t.use and validPath and
-               (t.use_map_specular or t.use_map_raymir or t.use_map_normal or t.use_map_alpha)):
-                special_texture_found = True
-                continue  # Some texture found
+                    #validPath
+                    if(t and t.use and
+                       (t.use_map_specular or t.use_map_raymir or t.use_map_normal or t.use_map_alpha)):
+                        special_texture_found = True
+                        continue  # Some texture found
 
         if special_texture_found or colored_specular_found:
             # Level=1 Means No specular nor Mirror reflection
@@ -824,7 +822,7 @@ def writeTextureInfluence(mater, materialNames, LocalMaterialNames, path_image, 
                 # IMAGE SEQUENCE BEGINS
                 if image_filename:
                     if bpy.data.images[t.texture.image.name].source == 'SEQUENCE':
-                        korvaa = "." + str(bpy.data.textures[t.texture.name].image_user.frame_offset + 1).zfill(3) + "."
+                        korvaa = "." + str(t.texture.image_user.frame_offset + 1).zfill(3) + "."
                         image_filename = image_filename.replace(".001.", korvaa)
                         print(" seq debug ")
                         print(image_filename)
@@ -1087,7 +1085,6 @@ def writeTextureInfluence(mater, materialNames, LocalMaterialNames, path_image, 
         else:
             if texturesDif and texturesDif.startswith("PAT_"):
                 tabWrite("pigment{%s %s}\n" %(texturesDif, mappingDif))
-                print('XXXMEEEERDE!')
             else:
                 tabWrite("pigment {\n")
                 tabWrite("uv_mapping image_map {\n")

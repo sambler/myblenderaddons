@@ -2013,9 +2013,14 @@ def draw_main(context):
     scene = bpy.context.scene
     # Get visible layers
     layers = []
-    for x in range(0, 20):
-        if bpy.context.scene.layers[x] is True:
-            layers.extend([x])
+    if bpy.context.space_data.lock_camera_and_layers is True:
+        for x in range(0, 20):
+            if bpy.context.scene.layers[x] is True:
+                layers.extend([x])
+    else:
+        for x in range(20):
+            if bpy.context.space_data.layers[x] is True:
+                layers.extend([x])
 
     # Display selected or all
     if scene.measureit_gl_ghost is False:
@@ -2033,10 +2038,9 @@ def draw_main(context):
             if 'MeasureGenerator' in myobj:
                 # verify visible layer
                 for x in range(0, 20):
-                    if myobj.layers[x] is True:
-                        if x in layers:
-                            op = myobj.MeasureGenerator[0]
-                            draw_segments(context, myobj, op, region, rv3d)
+                    if myobj.layers[x] is True and x in layers:
+                        op = myobj.MeasureGenerator[0]
+                        draw_segments(context, myobj, op, region, rv3d)
                         break
     # ---------------------------------------
     # Generate all OpenGL calls for debug
