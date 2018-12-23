@@ -91,7 +91,7 @@ class RenderPovSettingsScene(PropertyGroup):
             default=True)
     pov_editor = BoolProperty(
             name="POV-Ray editor",
-            description="Don't Close POV-Ray editor after rendering (Overriden"
+            description="Don't Close POV-Ray editor after rendering (Overridden"
                         " by /EXIT command)",
             default=False)
     deletefiles_enable = BoolProperty(
@@ -2172,7 +2172,7 @@ class RenderPovSettingsCamera(PropertyGroup):
     dof_aperture = FloatProperty(
             name="Aperture",
             description="Similar to a real camera's aperture effect over focal blur (though not "
-                        "in physical units and independant of focal length). "
+                        "in physical units and independent of focal length). "
                         "Increase to get more blur",
             min=0.01, max=1.00, default=0.50)
 
@@ -2199,7 +2199,7 @@ class RenderPovSettingsCamera(PropertyGroup):
             min=0.01, max=0.99, default=0.20)
 
     normal_enable = BoolProperty(name="Perturbated Camera", default=False)
-    cam_normal = FloatProperty(name="Normal Strenght", min=0.0, max=1.0, default=0.0)
+    cam_normal = FloatProperty(name="Normal Strength", min=0.0, max=1.0, default=0.0)
     normal_patterns = EnumProperty(
             name="Pattern",
             description="",
@@ -2274,11 +2274,11 @@ class PovrayPreferences(AddonPreferences):
 
 def register():
     bpy.utils.register_module(__name__)
-    bpy.types.INFO_MT_add.prepend(ui.menu_func_add)
-    bpy.types.INFO_MT_file_import.append(ui.menu_func_import)
+    bpy.types.VIEW3D_MT_add.prepend(ui.menu_func_add)
+    bpy.types.TOPBAR_MT_file_import.append(ui.menu_func_import)
     bpy.types.TEXT_MT_templates.append(ui.menu_func_templates)
     bpy.types.RENDER_PT_povray_radiosity.prepend(ui.rad_panel_func)
-    bpy.types.LAMP_PT_POV_lamp.prepend(ui.lamp_panel_func)
+    bpy.types.LIGHT_PT_POV_light.prepend(ui.light_panel_func)
     bpy.types.WORLD_PT_world.prepend(ui.world_panel_func)
     # was used for parametric objects but made the other addon unreachable on
     # unregister for other tools to use created a user action call instead
@@ -2312,11 +2312,11 @@ def unregister():
     #bpy.types.TEXTURE_PT_context_texture.remove(TEXTURE_PT_povray_type)
     #addon_utils.disable("add_mesh_extra_objects", default_set=False)
     bpy.types.WORLD_PT_world.remove(ui.world_panel_func)
-    bpy.types.LAMP_PT_POV_lamp.remove(ui.lamp_panel_func)
+    bpy.types.LIGHT_PT_POV_light.remove(ui.light_panel_func)
     bpy.types.RENDER_PT_povray_radiosity.remove(ui.rad_panel_func)
     bpy.types.TEXT_MT_templates.remove(ui.menu_func_templates)
-    bpy.types.INFO_MT_file_import.remove(ui.menu_func_import)
-    bpy.types.INFO_MT_add.remove(ui.menu_func_add)
+    bpy.types.TOPBAR_MT_file_import.remove(ui.menu_func_import)
+    bpy.types.VIEW3D_MT_add.remove(ui.menu_func_add)
     bpy.utils.unregister_module(__name__)
 
 

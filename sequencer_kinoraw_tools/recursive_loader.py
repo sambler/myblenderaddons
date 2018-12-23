@@ -202,7 +202,7 @@ class Sequencer_Extra_ReadExifData(Operator):
         return {'FINISHED'}
 
 
-# TODO: fix poll to hide when unuseful
+# TODO: fix poll to hide when useless
 
 class ExifInfoPanel(Panel):
     """Creates a Panel in the Object properties window"""
@@ -215,7 +215,7 @@ class ExifInfoPanel(Panel):
         if context.space_data.view_type in {'SEQUENCER', 'SEQUENCER_PREVIEW'}:
             strip = functions.act_strip(context)
             scn = context.scene
-            preferences = context.user_preferences
+            preferences = context.preferences
             prefs = preferences.addons[__package__].preferences
 
             if scn and scn.sequence_editor and scn.sequence_editor.active_strip:

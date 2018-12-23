@@ -536,7 +536,7 @@ class AntMeshDisplace(bpy.types.Operator):
             items = [
                 ("0", "None", "No strata", 0),
                 ("1", "Smooth", "Smooth transitions", 1),
-                ("2", "Sharp Sub", "Sharp substract transitions", 2),
+                ("2", "Sharp Sub", "Sharp subtract transitions", 2),
                 ("3", "Sharp Add", "Sharp add transitions", 3),
                 ("4", "Quantize", "Quantize", 4),
                 ("5", "Quantize Mix", "Quantize mixed", 5)]
@@ -616,8 +616,8 @@ class AntMeshDisplace(bpy.types.Operator):
             return {'PASS_THROUGH'}
 
         # turn off undo
-        undo = bpy.context.user_preferences.edit.use_global_undo
-        bpy.context.user_preferences.edit.use_global_undo = False
+        undo = bpy.context.preferences.edit.use_global_undo
+        bpy.context.preferences.edit.use_global_undo = False
 
         ob = context.object
 
@@ -745,6 +745,6 @@ class AntMeshDisplace(bpy.types.Operator):
             self.refresh = False
 
         # restore pre operator undo state
-        context.user_preferences.edit.use_global_undo = undo
+        context.preferences.edit.use_global_undo = undo
 
         return {'FINISHED'}

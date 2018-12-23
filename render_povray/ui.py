@@ -214,15 +214,12 @@ del properties_data_modifier
 from bl_ui import properties_material
 for member in dir(properties_material):
     subclass = getattr(properties_material, member)
-    if subclass not in (properties_material.MATERIAL_PT_transp_game,
-                        properties_material.MATERIAL_PT_game_settings,
-                        properties_material.MATERIAL_PT_physics):
-        try:
-            #mat=context.material
-            #if mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and not (mat.pov.material_use_nodes or mat.use_nodes):
-            subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
-        except:
-            pass
+    try:
+        #mat=context.material
+        #if mat and mat.type == "SURFACE" and (engine in cls.COMPAT_ENGINES) and not (mat.pov.material_use_nodes or mat.use_nodes):
+        subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
+    except:
+        pass
 del properties_material
 
 
@@ -248,12 +245,12 @@ for member in dir(properties_particle):  # add all "particle" panels from blende
 del properties_particle
 
 def check_add_mesh_extra_objects():
-    if "add_mesh_extra_objects" in bpy.context.user_preferences.addons.keys():
+    if "add_mesh_extra_objects" in bpy.context.preferences.addons.keys():
         return True
     return False
 
 def locate_docpath():
-    addon_prefs = bpy.context.user_preferences.addons[__package__].preferences
+    addon_prefs = bpy.context.preferences.addons[__package__].preferences
     # Use the system preference if its set.
     pov_documents = addon_prefs.docpath_povray
     if pov_documents:
@@ -294,7 +291,7 @@ class RenderButtonsPanel():
     @classmethod
     def poll(cls, context):
         rd = context.scene.render
-        return (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return (rd.engine in cls.COMPAT_ENGINES)
 
 class ModifierButtonsPanel():
     bl_space_type = 'PROPERTIES'
@@ -306,7 +303,7 @@ class ModifierButtonsPanel():
     def poll(cls, context):
         mods = context.object.modifiers
         rd = context.scene.render
-        return mods and (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return mods and (rd.engine in cls.COMPAT_ENGINES)
 
 class MaterialButtonsPanel():
     bl_space_type = 'PROPERTIES'
@@ -318,7 +315,7 @@ class MaterialButtonsPanel():
     def poll(cls, context):
         mat = context.material
         rd = context.scene.render
-        return mat and (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return mat (rd.engine in cls.COMPAT_ENGINES)
 
 
 class TextureButtonsPanel():
@@ -331,7 +328,7 @@ class TextureButtonsPanel():
     def poll(cls, context):
         tex = context.texture
         rd = context.scene.render
-        return tex and (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return tex and (rd.engine in cls.COMPAT_ENGINES)
 
 # class TextureTypePanel(TextureButtonsPanel):
 
@@ -352,7 +349,7 @@ class ObjectButtonsPanel():
     def poll(cls, context):
         obj = context.object
         rd = context.scene.render
-        return obj and (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return obj and (rd.engine in cls.COMPAT_ENGINES)
 
 class CameraDataButtonsPanel():
     bl_space_type = 'PROPERTIES'
@@ -364,7 +361,7 @@ class CameraDataButtonsPanel():
     def poll(cls, context):
         cam = context.camera
         rd = context.scene.render
-        return cam and (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return cam and (rd.engine in cls.COMPAT_ENGINES)
 
 class WorldButtonsPanel():
     bl_space_type = 'PROPERTIES'
@@ -376,7 +373,7 @@ class WorldButtonsPanel():
     def poll(cls, context):
         wld = context.world
         rd = context.scene.render
-        return wld and (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return wld and (rd.engine in cls.COMPAT_ENGINES)
 
 class TextButtonsPanel():
     bl_space_type = 'TEXT_EDITOR'
@@ -388,7 +385,7 @@ class TextButtonsPanel():
     def poll(cls, context):
         text = context.space_data
         rd = context.scene.render
-        return text and (rd.use_game_engine is False) and (rd.engine in cls.COMPAT_ENGINES)
+        return text and (rd.engine in cls.COMPAT_ENGINES)
 
 from bl_ui import properties_data_mesh
 # These panels are kept
@@ -464,25 +461,25 @@ del properties_data_mesh
 
 
 ################################################################################
-# from bl_ui import properties_data_lamp
-# for member in dir(properties_data_lamp):
-    # subclass = getattr(properties_data_lamp, member)
+# from bl_ui import properties_data_light
+# for member in dir(properties_data_light):
+    # subclass = getattr(properties_data_light, member)
     # try:
         # subclass.COMPAT_ENGINES.add('POVRAY_RENDER')
     # except:
         # pass
-# del properties_data_lamp
-#########################LAMPS################################
+# del properties_data_light
+#########################LIGHTS################################
 
-from bl_ui import properties_data_lamp
+from bl_ui import properties_data_light
 
 # These panels are kept
-properties_data_lamp.DATA_PT_custom_props_lamp.COMPAT_ENGINES.add('POVRAY_RENDER')
-properties_data_lamp.DATA_PT_context_lamp.COMPAT_ENGINES.add('POVRAY_RENDER')
+properties_data_light.DATA_PT_custom_props_light.COMPAT_ENGINES.add('POVRAY_RENDER')
+properties_data_light.DATA_PT_context_light.COMPAT_ENGINES.add('POVRAY_RENDER')
 
 ## make some native panels contextual to some object variable
 ## by recreating custom panels inheriting their properties
-class PovLampButtonsPanel(properties_data_lamp.DataButtonsPanel):
+class PovLampButtonsPanel(properties_data_light.DataButtonsPanel):
     COMPAT_ENGINES = {'POVRAY_RENDER'}
     POV_OBJECT_TYPES = {'RAINBOW'}
 
@@ -499,17 +496,17 @@ class PovLampButtonsPanel(properties_data_lamp.DataButtonsPanel):
 # Complex py/bpy/rna interactions (with metaclass and all) simply do not allow it to work.
 # So we simply have to explicitly copy here the interesting bits. ;)
 
-class LAMP_PT_POV_preview(PovLampButtonsPanel, bpy.types.Panel):
-    bl_label = properties_data_lamp.DATA_PT_preview.bl_label
+class LIGHT_PT_POV_preview(PovLampButtonsPanel, bpy.types.Panel):
+    bl_label = properties_data_light.DATA_PT_preview.bl_label
 
-    draw = properties_data_lamp.DATA_PT_preview.draw
+    draw = properties_data_light.DATA_PT_preview.draw
 
-class LAMP_PT_POV_lamp(PovLampButtonsPanel, bpy.types.Panel):
-    bl_label = properties_data_lamp.DATA_PT_lamp.bl_label
+class LIGHT_PT_POV_light(PovLampButtonsPanel, bpy.types.Panel):
+    bl_label = properties_data_light.DATA_PT_light.bl_label
 
-    draw = properties_data_lamp.DATA_PT_lamp.draw
+    draw = properties_data_light.DATA_PT_light.draw
 
-class POV_LAMP_MT_presets(bpy.types.Menu):
+class POV_LIGHT_MT_presets(bpy.types.Menu):
     bl_label = "Lamp Presets"
     preset_subdir = "pov/lamp"
     preset_operator = "script.execute_preset"
@@ -518,19 +515,19 @@ class POV_LAMP_MT_presets(bpy.types.Menu):
 
 class AddPresetLamp(AddPresetBase, bpy.types.Operator):
     '''Add a Lamp Preset'''
-    bl_idname = "object.lamp_preset_add"
+    bl_idname = "object.light_preset_add"
     bl_label = "Add Lamp Preset"
-    preset_menu = "POV_LAMP_MT_presets"
+    preset_menu = "POV_LIGHT_MT_presets"
 
     # variable used for all preset values
     preset_defines = [
-        "lampdata = bpy.context.object.data"
+        "lightdata = bpy.context.object.data"
         ]
 
     # properties to store in the preset
     preset_values = [
-        "lampdata.type",
-        "lampdata.color",
+        "lightdata.type",
+        "lightdata.color",
         ]
 
     # where to store the preset
@@ -541,68 +538,68 @@ class AddPresetLamp(AddPresetBase, bpy.types.Operator):
 
 
 # Draw into an existing panel
-def lamp_panel_func(self, context):
+def light_panel_func(self, context):
     layout = self.layout
 
     row = layout.row(align=True)
-    row.menu(POV_LAMP_MT_presets.__name__, text=POV_LAMP_MT_presets.bl_label)
+    row.menu(POV_LIGHT_MT_presets.__name__, text=POV_LIGHT_MT_presets.bl_label)
     row.operator(AddPresetLamp.bl_idname, text="", icon='ZOOMIN')
     row.operator(AddPresetLamp.bl_idname, text="", icon='ZOOMOUT').remove_active = True
 
 
 classes = (
-    POV_LAMP_MT_presets,
+    POV_LIGHT_MT_presets,
     AddPresetLamp,
     )
 
-class LAMP_PT_POV_sunsky(PovLampButtonsPanel, bpy.types.Panel):
-    bl_label = properties_data_lamp.DATA_PT_sunsky.bl_label
+class LIGHT_PT_POV_sunsky(PovLampButtonsPanel, bpy.types.Panel):
+    bl_label = properties_data_light.DATA_PT_sunsky.bl_label
 
     @classmethod
     def poll(cls, context):
-        lamp = context.lamp
+        lamp = context.light
         engine = context.scene.render.engine
         return (lamp and lamp.type == 'SUN') and (engine in cls.COMPAT_ENGINES)
 
-    draw = properties_data_lamp.DATA_PT_sunsky.draw
+    draw = properties_data_light.DATA_PT_sunsky.draw
 
-class LAMP_PT_POV_shadow(PovLampButtonsPanel, bpy.types.Panel):
-    bl_label = properties_data_lamp.DATA_PT_shadow.bl_label
+class LIGHT_PT_POV_shadow(PovLampButtonsPanel, bpy.types.Panel):
+    bl_label = properties_data_light.DATA_PT_shadow.bl_label
 
-    draw = properties_data_lamp.DATA_PT_shadow.draw
+    draw = properties_data_light.DATA_PT_shadow.draw
 
-class LAMP_PT_POV_area(PovLampButtonsPanel, bpy.types.Panel):
-    bl_label = properties_data_lamp.DATA_PT_area.bl_label
+class LIGHT_PT_POV_area(PovLampButtonsPanel, bpy.types.Panel):
+    bl_label = properties_data_light.DATA_PT_area.bl_label
 
     @classmethod
     def poll(cls, context):
-        lamp = context.lamp
+        lamp = context.light
         engine = context.scene.render.engine
         return (lamp and lamp.type == 'AREA') and (engine in cls.COMPAT_ENGINES)
 
-    draw = properties_data_lamp.DATA_PT_area.draw
+    draw = properties_data_light.DATA_PT_area.draw
 
-class LAMP_PT_POV_spot(PovLampButtonsPanel, bpy.types.Panel):
-    bl_label = properties_data_lamp.DATA_PT_spot.bl_label
+class LIGHT_PT_POV_spot(PovLampButtonsPanel, bpy.types.Panel):
+    bl_label = properties_data_light.DATA_PT_spot.bl_label
 
     @classmethod
     def poll(cls, context):
-        lamp = context.lamp
+        lamp = context.light
         engine = context.scene.render.engine
         return (lamp and lamp.type == 'SPOT') and (engine in cls.COMPAT_ENGINES)
-    draw = properties_data_lamp.DATA_PT_spot.draw
+    draw = properties_data_light.DATA_PT_spot.draw
 
-class LAMP_PT_POV_falloff_curve(PovLampButtonsPanel, bpy.types.Panel):
-    bl_label = properties_data_lamp.DATA_PT_falloff_curve.bl_label
-    bl_options = properties_data_lamp.DATA_PT_falloff_curve.bl_options
+class LIGHT_PT_POV_falloff_curve(PovLampButtonsPanel, bpy.types.Panel):
+    bl_label = properties_data_light.DATA_PT_falloff_curve.bl_label
+    bl_options = properties_data_light.DATA_PT_falloff_curve.bl_options
 
     @classmethod
     def poll(cls, context):
-        lamp = context.lamp
+        lamp = context.light
         engine = context.scene.render.engine
 
         return (lamp and lamp.type in {'POINT', 'SPOT'} and lamp.falloff_type == 'CUSTOM_CURVE') and (engine in cls.COMPAT_ENGINES)
-    draw = properties_data_lamp.DATA_PT_falloff_curve.draw
+    draw = properties_data_light.DATA_PT_falloff_curve.draw
 
 class OBJECT_PT_povray_obj_rainbow(PovLampButtonsPanel, bpy.types.Panel):
     bl_label = "POV-Ray Rainbow"
@@ -644,7 +641,7 @@ class OBJECT_PT_povray_obj_rainbow(PovLampButtonsPanel, bpy.types.Panel):
                 col.prop(obj.pov, "arc_angle")
                 col.prop(obj.pov, "falloff_angle")
 
-del properties_data_lamp
+del properties_data_light
 ###############################################################################
 
 class RENDER_PT_povray_export_settings(RenderButtonsPanel, bpy.types.Panel):
@@ -787,7 +784,7 @@ class RENDER_PT_povray_antialias(RenderButtonsPanel, bpy.types.Panel):
 
 
     def draw_header(self, context):
-        prefs = bpy.context.user_preferences.addons[__package__].preferences
+        prefs = bpy.context.preferences.addons[__package__].preferences
         scene = context.scene
         if prefs.branch_feature_set_povray != 'uberpov' and scene.pov.antialias_method == '2':
             self.layout.prop(scene.pov, "antialias_enable", text="", icon='ERROR')
@@ -797,7 +794,7 @@ class RENDER_PT_povray_antialias(RenderButtonsPanel, bpy.types.Panel):
             self.layout.prop(scene.pov, "antialias_enable", text="", icon='ALIASED')
 
     def draw(self, context):
-        prefs = bpy.context.user_preferences.addons[__package__].preferences
+        prefs = bpy.context.preferences.addons[__package__].preferences
         layout = self.layout
         scene = context.scene
 

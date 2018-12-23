@@ -277,11 +277,11 @@ class SCENE_OT_namedlayer_toggle_wire(Operator):
                     group_layers = scene.layergroups[group_idx].layers
                     layers = obj.layers
                     if True in {layer and group_layer for layer, group_layer in zip(layers, group_layers)}:
-                        obj.draw_type = display
+                        obj.display_type = display
                         scene.layergroups[group_idx].use_wire = use_wire
                 else:
                     if obj.layers[layer_idx]:
-                        obj.draw_type = display
+                        obj.display_type = display
                         scene.namedlayers.layers[layer_idx].use_wire = use_wire
 
         return {'FINISHED'}
@@ -580,8 +580,8 @@ class SCENE_PT_namedlayer_groups(Panel):
         row.template_list("SCENE_UL_namedlayer_groups", "", scene, "layergroups", scene, "layergroups_index")
 
         col = row.column(align=True)
-        col.operator("scene.namedlayer_group_add", icon='ZOOMIN', text="").layers = scene.layers
-        col.operator("scene.namedlayer_group_remove", icon='ZOOMOUT', text="").group_idx = group_idx
+        col.operator("scene.namedlayer_group_add", icon='ADD', text="").layers = scene.layers
+        col.operator("scene.namedlayer_group_remove", icon='REMOVE', text="").group_idx = group_idx
 
         if bool(scene.layergroups):
             layout.prop(scene.layergroups[group_idx], "layers", text="", toggle=True)
@@ -605,7 +605,7 @@ def update_panel(self, context):
                 bpy.utils.unregister_class(panel)
 
         for panel in panels:
-            panel.bl_category = context.user_preferences.addons[__name__].preferences.category
+            panel.bl_category = context.preferences.addons[__name__].preferences.category
             bpy.utils.register_class(panel)
 
     except Exception as e:

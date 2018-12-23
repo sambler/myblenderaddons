@@ -165,7 +165,7 @@ class Ms3dExporter():
                         = blender_context.selected_objects[0]
 
             # restore pre operator undo state
-            blender_context.user_preferences.edit.use_global_undo = self.undo
+            blender_context.preferences.edit.use_global_undo = self.undo
 
             is_valid, statistics = ms3d_model.is_valid()
             if self.options_verbose in Ms3dUi.VERBOSE_NORMAL:
@@ -254,7 +254,7 @@ class Ms3dExporter():
                     ms3d_group._comment_object.comment = \
                             blender_ms3d_group.comment
                     ms3d_group._comment_object.index = len(ms3d_model._groups)
-                ms3d_group.material_index = None # to mark as not setted
+                ms3d_group.material_index = None # to mark as not set
                 ms3d_model._groups.append(ms3d_group)
                 blender_to_ms3d_groups[blender_ms3d_group.id] = ms3d_group
 

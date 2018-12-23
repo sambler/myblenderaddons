@@ -77,7 +77,7 @@ def _get_pref_class(mod):
 
 def get_addon_preferences(name=''):
     """Acquisition and registration"""
-    addons = bpy.context.user_preferences.addons
+    addons = bpy.context.preferences.addons
     if __name__ not in addons:  # wm.read_factory_settings()
         return None
     addon_prefs = addons[__name__].preferences
@@ -468,7 +468,7 @@ class AdvancedObjProperties1(PropertyGroup):
             )
     # oscurart_constellation
     constellation_limit = FloatProperty(
-            name="Inital Threshold",
+            name="Initial Threshold",
             description="Edges will be created only if the distance\n"
                         "between vertices is smaller than this value\n"
                         "This is a starting value on Operator Invoke",

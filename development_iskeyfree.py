@@ -105,18 +105,18 @@ class MyChecker():
         cls.mylist.clear()
         for e in sortkeys:
             cmd = ""
-            if e[2] is not "":
+            if e[2] != "":
                 cmd += e[2] + "+"
-            if e[3] is not "":
+            if e[3] != "":
                 cmd += e[3] + "+"
-            if e[4] is not "":
+            if e[4] != "":
                 cmd += e[4] + "+"
-            if e[5] is not "":
+            if e[5] != "":
                 cmd += e[5] + "+"
 
             cmd += e[1]
 
-            if e[6] is not "":
+            if e[6] != "":
                 cmd += "  " + e[6]
             cls.mylist.append([e[0], cmd])
 
@@ -146,9 +146,9 @@ class MyChecker():
         allkeys = [
             "LEFTMOUSE", "MIDDLEMOUSE", "RIGHTMOUSE", "BUTTON4MOUSE", "BUTTON5MOUSE", "BUTTON6MOUSE",
             "BUTTON7MOUSE",
-            "ACTIONMOUSE", "SELECTMOUSE", "MOUSEMOVE", "INBETWEEN_MOUSEMOVE", "TRACKPADPAN", "TRACKPADZOOM",
+            "MOUSEMOVE", "INBETWEEN_MOUSEMOVE", "TRACKPADPAN", "TRACKPADZOOM",
             "MOUSEROTATE", "WHEELUPMOUSE", "WHEELDOWNMOUSE", "WHEELINMOUSE", "WHEELOUTMOUSE", "EVT_TWEAK_L",
-            "EVT_TWEAK_M", "EVT_TWEAK_R", "EVT_TWEAK_A", "EVT_TWEAK_S", "A", "B", "C", "D", "E", "F", "G", "H",
+            "EVT_TWEAK_M", "EVT_TWEAK_R", "A", "B", "C", "D", "E", "F", "G", "H",
             "I", "J",
             "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "ZERO", "ONE", "TWO",
             "THREE", "FOUR", "FIVE", "SIX", "SEVEN", "EIGHT", "NINE", "LEFT_CTRL", "LEFT_ALT", "LEFT_SHIFT",
@@ -309,8 +309,6 @@ class IskeyFreeProperties(PropertyGroup):
             ("BUTTON5MOUSE", "BUTTON5MOUSE", ""),
             ("BUTTON6MOUSE", "BUTTON6MOUSE", ""),
             ("BUTTON7MOUSE", "BUTTON7MOUSE", ""),
-            ("ACTIONMOUSE", "ACTIONMOUSE", ""),
-            ("SELECTMOUSE", "SELECTMOUSE", ""),
             ("MOUSEMOVE", "MOUSEMOVE", ""),
             ("INBETWEEN_MOUSEMOVE", "INBETWEEN_MOUSEMOVE", ""),
             ("TRACKPADPAN", "TRACKPADPAN", ""),
@@ -323,8 +321,6 @@ class IskeyFreeProperties(PropertyGroup):
             ("EVT_TWEAK_L", "EVT_TWEAK_L", ""),
             ("EVT_TWEAK_M", "EVT_TWEAK_M", ""),
             ("EVT_TWEAK_R", "EVT_TWEAK_R", ""),
-            ("EVT_TWEAK_A", "EVT_TWEAK_A", ""),
-            ("EVT_TWEAK_S", "EVT_TWEAK_S", ""),
             ("A", "A", ""),
             ("B", "B", ""),
             ("C", "C", ""),

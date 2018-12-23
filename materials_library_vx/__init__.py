@@ -264,7 +264,7 @@ class Library():
 def get_libraries():
     libs = [Library(matlib_path, f) for f in os.listdir(matlib_path) if f[-5::] == "blend"]
     try:
-        user_path = bpy.context.user_preferences.addons[__name__].preferences.matlib_path
+        user_path = bpy.context.preferences.addons[__name__].preferences.matlib_path
         if user_path:
             if os.path.exists(user_path):
                 libs.extend([Library(user_path, f) for f in os.listdir(user_path) if f[-5::] == "blend"])
@@ -600,7 +600,7 @@ if mat:
     print ("Material", material, force)
 
     #if material:
-    #maybe some test cases doesnt return a material, gotta take care of that
+    #maybe some test cases doesn't return a material, gotta take care of that
     #i cannot think of any case like that right now
     #maybe import linked when the database isnt sync
     if context.mode == "EDIT_MESH":
@@ -695,7 +695,7 @@ bpy.ops.wm.save_mainfile(filepath="{3}", check_existing=False, compress=True)
 
       return 'INFO', "Material added."
     else:
-      print("Save Material Error: Run Blender with administrative priviledges.")
+      print("Save Material Error: Run Blender with administrative privileges.")
       return 'WARNING', "There was an error saving the material"
 
   def remove_material(self):
@@ -952,7 +952,7 @@ class MATLIB_OT_operator(Operator):
       return {'RUNNING_MODAL'}
     return self.execute(context)
 
-  ### TODO: execute doesnt trigger remove
+  ### TODO: execute doesn't trigger remove
   def execute(self, context):
 
     success = ""
@@ -1093,7 +1093,7 @@ def clean_materials():
 
 bin = bpy.app.binary_path
 mats = list_materials()
-bpy.context.user_preferences.filepaths.save_version = 0
+bpy.context.preferences.filepaths.save_version = 0
 for mat in mats:
   clean_materials()
   matpath = os.path.join("{1}", mat + ".blend")
@@ -1132,7 +1132,7 @@ class MATLIB_PT_vxPanel(Panel):
 #      matlibProperties.init = False
 #      matlib.__init__()
 
-    #libaries
+    #libraries
     row = layout.row(align=True)
     if matlib.current_library:
       text = matlib.current_library.shortname
