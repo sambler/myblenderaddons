@@ -49,7 +49,7 @@ class Snap_CursSelToCenter1(Operator):
         return (context.area.type == "VIEW_3D" and context.mode == "OBJECT")
 
     def execute(self, context):
-        context.space_data.cursor_location = (0, 0, 0)
+        context.scene.cursor.location = (0, 0, 0)
         for obj in context.selected_objects:
             obj.location = (0, 0, 0)
 
@@ -58,7 +58,7 @@ class Snap_CursSelToCenter1(Operator):
 
 # Origin/Pivot menu1  - Shift + S
 class Snap_CursorMenu(Menu):
-    bl_idname = "snap.cursormenu"
+    bl_idname = "SNAP_MT_cursormenu"
     bl_label = "Cursor Menu"
 
     def draw(self, context):
@@ -102,7 +102,7 @@ def register():
         # Origin/Pivot
         km = wm.keyconfigs.addon.keymaps.new(name='3D View Generic', space_type='VIEW_3D')
         kmi = km.keymap_items.new('wm.call_menu_pie', 'S', 'PRESS', shift=True)
-        kmi.properties.name = "snap.cursormenu"
+        kmi.properties.name = "SNAP_MT_cursormenu"
         addon_keymaps.append((km, kmi))
 
 

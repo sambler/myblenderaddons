@@ -23,10 +23,11 @@ import struct
 
 
 class element_spec(object):
-    __slots__ = ("name",
-                 "count",
-                 "properties",
-                 )
+    __slots__ = (
+        "name",
+        "count",
+        "properties",
+    )
 
     def __init__(self, name, count):
         self.name = name
@@ -46,10 +47,11 @@ class element_spec(object):
 
 
 class property_spec(object):
-    __slots__ = ("name",
-                 "list_type",
-                 "numeric_type",
-                 )
+    __slots__ = (
+        "name",
+        "list_type",
+        "numeric_type",
+    )
 
     def __init__(self, name, list_type, numeric_type):
         self.name = name
@@ -128,26 +130,30 @@ def read(filepath):
     format = b''
     texture = b''
     version = b'1.0'
-    format_specs = {b'binary_little_endian': '<',
-                    b'binary_big_endian': '>',
-                    b'ascii': b'ascii'}
-    type_specs = {b'char': 'b',
-                  b'uchar': 'B',
-                  b'int8': 'b',
-                  b'uint8': 'B',
-                  b'int16': 'h',
-                  b'uint16': 'H',
-                  b'short': 'h',
-                  b'ushort': 'H',
-                  b'int': 'i',
-                  b'int32': 'i',
-                  b'uint': 'I',
-                  b'uint32': 'I',
-                  b'float': 'f',
-                  b'float32': 'f',
-                  b'float64': 'd',
-                  b'double': 'd',
-                  b'string': 's'}
+    format_specs = {
+        b'binary_little_endian': '<',
+        b'binary_big_endian': '>',
+        b'ascii': b'ascii',
+    }
+    type_specs = {
+        b'char': 'b',
+        b'uchar': 'B',
+        b'int8': 'b',
+        b'uint8': 'B',
+        b'int16': 'h',
+        b'uint16': 'H',
+        b'short': 'h',
+        b'ushort': 'H',
+        b'int': 'i',
+        b'int32': 'i',
+        b'uint': 'I',
+        b'uint32': 'I',
+        b'float': 'f',
+        b'float32': 'f',
+        b'float64': 'd',
+        b'double': 'd',
+        b'string': 's',
+    }
     obj_spec = object_spec()
     invalid_ply = (None, None, None)
 
@@ -243,8 +249,14 @@ def load_ply_mesh(filepath, ply_name):
             uvindices = (el.index(b's'), el.index(b't'))
             if -1 in uvindices:
                 uvindices = None
-            colindices = el.index(b'red'), el.index(b'green'), el.index(b'blue'), el.index(b'alpha')
+            # ignore alpha if not present
+            if el.index(b'alpha') == -1:
+                colindices = el.index(b'red'), el.index(b'green'), el.index(b'blue')
+            else:
+                colindices = el.index(b'red'), el.index(b'green'), el.index(b'blue'), el.index(b'alpha')
             if -1 in colindices:
+                if any(idx > -1 for idx in colindices):
+                    print("Warning: At least one obligatory color channel is missing, ignoring vertex colors.")
                 colindices = None
             else:  # if not a float assume uchar
                 colmultiply = [1.0 if el.properties[i].numeric_type in {'f', 'd'} else (1.0 / 255.0) for i in colindices]
@@ -265,11 +277,26 @@ def load_ply_mesh(filepath, ply_name):
         if uvindices:
             mesh_uvs.extend([(vertices[index][uvindices[0]], vertices[index][uvindices[1]]) for index in indices])
         if colindices:
-            mesh_colors.extend([(vertices[index][colindices[0]] * colmultiply[0],
-                                 vertices[index][colindices[1]] * colmultiply[1],
-                                 vertices[index][colindices[2]] * colmultiply[2],
-                                 vertices[index][colindices[3]] * colmultiply[3],
-                                 ) for index in indices])
+            if len(colindices) == 3:
+                mesh_colors.extend([
+                    (
+                       vertices[index][colindices[0]] * colmultiply[0],
+                       vertices[index][colindices[1]] * colmultiply[1],
+                       vertices[index][colindices[2]] * colmultiply[2],
+                       1.0
+                    )
+                    for index in indices
+                ])
+            elif len(colindices) == 4:
+                mesh_colors.extend([
+                    (
+                       vertices[index][colindices[0]] * colmultiply[0],
+                       vertices[index][colindices[1]] * colmultiply[1],
+                       vertices[index][colindices[2]] * colmultiply[2],
+                       vertices[index][colindices[3]] * colmultiply[3],
+                    )
+                    for index in indices
+                ])
 
     if uvindices or colindices:
         # If we have Cols or UVs then we need to check the face order.

@@ -39,7 +39,7 @@ import bgl
 import gpu
 from gpu_extras.batch import batch_for_shader
 
-shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR')
+shader = gpu.shader.from_builtin('2D_UNIFORM_COLOR') if not bpy.app.background else None
 
 # -------------------------------------------------------------
 # Draw segments
@@ -1014,7 +1014,7 @@ def draw_object(context, myobj, region, rv3d):
     for o in obidxs:
         # Display only selected
         if scene.measureit_debug_select is True:
-            if objs[o].select is False:
+            if objs[o].select_get() is False:
                 continue
         a_p1 = Vector(get_location(objs[o]))
         # Text

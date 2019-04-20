@@ -34,8 +34,10 @@ class BlenderNodeAnim():
             kf.interpolation = 'CONSTANT'
         elif interpolation == "CUBICSPLINE":
             kf.interpolation = 'BEZIER'
+            kf.handle_right_type = 'AUTO'
+            kf.handle_left_type = 'AUTO'
         else:
-            kf.interpolation = 'BEZIER'
+            kf.interpolation = 'LINEAR'
 
     @staticmethod
     def anim(gltf, anim_idx, node_idx):
@@ -76,58 +78,59 @@ class BlenderNodeAnim():
                 # We can't remove Yup2Zup oject
                 gltf.animation_object = True
 
+                if animation.samplers[channel.sampler].interpolation == "CUBICSPLINE":
+                    # TODO manage tangent?
+                    values = [values[idx * 3 + 1] for idx in range(0, len(keys))]
+
                 if channel.target.path == "translation":
                     blender_path = "location"
-                    for idx, key in enumerate(keys):
-                        if animation.samplers[channel.sampler].interpolation == "CUBICSPLINE":
-                            # TODO manage tangent?
-                            obj.location = Vector(loc_gltf_to_blender(list(values[idx * 3 + 1])))
-                        else:
-                            obj.location = Vector(loc_gltf_to_blender(list(values[idx])))
-                        obj.keyframe_insert(blender_path, frame=key[0] * fps, group='location')
-
-                    # Setting interpolation
-                    for fcurve in [curve for curve in obj.animation_data.action.fcurves
-                                   if curve.group.name == "location"]:
-                        for kf in fcurve.keyframe_points:
-                            BlenderNodeAnim.set_interpolation(animation.samplers[channel.sampler].interpolation, kf)
+                    group_name = "Location"
+                    num_components = 3
+                    values = [loc_gltf_to_blender(vals) for vals in values]
 
                 elif channel.target.path == "rotation":
                     blender_path = "rotation_quaternion"
-                    for idx, key in enumerate(keys):
-                        if animation.samplers[channel.sampler].interpolation == "CUBICSPLINE":
-                            # TODO manage tangent?
-                            vals = values[idx * 3 + 1]
-                        else:
-                            vals = values[idx]
+                    group_name = "Rotation"
+                    num_components = 4
+                    if node.correction_needed is True:
+                        values = [
+                            (quaternion_gltf_to_blender(vals).to_matrix().to_4x4() @ correction_rotation()).to_quaternion()
+                            for vals in values
+                        ]
+                    else:
+                        values = [quaternion_gltf_to_blender(vals) for vals in values]
 
-                        if node.correction_needed is True:
-                            obj.rotation_quaternion = (quaternion_gltf_to_blender(vals).to_matrix().to_4x4() @ correction_rotation()).to_quaternion()
-                        else:
-                            obj.rotation_quaternion = quaternion_gltf_to_blender(vals)
 
-                        obj.keyframe_insert(blender_path, frame=key[0] * fps, group='rotation')
-
-                    # Setting interpolation
-                    for fcurve in [curve for curve in obj.animation_data.action.fcurves
-                                   if curve.group.name == "rotation"]:
-                        for kf in fcurve.keyframe_points:
-                            BlenderNodeAnim.set_interpolation(animation.samplers[channel.sampler].interpolation, kf)
+                    # Manage antipodal quaternions
+                    for i in range(1, len(values)):
+                        if values[i].dot(values[i-1]) < 0:
+                            values[i] = -values[i]
 
                 elif channel.target.path == "scale":
                     blender_path = "scale"
-                    for idx, key in enumerate(keys):
-                        # TODO manage tangent?
-                        if animation.samplers[channel.sampler].interpolation == "CUBICSPLINE":
-                            obj.scale = Vector(scale_gltf_to_blender(list(values[idx * 3 + 1])))
-                        else:
-                            obj.scale = Vector(scale_gltf_to_blender(list(values[idx])))
-                        obj.keyframe_insert(blender_path, frame=key[0] * fps, group='scale')
+                    group_name = "Scale"
+                    num_components = 3
+                    values = [scale_gltf_to_blender(vals) for vals in values]
+
+                coords = [0] * (2 * len(keys))
+                coords[::2] = (key[0] * fps for key in keys)
+
+                if group_name not in action.groups:
+                    action.groups.new(group_name)
+                group = action.groups[group_name]
+
+                for i in range(0, num_components):
+                    fcurve = action.fcurves.new(data_path=blender_path, index=i)
+                    fcurve.group = group
+
+                    fcurve.keyframe_points.add(len(keys))
+                    coords[1::2] = (vals[i] for vals in values)
+                    fcurve.keyframe_points.foreach_set('co', coords)
 
                     # Setting interpolation
-                    for fcurve in [curve for curve in obj.animation_data.action.fcurves if curve.group.name == "scale"]:
-                        for kf in fcurve.keyframe_points:
-                            BlenderNodeAnim.set_interpolation(animation.samplers[channel.sampler].interpolation, kf)
+                    for kf in fcurve.keyframe_points:
+                        BlenderNodeAnim.set_interpolation(animation.samplers[channel.sampler].interpolation, kf)
+                    fcurve.update() # force updating tangents (this may change when tangent will be managed)
 
             elif channel.target.path == 'weights':
 
@@ -140,10 +143,14 @@ class BlenderNodeAnim():
 
                 for idx, key in enumerate(keys):
                     for sk in range(nb_targets):
-                        obj.data.shape_keys.key_blocks[sk + 1].value = values[idx * nb_targets + sk][0]
-                        obj.data.shape_keys.key_blocks[sk + 1].keyframe_insert(
-                            "value",
-                            frame=key[0] * fps,
-                            group='ShapeKeys'
-                        )
+                        if gltf.shapekeys[sk] is not None: # Do not animate shapekeys not created
+                            obj.data.shape_keys.key_blocks[gltf.shapekeys[sk]].value = values[idx * nb_targets + sk][0]
+                            obj.data.shape_keys.key_blocks[gltf.shapekeys[sk]].keyframe_insert(
+                                "value",
+                                frame=key[0] * fps,
+                                group='ShapeKeys'
+                            )
+
+        if action.name not in gltf.current_animation_names.keys():
+            gltf.current_animation_names[name] = action.name
 

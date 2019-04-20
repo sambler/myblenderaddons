@@ -14,6 +14,7 @@
 
 import bpy
 from .gltf2_blender_texture import BlenderTextureInfo
+from ..com.gltf2_blender_conversion import texture_transform_gltf_to_blender
 
 
 class BlenderKHR_materials_pbrSpecularGlossiness():
@@ -86,14 +87,17 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
                 math_vc_B = node_tree.nodes.new('ShaderNodeMath')
                 math_vc_B.operation = 'MULTIPLY'
 
-            BlenderTextureInfo.create(gltf, pbrSG['diffuseTexture']['index'])
+            BlenderTextureInfo.create(gltf, pbrSG['diffuseTexture'], dict_=True)
 
             # create UV Map / Mapping / Texture nodes / separate & math and combine
             text_node = node_tree.nodes.new('ShaderNodeTexImage')
-            text_node.image = \
-                bpy.data.images[
-                    gltf.data.images[gltf.data.textures[pbrSG['diffuseTexture']['index']].source].blender_image_name
-                ]
+            if gltf.data.images[
+                gltf.data.textures[pbrSG['diffuseTexture']['index']].source].blender_image_name is not None:
+                text_node.image = \
+                    bpy.data.images[
+                        gltf.data.images[
+                            gltf.data.textures[pbrSG['diffuseTexture']['index']].source].blender_image_name
+                    ]
             text_node.location = -1000, 500
 
             combine = node_tree.nodes.new('ShaderNodeCombineRGB')
@@ -119,6 +123,13 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
 
             mapping = node_tree.nodes.new('ShaderNodeMapping')
             mapping.location = -1500, 500
+            mapping.vector_type = 'POINT'
+            tex_transform = text_node.image['tex_transform'][str(pbrSG['diffuseTexture']['index'])]
+            mapping.translation[0] = texture_transform_gltf_to_blender(tex_transform)['offset'][0]
+            mapping.translation[1] = texture_transform_gltf_to_blender(tex_transform)['offset'][1]
+            mapping.rotation[2] = texture_transform_gltf_to_blender(tex_transform)['rotation']
+            mapping.scale[0] = texture_transform_gltf_to_blender(tex_transform)['scale'][0]
+            mapping.scale[1] = texture_transform_gltf_to_blender(tex_transform)['scale'][1]
 
             uvmap = node_tree.nodes.new('ShaderNodeUVMap')
             uvmap.location = -2000, 500
@@ -159,7 +170,7 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
 
         elif pbrSG['diffuse_type'] == gltf.TEXTURE:
 
-            BlenderTextureInfo.create(gltf, pbrSG['diffuseTexture']['index'])
+            BlenderTextureInfo.create(gltf, pbrSG['diffuseTexture'], dict_=True)
 
             # TODO alpha ?
             if vertex_color:
@@ -191,9 +202,11 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
 
             # create UV Map / Mapping / Texture nodes / separate & math and combine
             text_node = node_tree.nodes.new('ShaderNodeTexImage')
-            text_node.image = bpy.data.images[
-                gltf.data.images[gltf.data.textures[pbrSG['diffuseTexture']['index']].source].blender_image_name
-            ]
+            if gltf.data.images[
+                gltf.data.textures[pbrSG['diffuseTexture']['index']].source].blender_image_name is not None:
+                text_node.image = bpy.data.images[
+                    gltf.data.images[gltf.data.textures[pbrSG['diffuseTexture']['index']].source].blender_image_name
+                ]
             if vertex_color:
                 text_node.location = -2000, 500
             else:
@@ -204,6 +217,13 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
                 mapping.location = -2500, 500
             else:
                 mapping.location = -1500, 500
+            mapping.vector_type = 'POINT'
+            tex_transform = text_node.image['tex_transform'][str(pbrSG['diffuseTexture']['index'])]
+            mapping.translation[0] = texture_transform_gltf_to_blender(tex_transform)['offset'][0]
+            mapping.translation[1] = texture_transform_gltf_to_blender(tex_transform)['offset'][1]
+            mapping.rotation[2] = texture_transform_gltf_to_blender(tex_transform)['rotation']
+            mapping.scale[0] = texture_transform_gltf_to_blender(tex_transform)['scale'][0]
+            mapping.scale[1] = texture_transform_gltf_to_blender(tex_transform)['scale'][1]
 
             uvmap = node_tree.nodes.new('ShaderNodeUVMap')
             if vertex_color:
@@ -255,18 +275,28 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
             node_tree.links.new(glossy.inputs[0], combine.outputs[0])
 
         elif pbrSG['specgloss_type'] == gltf.TEXTURE:
-            BlenderTextureInfo.create(gltf, pbrSG['specularGlossinessTexture']['index'])
+            BlenderTextureInfo.create(gltf, pbrSG['specularGlossinessTexture'], dict_=True)
             spec_text = node_tree.nodes.new('ShaderNodeTexImage')
-            spec_text.image = bpy.data.images[
-                gltf.data.images[
-                    gltf.data.textures[pbrSG['specularGlossinessTexture']['index']].source
-                ].blender_image_name
-            ]
+            if gltf.data.images[
+                gltf.data.textures[pbrSG['specularGlossinessTexture']['index']].source
+            ].blender_image_name is not None:
+                spec_text.image = bpy.data.images[
+                    gltf.data.images[
+                        gltf.data.textures[pbrSG['specularGlossinessTexture']['index']].source
+                    ].blender_image_name
+                ]
             spec_text.color_space = 'NONE'
             spec_text.location = -500, 0
 
             spec_mapping = node_tree.nodes.new('ShaderNodeMapping')
             spec_mapping.location = -1000, 0
+            spec_mapping.vector_type = 'POINT'
+            tex_transform = spec_text.image['tex_transform'][str(pbrSG['specularGlossinessTexture']['index'])]
+            spec_mapping.translation[0] = texture_transform_gltf_to_blender(tex_transform)['offset'][0]
+            spec_mapping.translation[1] = texture_transform_gltf_to_blender(tex_transform)['offset'][1]
+            spec_mapping.rotation[2] = texture_transform_gltf_to_blender(tex_transform)['rotation']
+            spec_mapping.scale[0] = texture_transform_gltf_to_blender(tex_transform)['scale'][0]
+            spec_mapping.scale[1] = texture_transform_gltf_to_blender(tex_transform)['scale'][1]
 
             spec_uvmap = node_tree.nodes.new('ShaderNodeUVMap')
             spec_uvmap.location = -1500, 0
@@ -284,13 +314,15 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
             node_tree.links.new(spec_text.inputs[0], spec_mapping.outputs[0])
 
         elif pbrSG['specgloss_type'] == gltf.TEXTURE_FACTOR:
-
-            BlenderTextureInfo.create(gltf, pbrSG['specularGlossinessTexture']['index'])
+            BlenderTextureInfo.create(gltf, pbrSG['specularGlossinessTexture'], dict_=True)
 
             spec_text = node_tree.nodes.new('ShaderNodeTexImage')
-            spec_text.image = bpy.data.images[gltf.data.images[
+            if gltf.data.images[
                 gltf.data.textures[pbrSG['specularGlossinessTexture']['index']].source
-            ].blender_image_name]
+            ].blender_image_name is not None:
+                spec_text.image = bpy.data.images[gltf.data.images[
+                    gltf.data.textures[pbrSG['specularGlossinessTexture']['index']].source
+                ].blender_image_name]
             spec_text.color_space = 'NONE'
             spec_text.location = -1000, 0
 
@@ -301,6 +333,14 @@ class BlenderKHR_materials_pbrSpecularGlossiness():
 
             spec_mapping = node_tree.nodes.new('ShaderNodeMapping')
             spec_mapping.location = -1000, 0
+            spec_mapping.vector_type = 'POINT'
+            tex_transform = spec_text.image['tex_transform'][str(pbrSG['specularGlossinessTexture']['index'])]
+            spec_mapping.translation[0] = texture_transform_gltf_to_blender(tex_transform)['offset'][0]
+            spec_mapping.translation[1] = texture_transform_gltf_to_blender(tex_transform)['offset'][1]
+            spec_mapping.rotation[2] = texture_transform_gltf_to_blender(tex_transform)['rotation']
+            spec_mapping.scale[0] = texture_transform_gltf_to_blender(tex_transform)['scale'][0]
+            spec_mapping.scale[1] = texture_transform_gltf_to_blender(tex_transform)['scale'][1]
+
 
             spec_uvmap = node_tree.nodes.new('ShaderNodeUVMap')
             spec_uvmap.location = -1500, 0

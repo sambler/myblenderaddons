@@ -1579,9 +1579,9 @@ class ARCHIPACK_PT_window(Panel):
 
         row = layout.row(align=True)
         if prop.display_detail:
-            row.prop(prop, "display_detail", icon="TRIA_DOWN", icon_only=True, text="Components", emboss=False)
+            row.prop(prop, "display_detail", icon="TRIA_DOWN", text="Components", emboss=False)
         else:
-            row.prop(prop, "display_detail", icon="TRIA_RIGHT", icon_only=True, text="Components", emboss=False)
+            row.prop(prop, "display_detail", icon="TRIA_RIGHT", text="Components", emboss=False)
 
         if prop.display_detail:
             box = layout.box()
@@ -1629,9 +1629,9 @@ class ARCHIPACK_PT_window(Panel):
         if prop.window_shape != 'CIRCLE':
             row = layout.row()
             if prop.display_panels:
-                row.prop(prop, "display_panels", icon="TRIA_DOWN", icon_only=True, text="Rows", emboss=False)
+                row.prop(prop, "display_panels", icon="TRIA_DOWN", text="Rows", emboss=False)
             else:
-                row.prop(prop, "display_panels", icon="TRIA_RIGHT", icon_only=True, text="Rows", emboss=False)
+                row.prop(prop, "display_panels", icon="TRIA_RIGHT", text="Rows", emboss=False)
 
             if prop.display_panels:
                 if prop.window_type != 'RAIL':
@@ -1649,9 +1649,9 @@ class ARCHIPACK_PT_window(Panel):
 
         row = layout.row(align=True)
         if prop.display_materials:
-            row.prop(prop, "display_materials", icon="TRIA_DOWN", icon_only=True, text="Materials", emboss=False)
+            row.prop(prop, "display_materials", icon="TRIA_DOWN", text="Materials", emboss=False)
         else:
-            row.prop(prop, "display_materials", icon="TRIA_RIGHT", icon_only=True, text="Materials", emboss=False)
+            row.prop(prop, "display_materials", icon="TRIA_RIGHT", text="Materials", emboss=False)
         if prop.display_materials:
             box = layout.box()
             box.label(text="Hole")
@@ -1815,7 +1815,7 @@ class ARCHIPACK_OT_window(ArchipackCreateTool, Operator):
             if self.mode == 'CREATE':
                 bpy.ops.object.select_all(action="DESELECT")
                 o = self.create(context)
-                o.location = bpy.context.scene.cursor_location
+                o.location = bpy.context.scene.cursor.location
                 o.select_set(state=True)
                 context.view_layer.objects.active = o
                 self.manipulate()
@@ -1939,10 +1939,12 @@ class ARCHIPACK_OT_window_draw(ArchipackDrawTool, Operator):
 
             if event.type in {'LEFTMOUSE', 'RET', 'NUMPAD_ENTER', 'SPACE'}:
                 if wall is not None:
+                    o.select_set(state=True)
                     context.view_layer.objects.active = wall
                     wall.select_set(state=True)
                     if bpy.ops.archipack.single_boolean.poll():
                         bpy.ops.archipack.single_boolean()
+
                     wall.select_set(state=False)
                     # o must be a window here
                     if d is not None:

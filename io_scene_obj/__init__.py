@@ -21,7 +21,7 @@
 bl_info = {
     "name": "Wavefront OBJ format",
     "author": "Campbell Barton, Bastien Montagne",
-    "version": (3, 5, 2),
+    "version": (3, 5, 6),
     "blender": (2, 80, 0),
     "location": "File > Import-Export",
     "description": "Import-Export OBJ, Import OBJ mesh, UV's, materials and textures",
@@ -86,7 +86,7 @@ class ImportOBJ(bpy.types.Operator, ImportHelper):
     use_split_groups: BoolProperty(
             name="Group",
             description="Import OBJ Groups into Blender Objects",
-            default=True,
+            default=False,
             )
 
     use_groups_as_vgroups: BoolProperty(
@@ -203,11 +203,12 @@ class ExportOBJ(bpy.types.Operator, ExportHelper):
             description="Apply modifiers",
             default=True,
             )
-    use_mesh_modifiers_render: BoolProperty(
-            name="Use Modifiers Render Settings",
-            description="Use render settings when applying modifiers to mesh objects",
-            default=False,
-            )
+    # Non working in Blender 2.8 currently.
+    # ~ use_mesh_modifiers_render: BoolProperty(
+            # ~ name="Use Modifiers Render Settings",
+            # ~ description="Use render settings when applying modifiers to mesh objects",
+            # ~ default=False,
+            # ~ )
 
     # extra data group
     use_edges: BoolProperty(

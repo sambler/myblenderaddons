@@ -395,7 +395,7 @@ class Do:
             b[i].handle_left_type = 'AUTO'
             b[i].handle_right_type = 'AUTO'
 
-        vc = self.proj(en.center)
+        vc = Vector(en.center)
         clockwise = Matrix(((0, -1, 0), (1, 0, 0), (0, 0, 1)))
 
         r = major
@@ -404,10 +404,10 @@ class Do:
         r = r * en.radius
 
         try:
-            b[0].co = vc + r
-            b[1].co = vc + r @ clockwise
-            b[2].co = vc + r @ clockwise @ clockwise
-            b[3].co = vc + r @ clockwise @ clockwise @ clockwise
+            b[0].co = self.proj(vc + r)
+            b[1].co = self.proj(vc + r @ clockwise)
+            b[2].co = self.proj(vc + r @ clockwise @ clockwise)
+            b[3].co = self.proj(vc + r @ clockwise @ clockwise @ clockwise)
         except:
             print("Circle center: ", vc, "radius: ", r)
             raise
@@ -1410,7 +1410,7 @@ class Do:
         for o in (o for o in scene.objects if "BEVEL" not in o.name and "TAPER" not in o.name
                   and o not in self.objects_before and o.parent is None):
             o.location = o.location - center
-            o.select = True
+            o.select_set(True)
 
         if not self.did_group_instance:
             bpy.ops.object.origin_set(type='ORIGIN_CURSOR')

@@ -449,7 +449,7 @@ def update_t_part(self, context):
                 if o.parent is None:
                     # create a reference point and make it active
                     x, y, z = w.bound_box[0]
-                    context.scene.cursor_location = w.matrix_world @ Vector((x, y, z))
+                    context.scene.cursor.location = w.matrix_world @ Vector((x, y, z))
                     # fix issue #9
                     context.view_layer.objects.active = o
                     bpy.ops.archipack.reference_point()
@@ -738,9 +738,9 @@ class archipack_wall2_part(PropertyGroup):
 
         row = layout.row(align=True)
         if self.expand:
-            row.prop(self, 'expand', icon="TRIA_DOWN", icon_only=True, text="Part " + str(index + 1), emboss=False)
+            row.prop(self, 'expand', icon="TRIA_DOWN", text="Part " + str(index + 1), emboss=False)
         else:
-            row.prop(self, 'expand', icon="TRIA_RIGHT", icon_only=True, text="Part " + str(index + 1), emboss=False)
+            row.prop(self, 'expand', icon="TRIA_RIGHT", text="Part " + str(index + 1), emboss=False)
 
         row.prop(self, "type", text="")
 
@@ -1781,7 +1781,7 @@ class ARCHIPACK_OT_wall2(ArchipackCreateTool, Operator):
         if context.mode == "OBJECT":
             bpy.ops.object.select_all(action="DESELECT")
             o = self.create(context)
-            o.location = bpy.context.scene.cursor_location
+            o.location = bpy.context.scene.cursor.location
             o.select_set(state=True)
             context.view_layer.objects.active = o
             self.manipulate()
@@ -1886,7 +1886,7 @@ class ARCHIPACK_OT_wall2_from_slab(Operator):
         # parenting childs to wall reference point
         if o.parent is None:
             x, y, z = o.bound_box[0]
-            context.scene.cursor_location = o.matrix_world @ Vector((x, y, z))
+            context.scene.cursor.location = o.matrix_world @ Vector((x, y, z))
             # fix issue #9
             context.view_layer.objects.active = o
             bpy.ops.archipack.reference_point()

@@ -1670,13 +1670,13 @@ class ARCHIPACK_PT_floor(Panel):
         box = layout.box()
         row = box.row()
         if props.parts_expand:
-            row.prop(props, 'parts_expand', icon="TRIA_DOWN", icon_only=True, text="Parts", emboss=False)
+            row.prop(props, 'parts_expand', icon="TRIA_DOWN", text="Parts", emboss=False)
             box.prop(props, 'n_parts')
             # box.prop(prop, 'closed')
             for i, part in enumerate(props.parts):
                 part.draw(context, layout, i)
         else:
-            row.prop(props, 'parts_expand', icon="TRIA_RIGHT", icon_only=True, text="Parts", emboss=False)
+            row.prop(props, 'parts_expand', icon="TRIA_RIGHT", text="Parts", emboss=False)
         layout.separator()
         box = layout.box()
         box.prop(props, 'pattern', text="")
@@ -1830,7 +1830,7 @@ class ARCHIPACK_OT_floor(ArchipackCreateTool, Operator):
         if context.mode == "OBJECT":
             bpy.ops.object.select_all(action="DESELECT")
             o = self.create(context)
-            o.location = context.scene.cursor_location
+            o.location = context.scene.cursor.location
             # activate manipulators at creation time
             o.select_set(state=True)
             context.view_layer.objects.active = o
@@ -1978,7 +1978,7 @@ class ARCHIPACK_OT_floor_cutter(ArchipackCreateTool, Operator):
             pd = archipack_floor.datablock(parent)
             pd.boundary = o.name
         else:
-            o.location = context.scene.cursor_location
+            o.location = context.scene.cursor.location
         # make manipulators selectable
         d.manipulable_selectable = True
         self.link_object_to_scene(context, o)

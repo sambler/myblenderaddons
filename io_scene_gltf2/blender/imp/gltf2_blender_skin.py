@@ -36,7 +36,11 @@ class BlenderSkin():
 
         armature = bpy.data.armatures.new(name)
         obj = bpy.data.objects.new(name, armature)
-        bpy.data.scenes[gltf.blender_scene].collection.objects.link(obj)
+        if gltf.blender_active_collection is not None:
+            bpy.data.collections[gltf.blender_active_collection].objects.link(obj)
+        else:
+            bpy.data.scenes[gltf.blender_scene].collection.objects.link(obj)
+            
         pyskin.blender_armature_name = obj.name
         if parent is not None:
             obj.parent = bpy.data.objects[gltf.data.nodes[parent].blender_object]
@@ -52,15 +56,18 @@ class BlenderSkin():
         # Set bone bind_pose by inverting bindpose matrix
         if node_id in pyskin.joints:
             index_in_skel = pyskin.joints.index(node_id)
-            inverse_bind_matrices = BinaryData.get_data_from_accessor(gltf, pyskin.inverse_bind_matrices)
-            # Needed to keep scale in matrix, as bone.matrix seems to drop it
-            if index_in_skel < len(inverse_bind_matrices):
-                pynode.blender_bone_matrix = matrix_gltf_to_blender(
-                    inverse_bind_matrices[index_in_skel]
-                ).inverted()
-                bone.matrix = pynode.blender_bone_matrix
+            if pyskin.inverse_bind_matrices is not None:
+                inverse_bind_matrices = BinaryData.get_data_from_accessor(gltf, pyskin.inverse_bind_matrices)
+                # Needed to keep scale in matrix, as bone.matrix seems to drop it
+                if index_in_skel < len(inverse_bind_matrices):
+                    pynode.blender_bone_matrix = matrix_gltf_to_blender(
+                        inverse_bind_matrices[index_in_skel]
+                    ).inverted()
+                    bone.matrix = pynode.blender_bone_matrix
+                else:
+                    gltf.log.error("Error with inverseBindMatrix for skin " + pyskin)
             else:
-                gltf.log.error("Error with inverseBindMatrix for skin " + pyskin)
+                pynode.blender_bone_matrix = Matrix() # 4x4 identity matrix
         else:
             print('No invBindMatrix for bone ' + str(node_id))
             pynode.blender_bone_matrix = Matrix()
@@ -150,8 +157,27 @@ class BlenderSkin():
                 idx_already_done = {}
 
                 if 'JOINTS_0' in prim.attributes.keys() and 'WEIGHTS_0' in prim.attributes.keys():
-                    joint_ = BinaryData.get_data_from_accessor(gltf, prim.attributes['JOINTS_0'])
-                    weight_ = BinaryData.get_data_from_accessor(gltf, prim.attributes['WEIGHTS_0'])
+                    original_joint_ = BinaryData.get_data_from_accessor(gltf, prim.attributes['JOINTS_0'])
+                    original_weight_ = BinaryData.get_data_from_accessor(gltf, prim.attributes['WEIGHTS_0'])
+
+                    tmp_indices = {}
+                    tmp_idx = 0
+                    weight_ = []
+                    for i in prim.tmp_indices:
+                        if i[0] not in tmp_indices.keys():
+                            tmp_indices[i[0]] = tmp_idx
+                            tmp_idx += 1
+                            weight_.append(original_weight_[i[0]])
+
+                    tmp_indices = {}
+                    tmp_idx = 0
+                    joint_ = []
+                    for i in prim.tmp_indices:
+                        if i[0] not in tmp_indices.keys():
+                            tmp_indices[i[0]] = tmp_idx
+                            tmp_idx += 1
+                            joint_.append(original_joint_[i[0]])
+
 
                     for poly in obj.data.polygons:
                         for loop_idx in range(poly.loop_start, poly.loop_start + poly.loop_total):

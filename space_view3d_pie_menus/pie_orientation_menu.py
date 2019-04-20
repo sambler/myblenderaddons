@@ -39,49 +39,22 @@ from bpy.props import (
         )
 
 
-class OrientPoll(Operator):
-    bl_idname = "pie.orientation"
-    bl_label = "Orientation Poll"
-    bl_options = {'INTERNAL'}
-
-    space: StringProperty()
-
-    @classmethod
-    def poll(cls, context):
-        return context.space_data.type == "VIEW_3D"
-
-    def execute(self, context):
-        context.scene.transform_orientation = self.space
-        return {'FINISHED'}
-
-
 class OrientPie(Menu):
     bl_label = "Transform Orientation"
-    bl_idname = "pie.orient"
+    bl_idname = "PIE_MT_orient"
 
     def draw(self, context):
         layout = self.layout
         pie = layout.menu_pie()
-        view = context.space_data
+        scene = context.scene
 
-        pie.operator("pie.orientation", text="Global").space = 'GLOBAL'
-        pie.operator("pie.orientation", text="Local").space = 'LOCAL'
-        pie.operator("pie.orientation", text="Gimbal").space = 'GIMBAL'
-
-        # XXX: Display only custom orientations
-        pie = pie.box()
-        pie.prop(view, "transform_orientation", text="")
-        pie = layout.menu_pie()
-
-        pie.operator("pie.orientation", text="Normal").space = 'NORMAL'
-        pie.operator("pie.orientation", text="View").space = 'VIEW'
+        pie.prop(scene.transform_orientation_slots[0], "type", expand=True)
 
 
 addon_keymaps = []
 
 classes = (
     OrientPie,
-    OrientPoll
     )
 
 
@@ -94,7 +67,7 @@ def register():
         # Manipulators
         km = wm.keyconfigs.addon.keymaps.new(name='3D View Generic', space_type='VIEW_3D')
         kmi = km.keymap_items.new('wm.call_menu_pie', 'SPACE', 'PRESS', alt=True)
-        kmi.properties.name = "pie.orient"
+        kmi.properties.name = "PIE_MT_orient"
         addon_keymaps.append((km, kmi))
 
 

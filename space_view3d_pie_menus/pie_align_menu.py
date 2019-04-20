@@ -40,7 +40,7 @@ from bpy.props import EnumProperty
 
 # Pie Align - Alt + X
 class PieAlign(Menu):
-    bl_idname = "pie.align"
+    bl_idname = "PIE_MT_align"
     bl_label = "Pie Align"
 
     def draw(self, context):
@@ -126,14 +126,13 @@ class AlignSelectedXYZ(Operator):
             }
         chosen_value = values[self.axis][0]
         constraint_value = values[self.axis][1]
-        for vert in bpy.context.object.data.vertices:
-            bpy.ops.transform.resize(
-                    value=chosen_value, constraint_axis=constraint_value,
-                    constraint_orientation='GLOBAL',
-                    mirror=False, proportional='DISABLED',
-                    proportional_edit_falloff='SMOOTH',
-                    proportional_size=1
-                    )
+        bpy.ops.transform.resize(
+                value=chosen_value, constraint_axis=constraint_value,
+                orient_type='GLOBAL',
+                mirror=False, proportional='DISABLED',
+                proportional_edit_falloff='SMOOTH',
+                proportional_size=1
+                )
         return {'FINISHED'}
 
 
@@ -254,7 +253,7 @@ def register():
         # Align
         km = wm.keyconfigs.addon.keymaps.new(name='Mesh')
         kmi = km.keymap_items.new('wm.call_menu_pie', 'X', 'PRESS', alt=True)
-        kmi.properties.name = "pie.align"
+        kmi.properties.name = "PIE_MT_align"
         addon_keymaps.append((km, kmi))
 
 

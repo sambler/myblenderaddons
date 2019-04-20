@@ -19,6 +19,7 @@ from .gltf2_blender_export_keys import NORMALS, MORPH_NORMAL, TANGENTS, MORPH_TA
 
 from io_scene_gltf2.blender.exp.gltf2_blender_gather_cache import cached
 from io_scene_gltf2.blender.exp import gltf2_blender_extract
+from io_scene_gltf2.blender.exp import gltf2_blender_gather_accessors
 from io_scene_gltf2.blender.exp import gltf2_blender_gather_primitive_attributes
 from io_scene_gltf2.blender.exp import gltf2_blender_utils
 from io_scene_gltf2.blender.exp import gltf2_blender_gather_materials
@@ -63,41 +64,41 @@ def gather_primitives(
 
 def __gather_materials(blender_primitive, blender_mesh, modifiers, export_settings):
     if not blender_primitive['material']:
-        # TODO: fix 'extract_promitives' so that the value of 'material' is None and not empty string
+        # TODO: fix 'extract_primitives' so that the value of 'material' is None and not empty string
         return None
+    mesh_double_sided = blender_mesh.show_double_sided
     material = bpy.data.materials[blender_primitive['material']]
-    return gltf2_blender_gather_materials.gather_material(material, export_settings)
+    return gltf2_blender_gather_materials.gather_material(material, mesh_double_sided, export_settings)
 
 
 def __gather_indices(blender_primitive, blender_mesh, modifiers, export_settings):
     indices = blender_primitive['indices']
 
+    # NOTE: Values used by some graphics APIs as "primitive restart" values are disallowed.
+    # Specifically, the values 65535 (in UINT16) and 4294967295 (in UINT32) cannot be used as indices.
+    # https://github.com/KhronosGroup/glTF/issues/1142
+    # https://github.com/KhronosGroup/glTF/pull/1476/files
+    # Also, UINT8 mode is not supported:
+    # https://github.com/KhronosGroup/glTF/issues/1471
     max_index = max(indices)
-    if max_index < (1 << 8):
-        component_type = gltf2_io_constants.ComponentType.UnsignedByte
-    elif max_index < (1 << 16):
+    if max_index < 65535:
         component_type = gltf2_io_constants.ComponentType.UnsignedShort
-    elif max_index < (1 << 32):
+    elif max_index < 4294967295:
         component_type = gltf2_io_constants.ComponentType.UnsignedInt
     else:
-        print_console('ERROR', 'Invalid max_index: ' + str(max_index))
+        print_console('ERROR', 'A mesh contains too many vertices (' + str(max_index) + ') and needs to be split before export.')
         return None
 
     element_type = gltf2_io_constants.DataType.Scalar
     binary_data = gltf2_io_binary_data.BinaryData.from_list(indices, component_type)
-    return gltf2_io.Accessor(
-        buffer_view=binary_data,
-        byte_offset=None,
-        component_type=component_type,
-        count=len(indices) // gltf2_io_constants.DataType.num_elements(element_type),
-        extensions=None,
-        extras=None,
-        max=None,
-        min=None,
-        name=None,
-        normalized=None,
-        sparse=None,
-        type=element_type
+    return gltf2_blender_gather_accessors.gather_accessor(
+        binary_data,
+        component_type,
+        len(indices) // gltf2_io_constants.DataType.num_elements(element_type),
+        None,
+        None,
+        element_type,
+        export_settings
     )
 
 

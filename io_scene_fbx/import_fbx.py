@@ -252,9 +252,9 @@ def elem_props_get_bool(elem, elem_prop_id, default=None):
     elem_prop = elem_props_find_first(elem, elem_prop_id)
     if elem_prop is not None:
         assert(elem_prop.props[0] == elem_prop_id)
-        assert(elem_prop.props[1] == b'bool')
+        # b'Bool' with a capital seems to be used for animated property... go figure...
+        assert(elem_prop.props[1] in {b'bool', b'Bool'})
         assert(elem_prop.props[2] == b'')
-        assert(elem_prop.props[3] == b'')
 
         # we could allow other number types
         assert(elem_prop.props_type[4] == data_types.INT32)
@@ -717,7 +717,7 @@ def blen_read_animations(fbx_tmpl_astack, fbx_tmpl_alayer, stacks, scene, anim_o
                     id_data = item.bl_obj
                     # XXX Ignore rigged mesh animations - those are a nightmare to handle, see note about it in
                     #     FbxImportHelperNode class definition.
-                    if id_data.type == 'MESH' and id_data.parent and id_data.parent.type == 'ARMATURE':
+                    if id_data and id_data.type == 'MESH' and id_data.parent and id_data.parent.type == 'ARMATURE':
                         continue
                 if id_data is None:
                     continue
@@ -1006,7 +1006,13 @@ def blen_read_geom_layer_uv(fbx_obj, mesh):
             fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, b'UV'))
             fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'UVIndex'))
 
-            uv_lay = mesh.uv_layers.new(name=fbx_layer_name)
+            # Always init our new layers with (0, 0) UVs.
+            uv_lay = mesh.uv_layers.new(name=fbx_layer_name, do_init=False)
+            if uv_lay is None:
+                print("Failed to add {%r %r} UVLayer to %r (probably too many of them?)"
+                      "" % (layer_id, fbx_layer_name, mesh.name))
+                continue
+
             blen_data = uv_lay.data
 
             # some valid files omit this data
@@ -1035,7 +1041,8 @@ def blen_read_geom_layer_color(fbx_obj, mesh):
             fbx_layer_data = elem_prop_first(elem_find_first(fbx_layer, b'Colors'))
             fbx_layer_index = elem_prop_first(elem_find_first(fbx_layer, b'ColorIndex'))
 
-            color_lay = mesh.vertex_colors.new(name=fbx_layer_name)
+            # Always init our new layers with full white opaque color.
+            color_lay = mesh.vertex_colors.new(name=fbx_layer_name, do_init=False)
             blen_data = color_lay.data
 
             # some valid files omit this data
@@ -1995,6 +2002,7 @@ class FbxImportHelperNode:
                         child.pre_matrix = self.bone_child_matrix
 
                     child_obj.matrix_basis = child.get_matrix()
+                child.link_skeleton_children(fbx_tmpl, settings, scene)
             return None
         else:
             obj = self.bl_obj

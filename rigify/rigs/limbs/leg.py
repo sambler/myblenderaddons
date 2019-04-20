@@ -1,16 +1,19 @@
 
-import bpy, re, math
+import bpy, math
 from ..widgets import create_foot_widget, create_ballsocket_widget, create_gear_widget
 from .ui import create_script
 from .limb_utils import *
 from mathutils import Vector
-from ...utils import copy_bone, flip_bone, put_bone, create_cube_widget
-from ...utils import strip_org, strip_mch, make_deformer_name, create_widget
+from ...utils import copy_bone, flip_bone, put_bone
+from ...utils import strip_org, strip_mch
 from ...utils import create_circle_widget, create_sphere_widget, create_line_widget
-from ...utils import MetarigError, make_mechanism_name, org
+from ...utils import MetarigError, make_mechanism_name
 from ...utils import create_limb_widget, connected_children_names
 from ...utils import align_bone_y_axis, align_bone_x_axis, align_bone_z_axis
+from ...rig_ui_template import UTILITIES_RIG_LEG, REGISTER_RIG_LEG
+from ...utils import ControlLayersOption
 from rna_prop_ui import rna_idprop_ui_prop_get
+from ...utils.mechanism import make_property
 from ..widgets import create_ikarrow_widget
 from math import trunc, pi
 
@@ -47,16 +50,6 @@ class Rig:
         self.rot_axis = params.rotation_axis
         self.auto_align_extremity = params.auto_align_extremity
 
-        # Assign values to tweak/FK layers props if opted by user
-        if params.tweak_extra_layers:
-            self.tweak_layers = list(params.tweak_layers)
-        else:
-            self.tweak_layers = None
-
-        if params.fk_extra_layers:
-            self.fk_layers = list(params.fk_layers)
-        else:
-            self.fk_layers = None
 
     def orient_org_bones(self):
 
@@ -156,14 +149,7 @@ class Rig:
 
         # pb[ mch ][ name ] = 0.0
         # prop = rna_idprop_ui_prop_get( pb[ mch ], name, create = True )
-        pb[main_parent][name] = 0.0
-        prop = rna_idprop_ui_prop_get(pb[main_parent], name, create=True)
-
-        prop["min"] = 0.0
-        prop["max"] = 1.0
-        prop["soft_min"] = 0.0
-        prop["soft_max"] = 1.0
-        prop["description"] = name
+        make_property(pb[main_parent], name, 0.0)
 
         drv = pb[mch].constraints[0].driver_add("influence").driver
 
@@ -293,8 +279,7 @@ class Rig:
 
             create_sphere_widget(self.obj, t, bone_transform_name=None)
 
-            if self.tweak_layers:
-                pb[t].bone.layers = self.tweak_layers
+        ControlLayersOption.TWEAK.assign(self.params, pb, tweaks['ctrl'])
 
         return tweaks
 
@@ -368,17 +353,11 @@ class Rig:
             name = 'rubber_tweak'
 
             if i == trunc( len( tweaks[1:-1] ) / 2 ):
-                pb[t][name] = 0.0
+                defval = 0.0
             else:
-                pb[t][name] = 1.0
+                defval = 1.0
 
-            prop = rna_idprop_ui_prop_get( pb[t], name, create=True )
-
-            prop["min"]         = 0.0
-            prop["max"]         = 2.0
-            prop["soft_min"]    = 0.0
-            prop["soft_max"]    = 1.0
-            prop["description"] = name
+            make_property(pb[t], name, defval, max=2.0, soft_max=1.0)
 
         for j,d in enumerate(def_bones[:-1]):
             drvs = {}
@@ -574,9 +553,7 @@ class Rig:
 
         create_circle_widget(self.obj, ctrls[2], radius=0.4, head_tail=0.0)
 
-        for c in ctrls:
-            if self.fk_layers:
-                pb[c].bone.layers = self.fk_layers
+        ControlLayersOption.FK.assign(self.params, pb, ctrls)
 
         return {'ctrl': ctrls, 'mch': mch}
 
@@ -595,13 +572,7 @@ class Rig:
         pb_parent = pb[parent]
 
         # Create ik/fk switch property
-        pb_parent['IK_FK'] = 0.0
-        prop = rna_idprop_ui_prop_get(pb_parent, 'IK_FK', create=True)
-        prop["min"] = 0.0
-        prop["max"] = 1.0
-        prop["soft_min"] = 0.0
-        prop["soft_max"] = 1.0
-        prop["description"] = 'IK/FK Switch'
+        prop = make_property(pb_parent, 'IK_FK', 0.0, description='IK/FK Switch')
 
         # Constrain org to IK and FK bones
         iks = [ik['ctrl']['limb']]
@@ -966,13 +937,7 @@ class Rig:
         pb_parent.lock_rotation = True, True, True
         pb_parent.lock_scale = True, True, True
 
-        pb_parent['IK_Stretch'] = 1.0
-        prop = rna_idprop_ui_prop_get(pb_parent, 'IK_Stretch', create=True)
-        prop["min"] = 0.0
-        prop["max"] = 1.0
-        prop["soft_min"] = 0.0
-        prop["soft_max"] = 1.0
-        prop["description"] = 'IK Stretch'
+        prop = make_property(pb_parent, 'IK_Stretch', 1.0, description='IK Stretch')
 
         # Add driver to limit scale constraint influence
         b = bones['ik']['mch_str']
@@ -1098,11 +1063,7 @@ class Rig:
         for prop in props:
 
             if prop == 'pole_vector':
-                owner[prop] = False
-                pole_prop = rna_idprop_ui_prop_get(owner, prop, create=True)
-                pole_prop["min"] = False
-                pole_prop["max"] = True
-                pole_prop["description"] = prop
+                make_property(owner, prop, False)
                 mch_ik = pb[bones['ik']['mch_ik']]
 
                 # ik target hide driver
@@ -1186,11 +1147,7 @@ class Rig:
 
             elif prop == 'IK_follow':
 
-                owner[prop] = True
-                rna_prop = rna_idprop_ui_prop_get(owner, prop, create=True)
-                rna_prop["min"] = False
-                rna_prop["max"] = True
-                rna_prop["description"] = prop
+                make_property(owner, prop, True)
 
                 drv = ctrl.constraints[0].driver_add("mute").driver
                 drv.type = 'AVERAGE'
@@ -1264,13 +1221,7 @@ class Rig:
 
             elif prop == 'root/parent':
                 if len(ctrl.constraints) > 1:
-                    owner[prop] = 0.0
-                    rna_prop = rna_idprop_ui_prop_get(owner, prop, create=True)
-                    rna_prop["min"] = 0.0
-                    rna_prop["max"] = 1.0
-                    rna_prop["soft_min"] = 0.0
-                    rna_prop["soft_max"] = 1.0
-                    rna_prop["description"] = prop
+                    make_property(owner, prop, 0.0)
 
                     drv = ctrl.constraints[1].driver_add("influence").driver
                     drv.type = 'AVERAGE'
@@ -1284,13 +1235,7 @@ class Rig:
 
             elif prop == 'pole_follow':
                 if len(ctrl_pole.constraints) > 1:
-                    owner[prop] = 0.0
-                    rna_prop = rna_idprop_ui_prop_get(owner, prop, create=True)
-                    rna_prop["min"] = 0.0
-                    rna_prop["max"] = 1.0
-                    rna_prop["soft_min"] = 0.0
-                    rna_prop["soft_max"] = 1.0
-                    rna_prop["description"] = prop
+                    make_property(owner, prop, 0.0)
 
                     drv = ctrl_pole.constraints[1].driver_add("influence").driver
                     drv.type = 'AVERAGE'
@@ -1390,7 +1335,12 @@ class Rig:
         script += extra_script % (controls_string, bones['main_parent'], 'IK_follow',
                                   'pole_follow', 'pole_follow', 'root/parent', 'root/parent')
 
-        return [script]
+        return {
+            'script': [script],
+            'utilities': UTILITIES_RIG_LEG,
+            'register': REGISTER_RIG_LEG,
+            'noparent_bones': [bones['ik']['mch_foot'][i] for i in [0,1]],
+        }
 
 
 def add_parameters(params):
@@ -1431,30 +1381,8 @@ def add_parameters(params):
     )
 
     # Setting up extra layers for the FK and tweak
-    params.tweak_extra_layers = bpy.props.BoolProperty(
-        name        = "tweak_extra_layers",
-        default     = True,
-        description = ""
-        )
-
-    params.tweak_layers = bpy.props.BoolVectorProperty(
-        size        = 32,
-        description = "Layers for the tweak controls to be on",
-        default     = tuple( [ i == 1 for i in range(0, 32) ] )
-        )
-
-    # Setting up extra layers for the FK and tweak
-    params.fk_extra_layers = bpy.props.BoolProperty(
-        name        = "fk_extra_layers",
-        default     = True,
-        description = ""
-        )
-
-    params.fk_layers = bpy.props.BoolVectorProperty(
-        size        = 32,
-        description = "Layers for the FK controls to be on",
-        default     = tuple( [ i == 1 for i in range(0, 32) ] )
-        )
+    ControlLayersOption.FK.add_parameters(params)
+    ControlLayersOption.TWEAK.add_parameters(params)
 
 
 def parameters_ui(layout, params):
@@ -1474,46 +1402,8 @@ def parameters_ui(layout, params):
     r = layout.row()
     r.prop(params, "bbones")
 
-    bone_layers = bpy.context.active_pose_bone.bone.layers[:]
-
-    for layer in ['fk', 'tweak']:
-        r = layout.row()
-        r.prop(params, layer + "_extra_layers")
-        r.active = params.tweak_extra_layers
-
-        col = r.column(align=True)
-        row = col.row(align=True)
-
-        for i in range(8):
-            icon = "NONE"
-            if bone_layers[i]:
-                icon = "LAYER_ACTIVE"
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
-
-        row = col.row(align=True)
-
-        for i in range(16, 24):
-            icon = "NONE"
-            if bone_layers[i]:
-                icon = "LAYER_ACTIVE"
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
-
-        col = r.column(align=True)
-        row = col.row(align=True)
-
-        for i in range(8, 16):
-            icon = "NONE"
-            if bone_layers[i]:
-                icon = "LAYER_ACTIVE"
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
-
-        row = col.row(align=True)
-
-        for i in range(24, 32):
-            icon = "NONE"
-            if bone_layers[i]:
-                icon = "LAYER_ACTIVE"
-            row.prop(params, layer + "_layers", index=i, toggle=True, text="", icon=icon)
+    ControlLayersOption.FK.parameters_ui(layout, params)
+    ControlLayersOption.TWEAK.parameters_ui(layout, params)
 
 
 def create_sample(obj):

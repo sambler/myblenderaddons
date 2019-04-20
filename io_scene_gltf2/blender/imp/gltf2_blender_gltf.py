@@ -25,11 +25,17 @@ class BlenderGlTF():
     @staticmethod
     def create(gltf):
         """Create glTF main method."""
-        bpy.context.scene.render.engine = 'BLENDER_EEVEE'
+        if bpy.context.scene.render.engine not in ['CYCLES', 'BLENDER_EEVEE']:
+            bpy.context.scene.render.engine = 'BLENDER_EEVEE'
         BlenderGlTF.pre_compute(gltf)
 
-        for scene_idx, scene in enumerate(gltf.data.scenes):
-            BlenderScene.create(gltf, scene_idx)
+        if gltf.data.scenes is not None:
+            for scene_idx, scene in enumerate(gltf.data.scenes):
+                BlenderScene.create(gltf, scene_idx)
+        else:
+            # special case where there is no scene in glTF file
+            # generate all objects in current scene
+            BlenderScene.create(gltf, None)
 
         # Armature correction
         # Try to detect bone chains, and set bone lengths
@@ -43,6 +49,9 @@ class BlenderGlTF():
 
         threshold = 0.001
         for armobj in [obj for obj in bpy.data.objects if obj.type == "ARMATURE"]:
+            # Take into account only armature from this scene
+            if armobj.name not in bpy.context.view_layer.objects:
+                continue
             bpy.context.view_layer.objects.active = armobj
             armature = armobj.data
             bpy.ops.object.mode_set(mode="EDIT")
@@ -80,6 +89,10 @@ class BlenderGlTF():
         # Check if there is animation on object
         # Init is to False, and will be set to True during creation
         gltf.animation_object = False
+
+        # Store shapekeys equivalent between target & shapekey index
+        # For example when no POSITION on target
+        gltf.shapekeys = {}
 
         # Blender material
         if gltf.data.materials:
@@ -156,11 +169,19 @@ class BlenderGlTF():
                     if 'glossinessFactor' not in material.extensions['KHR_materials_pbrSpecularGlossiness'].keys():
                         material.extensions['KHR_materials_pbrSpecularGlossiness']['glossinessFactor'] = 1.0
 
+        # images
+        if gltf.data.images is not None:
+            for img in gltf.data.images:
+                img.blender_image_name = None
+
         if gltf.data.nodes is None:
             # Something is wrong in file, there is no nodes
             return
 
         for node_idx, node in enumerate(gltf.data.nodes):
+
+            # Weight animation management
+            node.weight_animation = False
 
             # skin management
             if node.skin is not None and node.mesh is not None:
@@ -193,6 +214,7 @@ class BlenderGlTF():
 
             node.transform = mat
 
+
         # joint management
         for node_idx, node in enumerate(gltf.data.nodes):
             is_joint, skin_idx = gltf.is_node_joint(node_idx)
@@ -220,9 +242,13 @@ class BlenderGlTF():
                     if anim_idx not in gltf.data.nodes[channel.target.node].animations.keys():
                         gltf.data.nodes[channel.target.node].animations[anim_idx] = []
                     gltf.data.nodes[channel.target.node].animations[anim_idx].append(channel_idx)
+                    # Manage node with animation on weights, that are animated in meshes in Blender (ShapeKeys)
+                    if channel.target.path == "weights":
+                        gltf.data.nodes[channel.target.node].weight_animation = True
 
         # Meshes
         if gltf.data.meshes:
             for mesh in gltf.data.meshes:
                 mesh.blender_name = None
+                mesh.is_weight_animated = False
 

@@ -12,40 +12,55 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#
-# Imports
-#
-
-import os
-import bpy
-from bpy_extras.io_utils import ImportHelper, ExportHelper
-from bpy.types import Operator, AddonPreferences
-
-from .io.com.gltf2_io_debug import Log
-
-from bpy.props import (CollectionProperty,
-                       StringProperty,
-                       BoolProperty,
-                       EnumProperty,
-                       FloatProperty,
-                       IntProperty)
-
-#
-# Globals
-#
-
 bl_info = {
     'name': 'glTF 2.0 format',
-    'author': 'Julien Duroure, Norbert Nopper, Urs Hanselmann Moritz Becher, Benjamin Schmithüsen',
-    "version": (0, 0, 1),
+    'author': 'Julien Duroure, Norbert Nopper, Urs Hanselmann, Moritz Becher, Benjamin Schmithüsen, Jim Eckerlein, and many external contributors',
+    "version": (0, 9, 2),
     'blender': (2, 80, 0),
     'location': 'File > Import-Export',
     'description': 'Import-Export as glTF 2.0',
     'warning': '',
-    'wiki_url': "https://github.com/KhronosGroup/glTF-Blender-IO",
+    'wiki_url': "https://docs.blender.org/manual/en/dev/addons/io_gltf2.html",
     'tracker_url': "https://github.com/KhronosGroup/glTF-Blender-IO/issues/",
     'support': 'OFFICIAL',
-    'category': 'Import-Export'}
+    'category': 'Import-Export',
+}
+
+def get_version_string():
+    return str(bl_info['version'][0]) + '.' + str(bl_info['version'][1]) + '.' + str(bl_info['version'][2])
+
+#
+# Script reloading (if the user calls 'Reload Scripts' from Blender)
+#
+
+def reload_package(module_dict_main):
+    import importlib
+    from pathlib import Path
+
+    def reload_package_recursive(current_dir, module_dict):
+        for path in current_dir.iterdir():
+            if "__init__" in str(path) or path.stem not in module_dict:
+                continue
+
+            if path.is_file() and path.suffix == ".py":
+                importlib.reload(module_dict[path.stem])
+            elif path.is_dir():
+                reload_package_recursive(path, module_dict[path.stem].__dict__)
+
+    reload_package_recursive(Path(__file__).parent, module_dict_main)
+
+
+if "bpy" in locals():
+    reload_package(locals())
+
+import bpy
+from bpy.props import (StringProperty,
+                       BoolProperty,
+                       EnumProperty,
+                       IntProperty)
+from bpy.types import Operator
+from bpy_extras.io_utils import ImportHelper, ExportHelper
+from io_scene_gltf2.io.exp import gltf2_io_draco_compression_extension
 
 
 #
@@ -54,8 +69,10 @@ bl_info = {
 
 
 class ExportGLTF2_Base:
-
     # TODO: refactor to avoid boilerplate
+
+    def __init__(self):
+        self.is_draco_available = gltf2_io_draco_compression_extension.dll_exists()
 
     bl_options = {'UNDO', 'PRESET'}
 
@@ -81,7 +98,6 @@ class ExportGLTF2_Base:
         items=(('GENERAL', "General", "General settings"),
                ('MESHES', "Meshes", "Mesh settings"),
                ('OBJECTS', "Objects", "Object settings"),
-               ('MATERIALS', "Materials", "Material settings"),
                ('ANIMATION', "Animation", "Animation settings")),
         name="ui_tab",
         description="Export setting categories",
@@ -91,6 +107,22 @@ class ExportGLTF2_Base:
         name='Copyright',
         description='Legal rights and conditions for the model',
         default=''
+    )
+
+    export_image_format: EnumProperty(
+        name='Images',
+        items=(('NAME', 'Automatic',
+                'Determine the image format from the blender image name'),
+                ('JPEG', 'JPEG Format (.jpg)',
+                'Encode and save textures as .jpg files. Be aware of a possible loss in quality'),
+               ('PNG', 'PNG Format (.png)',
+                'Encode and save textures as .png files')
+               ),
+        description=(
+            'Output format for images. PNG is lossless and generally preferred, but JPEG might be preferable for web '
+            'applications due to the smaller file size'
+        ),
+        default='NAME'
     )
 
     export_texcoords: BoolProperty(
@@ -103,6 +135,44 @@ class ExportGLTF2_Base:
         name='Normals',
         description='Export vertex normals with meshes',
         default=True
+    )
+
+    export_draco_mesh_compression_enable: BoolProperty(
+        name='Draco mesh compression',
+        description='Compress mesh using Draco',
+        default=False
+    )
+
+    export_draco_mesh_compression_level: IntProperty(
+        name='Compression level',
+        description='Compression level (0 = most speed, 6 = most compression, higher values currently not supported)',
+        default=6,
+        min=0,
+        max=6
+    )
+
+    export_draco_position_quantization: IntProperty(
+        name='Position quantization bits',
+        description='Quantization bits for position values (0 = no quantization)',
+        default=14,
+        min=0,
+        max=30
+    )
+
+    export_draco_normal_quantization: IntProperty(
+        name='Normal quantization bits',
+        description='Quantization bits for normal values (0 = no quantization)',
+        default=10,
+        min=0,
+        max=30
+    )
+
+    export_draco_texcoord_quantization: IntProperty(
+        name='Texcoord quantization bits',
+        description='Quantization bits for texture coordinate values (0 = no quantization)',
+        default=12,
+        min=0,
+        max=30
     )
 
     export_tangents: BoolProperty(
@@ -155,7 +225,7 @@ class ExportGLTF2_Base:
 
     export_apply: BoolProperty(
         name='Apply Modifiers',
-        description='Apply modifiers to mesh objects',
+        description='Apply modifiers (excluding Armatures) to mesh objects',
         default=False
     )
 
@@ -179,12 +249,6 @@ class ExportGLTF2_Base:
         max=120
     )
 
-    export_move_keyframes: BoolProperty(
-        name='Keyframes Start at 0',
-        description='Keyframes start at 0, instead of 1',
-        default=True
-    )
-
     export_force_sampling: BoolProperty(
         name='Always Sample Animations',
         description='Apply sampling to all animations',
@@ -194,7 +258,7 @@ class ExportGLTF2_Base:
     export_current_frame: BoolProperty(
         name='Use Current Frame',
         description='Export the scene in the current animation frame',
-        default=True
+        default=False
     )
 
     export_skins: BoolProperty(
@@ -240,13 +304,6 @@ class ExportGLTF2_Base:
         default=False
     )
 
-    export_texture_transform: BoolProperty(
-        name='Texture Transforms',
-        description='Export texture or UV position, rotation, and scale. '
-                    'Uses "KHR_texture_transform" glTF extension',
-        default=False
-    )
-
     export_displacement: BoolProperty(
         name='Displacement Textures (EXPERIMENTAL)',
         description='EXPERIMENTAL: Export displacement textures. '
@@ -254,7 +311,10 @@ class ExportGLTF2_Base:
         default=False
     )
 
-    will_save_settings: BoolProperty(default=False)
+    will_save_settings: BoolProperty(
+        name='Remember Export Settings',
+        description='Store glTF export settings in the Blender project',
+        default=False)
 
     # Custom scene property for saving settings
     scene_key = "glTF2ExportSettings"
@@ -285,6 +345,7 @@ class ExportGLTF2_Base:
         context.scene[self.scene_key] = export_props
 
     def execute(self, context):
+        import os
         import datetime
         from .blender.exp import gltf2_blender_export
 
@@ -305,26 +366,35 @@ class ExportGLTF2_Base:
         export_settings['gltf_filedirectory'] = os.path.dirname(export_settings['gltf_filepath']) + '/'
 
         export_settings['gltf_format'] = self.export_format
+        export_settings['gltf_image_format'] = self.export_image_format
         export_settings['gltf_copyright'] = self.export_copyright
         export_settings['gltf_texcoords'] = self.export_texcoords
         export_settings['gltf_normals'] = self.export_normals
         export_settings['gltf_tangents'] = self.export_tangents and self.export_normals
+
+        if self.is_draco_available:
+            export_settings['gltf_draco_mesh_compression'] = self.export_draco_mesh_compression_enable
+            export_settings['gltf_draco_mesh_compression_level'] = self.export_draco_mesh_compression_level
+            export_settings['gltf_draco_position_quantization'] = self.export_draco_position_quantization
+            export_settings['gltf_draco_normal_quantization'] = self.export_draco_normal_quantization
+            export_settings['gltf_draco_texcoord_quantization'] = self.export_draco_texcoord_quantization
+        else:
+            export_settings['gltf_draco_mesh_compression'] = False
+
         export_settings['gltf_materials'] = self.export_materials
         export_settings['gltf_colors'] = self.export_colors
         export_settings['gltf_cameras'] = self.export_cameras
         export_settings['gltf_selected'] = self.export_selected
-        export_settings['gltf_layers'] = True #self.export_layers
+        export_settings['gltf_layers'] = True  # self.export_layers
         export_settings['gltf_extras'] = self.export_extras
         export_settings['gltf_yup'] = self.export_yup
         export_settings['gltf_apply'] = self.export_apply
+        export_settings['gltf_current_frame'] = self.export_current_frame
         export_settings['gltf_animations'] = self.export_animations
         if self.export_animations:
-            export_settings['gltf_current_frame'] = False
             export_settings['gltf_frame_range'] = self.export_frame_range
-            export_settings['gltf_move_keyframes'] = self.export_move_keyframes
             export_settings['gltf_force_sampling'] = self.export_force_sampling
         else:
-            export_settings['gltf_current_frame'] = self.export_current_frame
             export_settings['gltf_frame_range'] = False
             export_settings['gltf_move_keyframes'] = False
             export_settings['gltf_force_sampling'] = False
@@ -347,11 +417,11 @@ class ExportGLTF2_Base:
             export_settings['gltf_morph_tangent'] = False
 
         export_settings['gltf_lights'] = self.export_lights
-        export_settings['gltf_texture_transform'] = self.export_texture_transform
         export_settings['gltf_displacement'] = self.export_displacement
 
         export_settings['gltf_binary'] = bytearray()
-        export_settings['gltf_binaryfilename'] = os.path.splitext(os.path.basename(self.filepath))[0] + '.bin'
+        export_settings['gltf_binaryfilename'] = os.path.splitext(os.path.basename(
+            bpy.path.ensure_ext(self.filepath,self.filename_ext)))[0] + '.bin'
 
         return gltf2_blender_export.save(context, export_settings)
 
@@ -375,6 +445,7 @@ class ExportGLTF2_Base:
         col.prop(self, 'export_apply')
         col.prop(self, 'export_yup')
         col.prop(self, 'export_extras')
+        col.prop(self, 'will_save_settings')
         col.prop(self, 'export_copyright')
 
     def draw_mesh_settings(self):
@@ -384,27 +455,34 @@ class ExportGLTF2_Base:
         if self.export_normals:
             col.prop(self, 'export_tangents')
         col.prop(self, 'export_colors')
+        col.prop(self, 'export_materials')
+        if self.export_materials:
+            col.prop(self, 'export_image_format')
+
+        # Add Draco compression option only if the DLL could be found.
+        if self.is_draco_available:
+            col.prop(self, 'export_draco_mesh_compression_enable')
+
+            # Display options when Draco compression is enabled.
+            if self.export_draco_mesh_compression_enable:
+                col.prop(self, 'export_draco_mesh_compression_level')
+                col.prop(self, 'export_draco_position_quantization')
+                col.prop(self, 'export_draco_normal_quantization')
+                col.prop(self, 'export_draco_texcoord_quantization')
 
     def draw_object_settings(self):
         col = self.layout.box().column()
         col.prop(self, 'export_cameras')
         col.prop(self, 'export_lights')
 
-    def draw_material_settings(self):
-        col = self.layout.box().column()
-        col.prop(self, 'export_materials')
-        col.prop(self, 'export_texture_transform')
-
     def draw_animation_settings(self):
         col = self.layout.box().column()
+        col.prop(self, 'export_current_frame')
         col.prop(self, 'export_animations')
         if self.export_animations:
             col.prop(self, 'export_frame_range')
             col.prop(self, 'export_frame_step')
-            col.prop(self, 'export_move_keyframes')
             col.prop(self, 'export_force_sampling')
-        else:
-            col.prop(self, 'export_current_frame')
         col.prop(self, 'export_skins')
         if self.export_skins:
             col.prop(self, 'export_bake_skins')
@@ -419,7 +497,7 @@ class ExportGLTF2_Base:
 class ExportGLTF2(bpy.types.Operator, ExportGLTF2_Base, ExportHelper):
     """Export scene as glTF 2.0 file"""
     bl_idname = 'export_scene.gltf'
-    bl_label = 'glTF 2.0 (.glb/.gltf)'
+    bl_label = 'Export glTF 2.0'
 
     filename_ext = ''
 
@@ -431,16 +509,15 @@ def menu_func_export(self, context):
 
 
 class ImportGLTF2(Operator, ImportHelper):
+    """Load a glTF 2.0 file"""
     bl_idname = 'import_scene.gltf'
-    bl_label = 'glTF 2.0 (.glb/.gltf)'
+    bl_label = 'Import glTF 2.0'
 
     filter_glob: StringProperty(default="*.glb;*.gltf", options={'HIDDEN'})
 
-    loglevel: EnumProperty(
-        items=Log.get_levels(),
-        name="Log Level",
-        description="Set level of log to display",
-        default=Log.default())
+    loglevel: IntProperty(
+        name='Log Level',
+        description="Log Level")
 
     import_pack_images: BoolProperty(
         name='Pack images',
@@ -459,7 +536,6 @@ class ImportGLTF2(Operator, ImportHelper):
     def draw(self, context):
         layout = self.layout
 
-        layout.prop(self, 'loglevel')
         layout.prop(self, 'import_pack_images')
         layout.prop(self, 'import_shading')
 
@@ -467,9 +543,11 @@ class ImportGLTF2(Operator, ImportHelper):
         return self.import_gltf2(context)
 
     def import_gltf2(self, context):
+        import time
         from .io.imp.gltf2_io_gltf import glTFImporter
         from .blender.imp.gltf2_blender_gltf import BlenderGlTF
 
+        self.set_debug_log()
         import_settings = self.as_keywords()
 
         self.gltf_importer = glTFImporter(self.filepath, import_settings)
@@ -482,15 +560,30 @@ class ImportGLTF2(Operator, ImportHelper):
             self.report({'ERROR'}, txt)
             return {'CANCELLED'}
         self.gltf_importer.log.critical("Data are loaded, start creating Blender stuff")
+        start_time = time.time()
         BlenderGlTF.create(self.gltf_importer)
-        self.gltf_importer.log.critical("glTF import is now finished")
+        elapsed_s = "{:.2f}s".format(time.time() - start_time)
+        self.gltf_importer.log.critical("glTF import finished in " + elapsed_s)
         self.gltf_importer.log.removeHandler(self.gltf_importer.log_handler)
 
         return {'FINISHED'}
 
+    def set_debug_log(self):
+        import logging
+        if bpy.app.debug_value == 0:
+            self.loglevel = logging.CRITICAL
+        elif bpy.app.debug_value == 1:
+            self.loglevel = logging.ERROR
+        elif bpy.app.debug_value == 2:
+            self.loglevel = logging.WARNING
+        elif bpy.app.debug_value == 3:
+            self.loglevel = logging.INFO
+        else:
+            self.loglevel = logging.NOTSET
+
 
 def menu_func_import(self, context):
-    self.layout.operator(ImportGLTF2.bl_idname, text=ImportGLTF2.bl_label)
+    self.layout.operator(ImportGLTF2.bl_idname, text='glTF 2.0 (.glb/.gltf)')
 
 
 classes = (

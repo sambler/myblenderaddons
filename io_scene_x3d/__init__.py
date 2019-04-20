@@ -21,8 +21,8 @@
 bl_info = {
     "name": "Web3D X3D/VRML2 format",
     "author": "Campbell Barton, Bart, Bastien Montagne, Seva Alekseyev",
-    "version": (1, 2, 0),
-    "blender": (2, 76, 0),
+    "version": (2, 2, 1),
+    "blender": (2, 80, 0),
     "location": "File > Import-Export",
     "description": "Import-Export X3D, Import VRML2",
     "warning": "",
@@ -62,7 +62,7 @@ class ImportX3D(bpy.types.Operator, ImportHelper):
     bl_options = {'PRESET', 'UNDO'}
 
     filename_ext = ".x3d"
-    filter_glob = StringProperty(default="*.x3d;*.wrl", options={'HIDDEN'})
+    filter_glob: StringProperty(default="*.x3d;*.wrl", options={'HIDDEN'})
 
     def execute(self, context):
         from . import import_x3d
@@ -87,51 +87,51 @@ class ExportX3D(bpy.types.Operator, ExportHelper):
     bl_options = {'PRESET'}
 
     filename_ext = ".x3d"
-    filter_glob = StringProperty(default="*.x3d", options={'HIDDEN'})
+    filter_glob: StringProperty(default="*.x3d", options={'HIDDEN'})
 
-    use_selection = BoolProperty(
+    use_selection: BoolProperty(
             name="Selection Only",
             description="Export selected objects only",
             default=False,
             )
-    use_mesh_modifiers = BoolProperty(
+    use_mesh_modifiers: BoolProperty(
             name="Apply Modifiers",
             description="Use transformed mesh data from each object",
             default=True,
             )
-    use_triangulate = BoolProperty(
+    use_triangulate: BoolProperty(
             name="Triangulate",
             description="Write quads into 'IndexedTriangleSet'",
             default=False,
             )
-    use_normals = BoolProperty(
+    use_normals: BoolProperty(
             name="Normals",
             description="Write normals with geometry",
             default=False,
             )
-    use_compress = BoolProperty(
+    use_compress: BoolProperty(
             name="Compress",
             description="Compress the exported file",
             default=False,
             )
-    use_hierarchy = BoolProperty(
+    use_hierarchy: BoolProperty(
             name="Hierarchy",
             description="Export parent child relationships",
             default=True,
             )
-    name_decorations = BoolProperty(
+    name_decorations: BoolProperty(
             name="Name decorations",
             description=("Add prefixes to the names of exported nodes to "
                          "indicate their type"),
             default=True,
             )
-    use_h3d = BoolProperty(
+    use_h3d: BoolProperty(
             name="H3D Extensions",
             description="Export shaders for H3D",
             default=False,
             )
 
-    global_scale = FloatProperty(
+    global_scale: FloatProperty(
             name="Scale",
             min=0.01, max=1000.0,
             default=1.0,
@@ -152,7 +152,7 @@ class ExportX3D(bpy.types.Operator, ExportHelper):
                                             ))
         global_matrix = axis_conversion(to_forward=self.axis_forward,
                                         to_up=self.axis_up,
-                                        ).to_4x4() * Matrix.Scale(self.global_scale, 4)
+                                        ).to_4x4() @ Matrix.Scale(self.global_scale, 4)
         keywords["global_matrix"] = global_matrix
 
         return export_x3d.save(context, **keywords)
@@ -168,21 +168,27 @@ def menu_func_export(self, context):
                          text="X3D Extensible 3D (.x3d)")
 
 
+classes = (
+    ExportX3D,
+    ImportX3D,
+)
+
+
 def register():
-    bpy.utils.register_module(__name__)
+    for cls in classes:
+        bpy.utils.register_class(cls)
 
     bpy.types.TOPBAR_MT_file_import.append(menu_func_import)
     bpy.types.TOPBAR_MT_file_export.append(menu_func_export)
 
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
-
     bpy.types.TOPBAR_MT_file_import.remove(menu_func_import)
     bpy.types.TOPBAR_MT_file_export.remove(menu_func_export)
 
-# NOTES
-# - blender version is hardcoded
+    for cls in classes:
+        bpy.utils.unregister_class(cls)
+
 
 if __name__ == "__main__":
     register()
