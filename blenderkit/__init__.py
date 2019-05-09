@@ -17,7 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 bl_info = {
-    "name": "Blender Kit",
+    "name": "BlenderKit Asset Library",
     "author": "Vilem Duha",
     "version": (1, 0, 22),
     "blender": (2, 80, 0),
@@ -1280,6 +1280,13 @@ class BlenderKitAddonPreferences(AddonPreferences):
                                    min=0,
                                    max=20)
 
+    asset_counter:  IntProperty(name="Usage Counter",
+                                   description="Counts usages so it asks for registration only after reaching a limit",
+                                   default=0,
+                                   min=0,
+                                   max=20000)
+
+
     # allow_proximity : BoolProperty(
     #     name="allow proximity data reports",
     #     description="This sends anonymized proximity data \n \
@@ -1296,7 +1303,7 @@ class BlenderKitAddonPreferences(AddonPreferences):
                                  icon='QUESTION')
             op.url = paths.BLENDERKIT_SIGNUP_URL
         layout.prop(self, "api_key", text='Your API Key')
-        # layout.label('After you paste API Key, categories are downloaded, so blender will freeze for a few seconds.')
+        # layout.label(text='After you paste API Key, categories are downloaded, so blender will freeze for a few seconds.')
         layout.prop(self, "global_dir")
         layout.prop(self, "project_subdir")
         # layout.prop(self, "temp_dir")
