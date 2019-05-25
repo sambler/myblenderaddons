@@ -1,4 +1,4 @@
-# Copyright 2018 The glTF-Blender-IO authors.
+# Copyright 2018-2019 The glTF-Blender-IO authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -104,9 +104,6 @@ def convert_swizzle_scale(scale, export_settings):
 
 def decompose_transition(matrix, export_settings):
     translation, rotation, scale = matrix.decompose()
-
-    # Put w at the end.
-    rotation = Quaternion((rotation[1], rotation[2], rotation[3], rotation[0]))
 
     return translation, rotation, scale
 
@@ -394,6 +391,10 @@ def extract_primitives(glTF, blender_mesh, blender_vertex_groups, modifiers, exp
     Finally, triangles are also split up/duplicated, if face normals are used instead of vertex normals.
     """
     print_console('INFO', 'Extracting primitive: ' + blender_mesh.name)
+
+    if blender_mesh.has_custom_normals:
+        # Custom normals are all (0, 0, 0) until calling calc_normals_split() or calc_tangents().
+        blender_mesh.calc_normals_split()
 
     use_tangents = False
     if blender_mesh.uv_layers.active and len(blender_mesh.uv_layers) > 0:

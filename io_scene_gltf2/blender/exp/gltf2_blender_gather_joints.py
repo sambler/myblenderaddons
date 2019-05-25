@@ -1,4 +1,4 @@
-# Copyright 2018 The glTF-Blender-IO authors.
+# Copyright 2018-2019 The glTF-Blender-IO authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,8 +52,8 @@ def gather_joint(blender_bone, export_settings):
     translation, rotation, scale = (None, None, None)
     if trans[0] != 0.0 or trans[1] != 0.0 or trans[2] != 0.0:
         translation = [trans[0], trans[1], trans[2]]
-    if rot[0] != 0.0 or rot[1] != 0.0 or rot[2] != 0.0 or rot[3] != 1.0:
-        rotation = [rot[0], rot[1], rot[2], rot[3]]
+    if rot[0] != 1.0 or rot[1] != 0.0 or rot[2] != 0.0 or rot[3] != 0.0:
+        rotation = [rot[1], rot[2], rot[3], rot[0]]
     if sca[0] != 1.0 or sca[1] != 1.0 or sca[2] != 1.0:
         scale = [sca[0], sca[1], sca[2]]
 
