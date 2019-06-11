@@ -16,23 +16,25 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
+if "bpy" in locals():
+    from importlib import reload
+
+    paths = reload(paths)
+    append_link = reload(append_link)
+    utils = reload(utils)
+    ui = reload(ui)
+    colors = reload(colors)
+    tasks_queue = reload(tasks_queue)
+else:
+    from blenderkit import paths, append_link, utils, ui, colors, tasks_queue
+
 import threading
 import time
 import requests
-import shutil, sys, os, math
-import random
+import shutil, sys, os
 import uuid
 import copy
 
-if "bpy" in locals():
-    import imp
-
-    imp.reload(paths)
-    imp.reload(append_link)
-    imp.reload(utils)
-
-else:
-    from blenderkit import paths, append_link, utils
 import bpy
 from bpy.props import (
     IntProperty,
@@ -492,7 +494,7 @@ def timer_update():  # TODO might get moved to handle all blenderkit stuff, not 
                     done = try_finished_append(asset_data, **tcom.passargs)
                     if not done:
                         at = asset_data['asset_type']
-                        tcom.passargs['retry_counter'] = tcom.passargs.get('retry_counter',0) +1
+                        tcom.passargs['retry_counter'] = tcom.passargs.get('retry_counter', 0) + 1
                         if at in ('model', 'material'):
                             download(asset_data, **tcom.passargs)
                         elif asset_data['asset_type'] == 'material':
@@ -595,12 +597,14 @@ def download(asset_data, **kwargs):
     tcom = ThreadCom()
     tcom.passargs = kwargs
 
-    if kwargs.get('retry_counter',0) > 3:
+    if kwargs.get('retry_counter', 0) > 3:
         sprops = utils.get_search_props()
-        sprops.report = f"Maximum retries exceeded for {asset_data['name']}"
+        report = f"Maximum retries exceeded for {asset_data['name']}"
+        sprops.report = report
+        ui.add_report(report, 5, colors.RED)
+
         utils.p(sprops.report)
         return
-
 
     # incoming data can be either directly dict from python, or blender id property
     # (recovering failed downloads on reload)
@@ -731,6 +735,7 @@ def get_download_url(asset_data, scene_id, api_key, tcom=None):
         tcom.report = 'Connection Error'
         tcom.error = True
         return 'Connection Error'
+
     if r.status_code < 400:
         data = r.json()
         url = data['filePath']
@@ -739,9 +744,12 @@ def get_download_url(asset_data, scene_id, api_key, tcom=None):
         return True
 
     if r.status_code == 403:
-        tcom.report = 'Available only in higher plans.'
+        r = 'You need Standard plan to get this item.'
+        tcom.report = r
+        r1 = 'All materials and brushes are aviable for free. Only users registered to Standart plan can use all models.'
+        tasks_queue.add_task((ui.add_report, (r1, 5, colors.RED)))
         tcom.error = True
-        return 'Available only in higher plans.'
+
     if r.status_code == 401:
         tcom.report = 'Invalid API key'
         tcom.error = True
@@ -749,6 +757,7 @@ def get_download_url(asset_data, scene_id, api_key, tcom=None):
     elif r.status_code >= 500:
         tcom.report = 'Server error'
         tcom.error = True
+    return False
 
 
 def start_download(asset_data, **kwargs):
