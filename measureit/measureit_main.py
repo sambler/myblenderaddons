@@ -503,9 +503,9 @@ def add_item(box, idx, segment):
     scene = bpy.context.scene
     row = box.row(align=True)
     if segment.glview is True:
-        icon = "VISIBLE_IPO_ON"
+        icon = "HIDE_OFF"
     else:
-        icon = "VISIBLE_IPO_OFF"
+        icon = "HIDE_ON"
 
     row.prop(segment, 'glview', text="", toggle=True, icon=icon)
     row.prop(segment, 'gladvance', text="", toggle=True, icon="PREFERENCES")
@@ -1948,7 +1948,7 @@ def draw_main(context):
     if scene.measureit_gl_ghost is False:
         objlist = context.selected_objects
     else:
-        objlist = context.scene.objects
+        objlist = context.view_layer.objects
 
     # Enable GL drawing
     bgl.glEnable(bgl.GL_BLEND)

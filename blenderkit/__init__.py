@@ -18,8 +18,8 @@
 
 bl_info = {
     "name": "BlenderKit Asset Library",
-    "author": "Vilem Duha",
-    "version": (1, 0, 24),
+    "author": "Vilem Duha, Petr Dlouhy",
+    "version": (1, 0, 26),
     "blender": (2, 80, 0),
     "location": "View3D > Properties > BlenderKit",
     "description": "Online BlenderKit library (materials, models, brushes and more)",
@@ -243,7 +243,7 @@ class BlenderKitUIProps(PropertyGroup):
         name="Active Asset Type",
         items=(
             ('MODEL', 'Model', 'Browse models', 'OBJECT_DATAMODE', 0),
-            ('SCENE', 'SCENE', 'Browse scenes', 'SCENE_DATA', 1),
+            # ('SCENE', 'SCENE', 'Browse scenes', 'SCENE_DATA', 1),
             ('MATERIAL', 'Material', 'Browse models', 'MATERIAL', 2),
             # ('TEXTURE', 'Texture', 'Browse textures', 'TEXTURE', 3),
             ('BRUSH', 'Brush', 'Browse brushes', 'BRUSH_DATA', 3)
@@ -375,6 +375,8 @@ def name_update(self, context):
             nname = nname.lower()
         nname = nname[0].upper() + nname[1:]
         props.name = nname
+        asset = utils.get_active_asset()
+        asset.name = nname
 
 
 def update_tags(self, context):
@@ -400,6 +402,7 @@ def update_tags(self, context):
     ns = ns[:-1]
     if props.tags != ns:
         props.tags = ns
+
 
 
 class BlenderKitCommonUploadProps(object):
@@ -1243,7 +1246,7 @@ class BlenderKitAddonPreferences(AddonPreferences):
 
     default_global_dict = paths.default_global_dict()
 
-    enable_oauth = False
+    enable_oauth = True
 
     api_key: StringProperty(
         name="BlenderKit API Key",
@@ -1355,8 +1358,8 @@ class BlenderKitAddonPreferences(AddonPreferences):
                 layout.operator("wm.blenderkit_logout", text="Logout",
                                 icon='URL')
 
-        if not self.enable_oauth:
-            layout.prop(self, "api_key", text='Your API Key')
+        #if not self.enable_oauth:
+        layout.prop(self, "api_key", text='Your API Key')
         # layout.label(text='After you paste API Key, categories are downloaded, so blender will freeze for a few seconds.')
         layout.prop(self, "global_dir")
         layout.prop(self, "project_subdir")

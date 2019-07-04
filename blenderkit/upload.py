@@ -28,8 +28,12 @@ if "bpy" in locals():
     version_checker = reload(version_checker)
     search = reload(search)
     ui_panels = reload(ui_panels)
+    ui = reload(ui)
+    overrides = reload(overrides)
+    colors = reload(colors)
 else:
-    from blenderkit import asset_inspector, paths, utils, bg_blender, autothumb, version_checker, search, ui_panels
+    from blenderkit import asset_inspector, paths, utils, bg_blender, autothumb, version_checker, search, ui_panels, ui, \
+        overrides, colors
 
 import tempfile, os, subprocess, json, re
 
@@ -524,7 +528,17 @@ def check_storage_quota(props):
     return False
 
 
+def auto_fix(asset_type=''):
+    # this applies various procedures to ensure coherency in the database.
+    asset = utils.get_active_asset()
+    props = utils.get_upload_props()
+    if asset_type == 'MATERIAL':
+        overrides.ensure_eevee_transparency(asset)
+        asset.name = props.name
+
+
 def start_upload(self, context, asset_type, as_new, metadata_only):
+    '''start upload process, by processing data'''
     props = utils.get_upload_props()
     storage_quota_ok = check_storage_quota(props)
     if not storage_quota_ok:
@@ -533,6 +547,9 @@ def start_upload(self, context, asset_type, as_new, metadata_only):
 
     location = get_upload_location(props)
     props.upload_state = 'preparing upload'
+
+    auto_fix(asset_type=asset_type)
+
     # do this for fixing long tags in some upload cases
     props.tags = props.tags[:]
 
@@ -582,11 +599,11 @@ def start_upload(self, context, asset_type, as_new, metadata_only):
     datafile = os.path.join(tempdir, BLENDERKIT_EXPORT_DATA_FILE)
 
     # check if thumbnail exists:
-
-    if not os.path.exists(export_data["thumbnail_path"]):
-        props.upload_state = 'Thumbnail not found'
-        props.uploading = False
-        return {'CANCELLED'}
+    if not metadata_only:
+        if not os.path.exists(export_data["thumbnail_path"]):
+            props.upload_state = 'Thumbnail not found'
+            props.uploading = False
+            return {'CANCELLED'}
 
     # first upload metadata to server, so it can be saved inside the current file
     url = paths.get_api_url() + 'assets/'
@@ -630,15 +647,18 @@ def start_upload(self, context, asset_type, as_new, metadata_only):
         return {'FINISHED'}
     try:
         rj = r.json()
+        utils.pprint(rj)
+        # if r.status_code not in (200, 201):
+        #     if r.status_code == 401:
+        #         ui.add_report(r.detail, 5, colors.RED)
+        #     return {'CANCELLED'}
         if props.asset_base_id == '':
             props.asset_base_id = rj['assetBaseId']
             props.id = rj['id']
-
         upload_data['assetBaseId'] = props.asset_base_id
         upload_data['id'] = props.id
 
         bpy.ops.wm.save_mainfile()
-        # fa
         props.uploading = True
         # save a copy of actual scene but don't interfere with the users models
         bpy.ops.wm.save_as_mainfile(filepath=source_filepath, compress=False, copy=True)
@@ -661,6 +681,7 @@ def start_upload(self, context, asset_type, as_new, metadata_only):
     except Exception as e:
         props.upload_state = str(e)
         props.uploading = False
+        print(e)
         return {'CANCELLED'}
 
     return {'FINISHED'}
@@ -735,7 +756,7 @@ class ModelUploadOperator(Operator):
             layout.label(text="For updates of thumbnail or model use reupload.")
 
         if props.is_private == 'PUBLIC':
-            ui_panels.label_multiline(layout, text='Since this version (1.0.24), '
+            ui_panels.label_multiline(layout, text='Since version 1.0.24: '
                                                    'PUBLIC ASSETS ARE VALIDATED AUTOMATICALLY '
                                                    ' after upload. '
                                                    'Click Ok to proceed.')

@@ -29,6 +29,7 @@ BLENDERKIT_PLANS = "https://www.blenderkit.com/plans/pricing/"
 BLENDERKIT_MANUAL = "https://youtu.be/1hVgcQhIAo8"
 BLENDERKIT_MODEL_UPLOAD_INSTRUCTIONS_URL = "https://www.blenderkit.com/docs/upload/"
 BLENDERKIT_MATERIAL_UPLOAD_INSTRUCTIONS_URL = "https://www.blenderkit.com/docs/uploading-material/"
+BLENDERKIT_BRUSH_UPLOAD_INSTRUCTIONS_URL = "https://www.blenderkit.com/docs/uploading-brush/"
 BLENDERKIT_LOGIN_URL = "https://www.blenderkit.com/accounts/login"
 BLENDERKIT_OAUTH_LANDING_URL = "/oauth-landing/"
 BLENDERKIT_SIGNUP_URL = "https://www.blenderkit.com/accounts/register"
@@ -49,6 +50,13 @@ def get_bkit_url():
         url = BLENDERKIT_MAIN
     return url
 
+def find_in_local(text=''):
+    fs = []
+    for p, d, f in os.walk('.'):
+        for file in f:
+            if text in file:
+                fs.append(file)
+    return fs
 
 def get_api_url():
     return get_bkit_url() + BLENDERKIT_API
