@@ -14,6 +14,7 @@
 
 import bpy
 import sys
+import site
 from ctypes import *
 from pathlib import Path
 
