@@ -35,7 +35,7 @@ def dll_path() -> Path:
         'darwin': blender_root.parent/'Resources'/python_lib/'python3.7'/'site-packages'/'lib{}.dylib'.format(lib_name)
     }
 
-    path = paths.get(sys.platform)
+    path = Path('{}/lib{}.so'.format(site.getsitepackages(), lib_name))
     return path if path is not None else ''
 
 
