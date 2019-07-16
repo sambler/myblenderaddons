@@ -65,7 +65,8 @@ verification_icons = {
     'uploaded': 'vs_uploaded.png',
     'uploading': None,
     'on_hold': 'vs_on_hold.png',
-    'validated': None
+    'validated': None,
+    'rejected': None
 
 }
 
@@ -369,6 +370,8 @@ def draw_tooltip(x, y, text='', author='', img=None, gravatar=None):
 
     texth = line_height * nlines + nameline_height
 
+    if max(img.size[0], img.size[1]) == 0:
+        return;
     isizex = int(512 * scale * img.size[0] / max(img.size[0], img.size[1]))
     isizey = int(512 * scale * img.size[1] / max(img.size[0], img.size[1]))
 
