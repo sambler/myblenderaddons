@@ -62,7 +62,21 @@ def filenames_group_by_ext(line, ext):
     """
     Splits material libraries supporting spaces, so:
     b'foo bar.mtl baz spam.MTL' -> (b'foo bar.mtl', b'baz spam.MTL')
+    Also handle " chars (some softwares use those to protect filenames with spaces, see T67266... sic).
     """
+    # Note that we assume that if there are some " in that line,
+    # then all filenames are properly enclosed within those...
+    start = line.find(b'"') + 1
+    if start != 0:
+        while start != 0:
+            end = line.find(b'"', start)
+            if end != -1:
+                yield line[start:end]
+                start = line.find(b'"', end + 1) + 1
+            else:
+                break
+        return
+
     line_lower = line.lower()
     i_prev = 0
     while i_prev != -1 and i_prev < len(line):
@@ -79,8 +93,16 @@ def obj_image_load(context_imagepath_map, line, DIR, recursive, relpath):
     But we try all space-separated items from current line when file is not found with last one
     (users keep generating/using image files with spaces in a format that does not support them, sigh...)
     Also tries to replace '_' with ' ' for Max's exporter replaces spaces with underscores.
+    Also handle " chars (some softwares use those to protect filenames with spaces, see T67266... sic).
     """
     filepath_parts = line.split(b' ')
+
+    start = line.find(b'"') + 1
+    if start != 0:
+        end = line.find(b'"', start)
+        if end != 0:
+            filepath_parts = (line[start:end],)
+
     image = None
     for i in range(-1, -len(filepath_parts), -1):
         imagepath = os.fsdecode(b" ".join(filepath_parts[i:]))
@@ -335,7 +357,8 @@ def create_materials(filepath, relpath,
                     elif line_id == b'ns':
                         # XXX Totally empirical conversion, trying to adapt it
                         #     (from 0.0 - 900.0 OBJ specular exponent range to 1.0 - 0.0 Principled BSDF range)...
-                        context_mat_wrap.roughness = 1.0 - (sqrt(float_func(line_split[1])) / 30)
+                        val = max(0.0, min(900.0, float_func(line_split[1])))
+                        context_mat_wrap.roughness = 1.0 - (sqrt(val) / 30)
                         context_material_vars.add("roughness")
                     elif line_id == b'ni':  # Refraction index (between 0.001 and 10).
                         context_mat_wrap.ior = float_func(line_split[1])
@@ -893,6 +916,8 @@ def load(context,
     """
     def unique_name(existing_names, name_orig):
         i = 0
+        if name_orig is None:
+            name_orig = b"ObjObject"
         name = name_orig
         while name in existing_names:
             name = b"%s.%03d" % (name_orig, i)
