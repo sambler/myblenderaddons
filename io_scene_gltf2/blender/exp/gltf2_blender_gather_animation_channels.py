@@ -31,23 +31,26 @@ def gather_animation_channels(blender_action: bpy.types.Action,
                               ) -> typing.List[gltf2_io.AnimationChannel]:
     channels = []
 
+
+    # First calculate range of animation for baking
+    # This is need if user set 'Force sampling' and in case we need to bake
+    bake_range_start = None
+    bake_range_end = None
+    groups = __get_channel_groups(blender_action, blender_object, export_settings)
+    for chans in groups:
+        ranges = [channel.range() for channel in chans]
+        if bake_range_start is None:
+            bake_range_start = min([channel.range()[0] for channel in chans])
+        else:
+            bake_range_start = min(bake_range_start, min([channel.range()[0] for channel in chans]))
+        if bake_range_end is None:
+            bake_range_end = max([channel.range()[1] for channel in chans])
+        else:
+            bake_range_end = max(bake_range_end, max([channel.range()[1] for channel in chans]))
+
+
     if blender_object.type == "ARMATURE" and export_settings['gltf_force_sampling'] is True:
         # We have to store sampled animation data for every deformation bones
-
-        # First calculate range of animation for baking
-        bake_range_start = None
-        bake_range_end = None
-        groups = __get_channel_groups(blender_action, blender_object, export_settings)
-        for chans in groups:
-            ranges = [channel.range() for channel in chans]
-            if bake_range_start is None:
-                bake_range_start = min([channel.range()[0] for channel in chans])
-            else:
-                bake_range_start = min(bake_range_start, min([channel.range()[0] for channel in chans]))
-            if bake_range_end is None:
-                bake_range_end = max([channel.range()[1] for channel in chans])
-            else:
-                bake_range_end = max(bake_range_end, max([channel.range()[1] for channel in chans]))
 
         # Then bake all bones
         for bone in blender_object.data.bones:
@@ -65,7 +68,7 @@ def gather_animation_channels(blender_action: bpy.types.Action,
     else:
         for channel_group in __get_channel_groups(blender_action, blender_object, export_settings):
             channel_group_sorted = __get_channel_group_sorted(channel_group, blender_object)
-            channel = __gather_animation_channel(channel_group_sorted, blender_object, export_settings, None, None, None, None, blender_action.name)
+            channel = __gather_animation_channel(channel_group_sorted, blender_object, export_settings, None, None, bake_range_start, bake_range_end, blender_action.name)
             if channel is not None:
                 channels.append(channel)
 
@@ -187,18 +190,24 @@ def __get_channel_groups(blender_action: bpy.types.Action, blender_object: bpy.t
         else:
             try:
                 target = gltf2_blender_get.get_object_from_datapath(blender_object, object_path)
-                if blender_object.type == "MESH":
-                    shape_key = blender_object.data.shape_keys.path_resolve(object_path)
-                    if shape_key.mute is True:
-                        continue
-            except ValueError as e:
-                # if the object is a mesh and the action target path can not be resolved, we know that this is a morph
-                # animation.
-                if blender_object.type == "MESH":
+                if blender_object.type == "MESH" and object_path.startswith("key_blocks"):
                     shape_key = blender_object.data.shape_keys.path_resolve(object_path)
                     if shape_key.mute is True:
                         continue
                     target = blender_object.data.shape_keys
+            except ValueError as e:
+                # if the object is a mesh and the action target path can not be resolved, we know that this is a morph
+                # animation.
+                if blender_object.type == "MESH":
+                    try:
+                        shape_key = blender_object.data.shape_keys.path_resolve(object_path)
+                        if shape_key.mute is True:
+                            continue
+                        target = blender_object.data.shape_keys
+                    except:
+                        # Something is wrong, for example a bone animation is linked to an object mesh...
+                        gltf2_io_debug.print_console("WARNING", "Animation target {} not found".format(object_path))
+                        continue
                 else:
                     gltf2_io_debug.print_console("WARNING", "Animation target {} not found".format(object_path))
                     continue

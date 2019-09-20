@@ -2375,7 +2375,7 @@ def importMesh_LineSet(geom, ancestry):
     return bpycurve
 
 
-def importMesh_IndexedLineSet(geom, ancestry, _):
+def importMesh_IndexedLineSet(geom, ancestry):
     # VRML not x3d
     # coord = geom.getChildByName('coord') # 'Coordinate'
     coord = geom.getChildBySpec('Coordinate')  # works for x3d and vrml
@@ -2419,7 +2419,7 @@ def importMesh_IndexedLineSet(geom, ancestry, _):
     return bpycurve
 
 
-def importMesh_PointSet(geom, ancestry, _):
+def importMesh_PointSet(geom, ancestry):
     # VRML not x3d
     coord = geom.getChildBySpec('Coordinate')  # works for x3d and vrml
     if coord:
@@ -2717,7 +2717,7 @@ def appearance_CreateMaterial(vrmlname, mat, ancestry, is_vcol):
     bpymat.alpha = 1.0 - mat.getFieldAsFloat('transparency', 0.0, ancestry)
     if bpymat.alpha < 0.999:
         bpymat.use_transparency = True
-    if is_vcol:
+    if False and is_vcol:
         bpymat.use_vertex_color_paint = True
     return bpymat
 
@@ -2869,10 +2869,10 @@ def appearance_Create(vrmlname, material, tex_node, ancestry, node, is_vcol):
     if tex_node:  # Texture caching inside there
         bpyima = appearance_LoadTexture(tex_node, ancestry, node)
 
-    if 0 & is_vcol:
+    if False and is_vcol:
         bpymat.use_vertex_color_paint = True
 
-    if 0 and bpyima:
+    if False and bpyima:
         tex_has_alpha = bpyima.alpha_mode not in {'NONE', 'CHANNEL_PACKED'}
 
         texture = bpy.data.textures.new(bpyima.name, 'IMAGE')
