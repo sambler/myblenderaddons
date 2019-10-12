@@ -139,8 +139,9 @@ def delete_key(data, key):
 class VIEW3D_PT_animall(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = "Animation"
+    bl_category = "Animate"
     bl_label = 'AnimAll'
+    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(self, context):
@@ -551,7 +552,7 @@ class AnimallAddonPreferences(AddonPreferences):
     category: StringProperty(
         name="Tab Category",
         description="Choose a name for the category of the panel",
-        default="Animation",
+        default="Animate",
         update=update_panel
     )
 
